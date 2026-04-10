@@ -132,6 +132,13 @@ export default function CandidateCard() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(null)
 
+  // Add-to-role picker
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [openRoles, setOpenRoles] = useState(null)   // null = not yet fetched
+  const [rolesLoading, setRolesLoading] = useState(false)
+  const [addingRoleId, setAddingRoleId] = useState(null)
+  const [addError, setAddError] = useState(null)
+
   useEffect(() => {
     if (!id) return
 
@@ -220,6 +227,49 @@ export default function CandidateCard() {
     }
   }
 
+  async function handleOpenPicker() {
+    setAddError(null)
+    if (!pickerOpen && openRoles === null) {
+      setRolesLoading(true)
+      const { data } = await supabase
+        .from('roles')
+        .select('id, title, process_steps, clients(name)')
+        .eq('recruiter_id', recruiter.id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+      setOpenRoles(data ?? [])
+      setRolesLoading(false)
+    }
+    setPickerOpen(prev => !prev)
+  }
+
+  async function handleAddToRole(role) {
+    if (addingRoleId) return
+    setAddError(null)
+    setAddingRoleId(role.id)
+
+    const firstStage = role.process_steps?.[0] ?? 'Sourced'
+    const { data: entry, error } = await supabase
+      .from('pipeline')
+      .insert({
+        recruiter_id:  recruiter.id,
+        candidate_id:  id,
+        role_id:       role.id,
+        current_stage: firstStage,
+        status:        'active',
+      })
+      .select(`*, roles(title, clients(name))`)
+      .single()
+
+    if (error) {
+      setAddError(error.message)
+    } else {
+      setPipelines(prev => [...prev, entry])
+      setPickerOpen(false)
+    }
+    setAddingRoleId(null)
+  }
+
   // ── Render states ────────────────────────────────────────
 
   if (loading) {
@@ -302,7 +352,48 @@ export default function CandidateCard() {
 
           {/* Right: Pipeline status */}
           <section className="candidate-section">
-            <h2 className="section-heading">Pipeline</h2>
+            <div className="section-heading-row">
+              <h2 className="section-heading">Pipeline</h2>
+              <button className="btn-ghost btn-sm" onClick={handleOpenPicker}>
+                {pickerOpen ? 'Cancel' : '+ Add to Role'}
+              </button>
+            </div>
+
+            {/* Role picker */}
+            {pickerOpen && (
+              <div className="role-picker">
+                {rolesLoading ? (
+                  <p className="muted" style={{ padding: '10px 0' }}>Loading roles…</p>
+                ) : openRoles?.length === 0 ? (
+                  <p className="muted" style={{ padding: '10px 0' }}>No open roles.</p>
+                ) : (
+                  <ul className="role-picker-list">
+                    {openRoles.map(role => {
+                      const alreadyAdded = pipelines.some(p => p.role_id === role.id)
+                      const isAdding = addingRoleId === role.id
+                      return (
+                        <li key={role.id}>
+                          <button
+                            className={`role-picker-option${alreadyAdded ? ' role-picker-option--added' : ''}`}
+                            onClick={() => !alreadyAdded && handleAddToRole(role)}
+                            disabled={alreadyAdded || !!addingRoleId}
+                          >
+                            <span className="role-picker-title">{role.title}</span>
+                            {role.clients?.name && (
+                              <span className="role-picker-client">{role.clients.name}</span>
+                            )}
+                            {alreadyAdded && <span className="role-picker-check">✓</span>}
+                            {isAdding && <span className="role-picker-check">…</span>}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                {addError && <p className="error" style={{ marginTop: 8 }}>{addError}</p>}
+              </div>
+            )}
+
             {pipelines.length === 0 ? (
               <p className="muted">Not in any pipeline yet.</p>
             ) : (

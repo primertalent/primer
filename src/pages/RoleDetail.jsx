@@ -161,9 +161,9 @@ export default function RoleDetail() {
             </p>
           </div>
         </div>
-        <button className="btn-ghost" disabled title="Coming soon">
+        <Link to={`/roles/${id}/edit`} className="btn-ghost">
           Edit
-        </button>
+        </Link>
       </div>
 
       {/* Pipeline board */}

@@ -18,13 +18,17 @@ function getFormattedDate() {
   })
 }
 
-function StatCard({ label, value, loading }) {
-  return (
-    <div className="stat-card">
+function StatCard({ label, value, loading, to }) {
+  const content = (
+    <>
       <span className="stat-value">{loading ? '—' : value}</span>
       <span className="stat-label">{label}</span>
-    </div>
+    </>
   )
+  if (to) {
+    return <Link to={to} className="stat-card stat-card--link">{content}</Link>
+  }
+  return <div className="stat-card">{content}</div>
 }
 
 export default function Dashboard() {
@@ -52,9 +56,9 @@ export default function Dashboard() {
       </section>
 
       <section className="stats-row">
-        <StatCard label="Active Roles" value={stats?.activeRoles} loading={statsLoading} />
-        <StatCard label="Candidates in Pipeline" value={stats?.candidatesInPipeline} loading={statsLoading} />
-        <StatCard label="Messages to Review" value={stats?.messagesToReview} loading={statsLoading} />
+        <StatCard label="Active Roles" value={stats?.activeRoles} loading={statsLoading} to="/roles" />
+        <StatCard label="Candidates in Pipeline" value={stats?.candidatesInPipeline} loading={statsLoading} to="/candidates" />
+        <StatCard label="Messages to Review" value={stats?.messagesToReview} loading={statsLoading} to="/queue" />
       </section>
 
       <section className="dashboard-candidates">

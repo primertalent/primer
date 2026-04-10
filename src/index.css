@@ -1746,3 +1746,94 @@ select.field-input {
   color: var(--color-text);
   margin-top: 4px;
 }
+
+/* ── Stat card links ────────────────────────────────── */
+
+.stat-card--link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.stat-card--link:hover {
+  border-color: #a1a1aa;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* ── Section heading row ────────────────────────────── */
+
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-heading-row .section-heading {
+  margin-bottom: 0;
+}
+
+/* ── Role picker ────────────────────────────────────── */
+
+.role-picker {
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.role-picker-list {
+  list-style: none;
+}
+
+.role-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.1s;
+}
+
+.role-picker-list li:last-child .role-picker-option {
+  border-bottom: none;
+}
+
+.role-picker-option:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.role-picker-option:disabled {
+  cursor: default;
+}
+
+.role-picker-option--added {
+  opacity: 0.6;
+}
+
+.role-picker-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.role-picker-client {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.role-picker-check {
+  font-size: 13px;
+  color: #15803d;
+  font-weight: 600;
+  flex-shrink: 0;
+}

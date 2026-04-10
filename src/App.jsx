@@ -11,6 +11,7 @@ import CreateRole from './pages/CreateRole'
 import Candidates from './pages/Candidates'
 import CreateCandidate from './pages/CreateCandidate'
 import RoleDetail from './pages/RoleDetail'
+import EditRole from './pages/EditRole'
 
 export default function App() {
   return (
@@ -73,6 +74,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <RoleDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles/:id/edit"
+            element={
+              <ProtectedRoute>
+                <EditRole />
               </ProtectedRoute>
             }
           />
