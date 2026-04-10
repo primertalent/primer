@@ -1240,3 +1240,229 @@ select.field-input {
   height: 32px;
   font-size: 13px;
 }
+
+/* ── Dashboard candidates section ───────────────────── */
+
+.dashboard-candidates {
+  margin-top: 32px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+
+.dashboard-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dashboard-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dashboard-section-hint {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.btn-sm {
+  height: 32px;
+  font-size: 13px;
+  padding: 0 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Upload section ─────────────────────────────────── */
+
+.upload-section {
+  margin-bottom: 8px;
+}
+
+.upload-section-header {
+  margin-bottom: 12px;
+}
+
+.section-heading-lg {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.drop-zone {
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--color-surface);
+  user-select: none;
+}
+
+.drop-zone:hover,
+.drop-zone--dragging {
+  border-color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.drop-zone--processing {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.drop-icon {
+  font-size: 24px;
+  color: var(--color-muted);
+}
+
+.drop-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.drop-hint {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* Spinner */
+.drop-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-text);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.upload-filename {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin: 8px 0 0;
+}
+
+.upload-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.upload-divider::before,
+.upload-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ── Candidate form extras ──────────────────────────── */
+
+.form-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .form-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Skills tag input ───────────────────────────────── */
+
+.skills-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.skills-input:focus-within {
+  border-color: var(--color-text);
+}
+
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.skill-remove {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.1s;
+}
+
+.skill-remove:hover {
+  color: var(--color-error);
+}
+
+.skills-text-input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--color-text);
+  background: transparent;
+  min-width: 140px;
+  flex: 1;
+}
+
+.skills-text-input::placeholder {
+  color: var(--color-muted);
+}

@@ -8,6 +8,7 @@ import CandidateCard from './pages/CandidateCard'
 import Queue from './pages/Queue'
 import Roles from './pages/Roles'
 import CreateRole from './pages/CreateRole'
+import CreateCandidate from './pages/CreateCandidate'
 
 export default function App() {
   return (
@@ -22,6 +23,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/candidates/new"
+            element={
+              <ProtectedRoute>
+                <CreateCandidate />
               </ProtectedRoute>
             }
           />

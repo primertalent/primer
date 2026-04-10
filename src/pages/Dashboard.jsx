@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { useStats } from '../hooks/useStats'
@@ -54,6 +55,18 @@ export default function Dashboard() {
         <StatCard label="Active Roles" value={stats?.activeRoles} loading={statsLoading} />
         <StatCard label="Candidates in Pipeline" value={stats?.candidatesInPipeline} loading={statsLoading} />
         <StatCard label="Messages to Review" value={stats?.messagesToReview} loading={statsLoading} />
+      </section>
+
+      <section className="dashboard-candidates">
+        <div className="dashboard-section-header">
+          <h2 className="dashboard-section-title">Candidates</h2>
+          <Link to="/candidates/new" className="btn-primary btn-sm">
+            New Candidate
+          </Link>
+        </div>
+        <p className="dashboard-section-hint">
+          Upload a CV or enter manually to add a candidate to your pipeline.
+        </p>
       </section>
     </AppLayout>
   )
