@@ -10,6 +10,7 @@ import Roles from './pages/Roles'
 import CreateRole from './pages/CreateRole'
 import Candidates from './pages/Candidates'
 import CreateCandidate from './pages/CreateCandidate'
+import RoleDetail from './pages/RoleDetail'
 
 export default function App() {
   return (
@@ -64,6 +65,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Roles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles/:id"
+            element={
+              <ProtectedRoute>
+                <RoleDetail />
               </ProtectedRoute>
             }
           />

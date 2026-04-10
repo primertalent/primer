@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
@@ -36,7 +36,7 @@ function RoleCard({ role }) {
   const activePipeline = (role.pipeline ?? []).filter(p => p.status === 'active').length
 
   return (
-    <div className="role-card">
+    <Link to={`/roles/${role.id}`} className="role-card role-card--link">
       <div className="role-card-header">
         <div>
           <h2 className="role-title">{role.title}</h2>
@@ -55,7 +55,7 @@ function RoleCard({ role }) {
           {activePipeline} {activePipeline === 1 ? 'candidate' : 'candidates'} in pipeline
         </span>
       </div>
-    </div>
+    </Link>
   )
 }
 
