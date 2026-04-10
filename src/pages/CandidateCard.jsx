@@ -5,6 +5,7 @@ import { useRecruiter } from '../hooks/useRecruiter'
 import AppLayout from '../components/AppLayout'
 import { generateText } from '../lib/ai'
 import { buildNextActionMessages } from '../lib/prompts/nextAction'
+import { buildScreenerMessages } from '../lib/prompts/resumeScreener'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -115,6 +116,100 @@ function InteractionEntry({ interaction }) {
   )
 }
 
+// ── Screener result ───────────────────────────────────────
+
+const REC_STYLES = {
+  advance: 'screener-rec--advance',
+  hold:    'screener-rec--hold',
+  pass:    'screener-rec--pass',
+}
+
+const SKILL_STYLES = {
+  full:    'skill-status--full',
+  partial: 'skill-status--partial',
+  missing: 'skill-status--missing',
+}
+
+function ScreenerResult({ result }) {
+  const recClass = REC_STYLES[result.recommendation] ?? ''
+  const recLabel = result.recommendation
+    ? result.recommendation.charAt(0).toUpperCase() + result.recommendation.slice(1)
+    : '—'
+
+  return (
+    <div className="screener-result">
+      <div className="screener-result-header">
+        <div className="screener-score">
+          <span className="screener-score-value">{result.match_score}</span>
+          <span className="screener-score-denom">/10</span>
+        </div>
+        <span className={`screener-rec-badge ${recClass}`}>{recLabel}</span>
+        {result.recommendation_reason && (
+          <p className="screener-rec-reason">{result.recommendation_reason}</p>
+        )}
+      </div>
+
+      {result.skills_match?.length > 0 && (
+        <div className="screener-block">
+          <p className="screener-block-label">Skills Match</p>
+          <div className="screener-skills">
+            {result.skills_match.map((s, i) => (
+              <div key={i} className="screener-skill-row">
+                <span className="screener-skill-name">{s.skill}</span>
+                <span className={`screener-skill-status ${SKILL_STYLES[s.status] ?? ''}`}>
+                  {s.status === 'full' ? 'Full' : s.status === 'partial' ? 'Partial' : 'Missing'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="screener-two-col">
+        {result.top_strengths?.length > 0 && (
+          <div className="screener-block">
+            <p className="screener-block-label">Strengths</p>
+            <ul className="screener-list screener-list--strengths">
+              {result.top_strengths.map((s, i) => <li key={i}>{s}</li>)}
+            </ul>
+          </div>
+        )}
+        {result.top_concerns?.length > 0 && (
+          <div className="screener-block">
+            <p className="screener-block-label">Concerns</p>
+            <ul className="screener-list screener-list--concerns">
+              {result.top_concerns.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {result.career_trajectory && (
+        <div className="screener-block">
+          <p className="screener-block-label">Career Trajectory</p>
+          <p className="screener-block-body">{result.career_trajectory}</p>
+        </div>
+      )}
+
+      {result.quantified_results && (
+        <div className="screener-block">
+          <p className="screener-block-label">Quantified Results</p>
+          <p className="screener-block-body">{result.quantified_results}</p>
+        </div>
+      )}
+
+      {result.red_flags?.length > 0 && (
+        <div className="screener-block">
+          <p className="screener-block-label">Red Flags</p>
+          <ul className="screener-list screener-list--flags">
+            {result.red_flags.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 export default function CandidateCard() {
@@ -134,10 +229,16 @@ export default function CandidateCard() {
 
   // Add-to-role picker
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [openRoles, setOpenRoles] = useState(null)   // null = not yet fetched
+  const [openRoles, setOpenRoles] = useState(null)
   const [rolesLoading, setRolesLoading] = useState(false)
   const [addingRoleId, setAddingRoleId] = useState(null)
   const [addError, setAddError] = useState(null)
+
+  // Resume screener
+  const [screenerRoleId, setScreenerRoleId] = useState('')
+  const [screening, setScreening] = useState(false)
+  const [screenResult, setScreenResult] = useState(null)
+  const [screenError, setScreenError] = useState(null)
 
   useEffect(() => {
     if (!id) return
@@ -149,7 +250,7 @@ export default function CandidateCard() {
       console.debug('[CandidateCard] recruiter row:', recruiter)
       console.debug('[CandidateCard] fetching candidate id:', id)
 
-      const [candidateRes, pipelineRes, interactionRes] = await Promise.all([
+      const [candidateRes, pipelineRes, interactionRes, rolesRes] = await Promise.all([
         supabase
           .from('candidates')
           .select('*')
@@ -172,6 +273,13 @@ export default function CandidateCard() {
           .select('*')
           .eq('candidate_id', id)
           .order('occurred_at', { ascending: true }),
+
+        supabase
+          .from('roles')
+          .select('id, title, notes, process_steps, clients(name)')
+          .eq('recruiter_id', recruiter.id)
+          .eq('status', 'open')
+          .order('created_at', { ascending: false }),
       ])
 
       console.debug('[CandidateCard] candidate result:', {
@@ -202,6 +310,7 @@ export default function CandidateCard() {
         setCandidate(candidateRes.data)
         setPipelines(pipelineRes.data ?? [])
         setInteractions(interactionRes.data ?? [])
+        setOpenRoles(rolesRes.data ?? [])
       }
 
       setLoading(false)
@@ -227,20 +336,27 @@ export default function CandidateCard() {
     }
   }
 
-  async function handleOpenPicker() {
+  function handleOpenPicker() {
     setAddError(null)
-    if (!pickerOpen && openRoles === null) {
-      setRolesLoading(true)
-      const { data } = await supabase
-        .from('roles')
-        .select('id, title, process_steps, clients(name)')
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'open')
-        .order('created_at', { ascending: false })
-      setOpenRoles(data ?? [])
-      setRolesLoading(false)
-    }
     setPickerOpen(prev => !prev)
+  }
+
+  async function handleScreen() {
+    const role = openRoles?.find(r => r.id === screenerRoleId)
+    if (!role || !candidate) return
+    setScreenResult(null)
+    setScreenError(null)
+    setScreening(true)
+    try {
+      const messages = buildScreenerMessages(candidate, role)
+      const raw = await generateText({ messages, maxTokens: 2048 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      setScreenResult(JSON.parse(cleaned))
+    } catch (err) {
+      setScreenError(err.message ?? 'Screening failed.')
+    } finally {
+      setScreening(false)
+    }
   }
 
   async function handleAddToRole(role) {
@@ -404,6 +520,48 @@ export default function CandidateCard() {
           </section>
 
         </div>
+
+        {/* Resume Screener */}
+        <section className="candidate-section screener-section" style={{ marginTop: 24 }}>
+          <h2 className="section-heading">Resume Screener</h2>
+          <div className="screener-controls">
+            <select
+              className="field-input screener-role-select"
+              value={screenerRoleId}
+              onChange={e => {
+                setScreenerRoleId(e.target.value)
+                setScreenResult(null)
+                setScreenError(null)
+              }}
+              disabled={!openRoles}
+            >
+              <option value="">
+                {openRoles === null ? 'Loading roles…' : 'Select a role to screen against…'}
+              </option>
+              {openRoles?.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn-primary"
+              onClick={handleScreen}
+              disabled={!screenerRoleId || screening}
+            >
+              {screening ? 'Screening…' : 'Screen Against Role'}
+            </button>
+          </div>
+
+          {screenError && (
+            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
+              <p className="ai-card-eyebrow">Error</p>
+              <p className="ai-card-body">{screenError}</p>
+            </div>
+          )}
+
+          {screenResult && <ScreenerResult result={screenResult} />}
+        </section>
 
         {/* Interaction history */}
         <section className="candidate-section" style={{ marginTop: 24 }}>
