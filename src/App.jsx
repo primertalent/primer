@@ -6,6 +6,8 @@ import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
 import CandidateCard from './pages/CandidateCard'
 import Queue from './pages/Queue'
+import Roles from './pages/Roles'
+import CreateRole from './pages/CreateRole'
 
 export default function App() {
   return (
@@ -36,6 +38,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Queue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute>
+                <Roles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roles/new"
+            element={
+              <ProtectedRoute>
+                <CreateRole />
               </ProtectedRoute>
             }
           />

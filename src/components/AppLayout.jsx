@@ -16,6 +16,12 @@ export default function AppLayout({ children }) {
             Brief
           </NavLink>
           <NavLink
+            to="/roles"
+            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+          >
+            Roles
+          </NavLink>
+          <NavLink
             to="/queue"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
