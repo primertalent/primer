@@ -207,17 +207,87 @@ body {
   margin: 0 auto;
 }
 
-/* ── Dashboard greeting ─────────────────────────────── */
+/* ── Morning brief — greeting ───────────────────────── */
 
-.greeting {
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+.brief-greeting {
+  margin-bottom: 40px;
 }
 
-.greeting-sub {
-  margin-top: 8px;
+.brief-headline {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.75px;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.brief-date {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+/* ── Morning brief — card ───────────────────────────── */
+
+.brief-card {
+  margin-bottom: 40px;
+}
+
+.brief-card-inner {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+}
+
+.brief-card-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 12px;
+}
+
+.brief-card-body {
   font-size: 15px;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+/* ── Morning brief — stats row ──────────────────────── */
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.stat-label {
+  font-size: 13px;
   color: var(--color-muted);
 }
