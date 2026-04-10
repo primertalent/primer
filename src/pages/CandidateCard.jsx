@@ -1,20 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
 import AppLayout from '../components/AppLayout'
-
-// ─────────────────────────────────────────────────────────
-// SECURITY NOTE: VITE_ANTHROPIC_API_KEY is embedded in the
-// client bundle and is visible to anyone who inspects it.
-// Before shipping, move this call to a Vercel serverless
-// function (api/generate-next-action.js) and proxy from here.
-// ─────────────────────────────────────────────────────────
-const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true,
-})
+import { generateText } from '../lib/ai'
+import { buildNextActionMessages } from '../lib/prompts/nextAction'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -51,51 +41,6 @@ function formatDateShort(iso) {
     day: 'numeric',
     year: 'numeric',
   })
-}
-
-function buildPrompt(candidate, pipelines, interactions) {
-  const skills = candidate.skills?.join(', ') || 'None listed'
-
-  const pipelineSection = pipelines.length
-    ? pipelines.map(p => `
-  Role: ${p.roles?.title ?? 'Unknown'} at ${p.roles?.clients?.name ?? 'Unknown client'}
-  Stage: ${p.current_stage}
-  Status: ${p.status}
-  Fit Score: ${p.fit_score != null ? `${p.fit_score}/100` : 'Not scored'}
-  Fit Rationale: ${p.fit_score_rationale || 'None'}
-  Next Action: ${p.next_action || 'None set'}
-  Next Action Due: ${p.next_action_due_at ? formatDateShort(p.next_action_due_at) : 'None'}`).join('\n')
-    : '  Not in any active pipeline.'
-
-  const historySection = interactions.length
-    ? interactions.map(i => `
-  [${formatDate(i.occurred_at)}] ${TYPE_LABELS[i.type] ?? i.type}${i.direction ? ` (${i.direction})` : ''}
-  ${i.subject ? `Subject: ${i.subject}` : ''}
-  ${i.body ?? '(no body)'}`).join('\n')
-    : '  No interactions recorded yet.'
-
-  return `You are a recruiting intelligence assistant for Primer, a recruiting OS for independent recruiters.
-
-Analyze the following candidate profile and their full interaction history, then recommend the single most important next action the recruiter should take. Be specific, actionable, and concise. If a message needs to be sent, include suggested talking points or a brief draft.
-
-CANDIDATE PROFILE
-Name: ${candidate.first_name} ${candidate.last_name}
-Current Role: ${candidate.current_title ?? 'Unknown'} at ${candidate.current_company ?? 'Unknown'}
-Location: ${candidate.location ?? 'Unknown'}
-Email: ${candidate.email ?? 'Not provided'}
-Phone: ${candidate.phone ?? 'Not provided'}
-LinkedIn: ${candidate.linkedin_url ?? 'Not provided'}
-Skills: ${skills}
-Source: ${SOURCE_LABELS[candidate.source] ?? candidate.source}
-Notes: ${candidate.notes || 'None'}
-
-PIPELINE STATUS
-${pipelineSection}
-
-INTERACTION HISTORY
-${historySection}
-
-Based on everything above, what is the single most important next action the recruiter should take right now?`
 }
 
 // ── Sub-components ────────────────────────────────────────
@@ -265,13 +210,9 @@ export default function CandidateCard() {
     setGenerating(true)
 
     try {
-      const prompt = buildPrompt(candidate, pipelines, interactions)
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      setSuggestion(message.content[0]?.text ?? 'No suggestion returned.')
+      const messages = buildNextActionMessages(candidate, pipelines, interactions)
+      const text = await generateText({ messages })
+      setSuggestion(text || 'No suggestion returned.')
     } catch (err) {
       setGenError(err.message ?? 'Failed to generate suggestion.')
     } finally {

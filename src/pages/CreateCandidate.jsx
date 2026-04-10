@@ -1,36 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
-
-// See security note in CandidateCard.jsx — move to serverless before shipping
-const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true,
-})
+import { generateText } from '../lib/ai'
+import { buildCvPdfMessages, buildCvTextMessages } from '../lib/prompts/cvExtraction'
 
 const ACCEPTED_TYPES = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/msword': 'doc',
 }
-
-const EXTRACTION_PROMPT = `Extract structured information from the CV/resume and return ONLY a valid JSON object with these exact keys (use null for any field not found):
-{
-  "first_name": string,
-  "last_name": string,
-  "email": string | null,
-  "phone": string | null,
-  "current_title": string | null,
-  "current_company": string | null,
-  "location": string | null,
-  "skills": string[]
-}
-
-Return only the JSON — no markdown, no explanation.`
 
 // ── File reading helpers ──────────────────────────────────
 
@@ -50,38 +31,16 @@ async function extractTextFromDocx(file) {
   return result.value
 }
 
-// ── CV extraction via Anthropic API ──────────────────────
+// ── CV extraction via AI service ─────────────────────────
 
 async function extractFromPdf(file) {
   const base64 = await fileToBase64(file)
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-        },
-        { type: 'text', text: EXTRACTION_PROMPT },
-      ],
-    }],
-  })
-  return message.content[0]?.text ?? ''
+  return generateText({ messages: buildCvPdfMessages(base64) })
 }
 
 async function extractFromDocx(file) {
   const text = await extractTextFromDocx(file)
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    messages: [{
-      role: 'user',
-      content: `${EXTRACTION_PROMPT}\n\nCV TEXT:\n${text}`,
-    }],
-  })
-  return message.content[0]?.text ?? ''
+  return generateText({ messages: buildCvTextMessages(text) })
 }
 
 function parseExtraction(raw) {
