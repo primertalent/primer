@@ -1837,3 +1837,270 @@ select.field-input {
   font-weight: 600;
   flex-shrink: 0;
 }
+
+/* ── Clients list ───────────────────────────────────── */
+
+.new-client-form-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.new-client-fields {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.new-client-fields .field-input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.client-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.client-card:hover {
+  border-color: #a1a1aa;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.client-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.client-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.2px;
+}
+
+.client-industry-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+.client-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-meta-item {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.client-meta-sep {
+  font-size: 13px;
+  color: var(--color-border);
+}
+
+/* ── Client detail page ─────────────────────────────── */
+
+.client-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.client-detail-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.client-edit-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.client-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 320px;
+}
+
+.client-website-link {
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.client-website-link:hover {
+  color: var(--color-text);
+}
+
+/* ── Contact card ───────────────────────────────────── */
+
+.contact-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contact-card:last-child {
+  border-bottom: none;
+}
+
+.contact-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.contact-card-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.contact-title {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.contact-primary-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.contact-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contact-link {
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.contact-link:hover {
+  color: var(--color-text);
+}
+
+.contact-detail {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* ── Add contact form ───────────────────────────────── */
+
+.add-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.contact-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Client role row ────────────────────────────────── */
+
+.client-role-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.12s;
+}
+
+.client-role-row:last-child {
+  border-bottom: none;
+}
+
+.client-role-row:hover {
+  opacity: 0.75;
+}
+
+.client-role-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.client-role-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.client-role-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.client-role-candidates {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* ── Notes saved label ──────────────────────────────── */
+
+.notes-saved-label {
+  font-size: 13px;
+  color: #15803d;
+  font-weight: 500;
+}

@@ -12,6 +12,8 @@ import Candidates from './pages/Candidates'
 import CreateCandidate from './pages/CreateCandidate'
 import RoleDetail from './pages/RoleDetail'
 import EditRole from './pages/EditRole'
+import Clients from './pages/Clients'
+import ClientDetail from './pages/ClientDetail'
 
 export default function App() {
   return (
@@ -58,6 +60,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Queue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clients"
+            element={
+              <ProtectedRoute>
+                <Clients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clients/:id"
+            element={
+              <ProtectedRoute>
+                <ClientDetail />
               </ProtectedRoute>
             }
           />
