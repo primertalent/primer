@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
+import AppLayout from '../components/AppLayout'
 
 // ─────────────────────────────────────────────────────────
 // SECURITY NOTE: VITE_ANTHROPIC_API_KEY is embedded in the
@@ -281,43 +282,24 @@ export default function CandidateCard() {
   // ── Render states ────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="app-shell">
-        <header className="app-header">
-          <span className="wordmark">Primer</span>
-        </header>
-        <main className="app-main">
-          <p className="muted">Loading…</p>
-        </main>
-      </div>
-    )
+    return <AppLayout><p className="muted">Loading…</p></AppLayout>
   }
 
   if (notFound) {
     return (
-      <div className="app-shell">
-        <header className="app-header">
-          <span className="wordmark">Primer</span>
-        </header>
-        <main className="app-main">
-          <p className="muted">Candidate not found.</p>
-          <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>
-            Go back
-          </button>
-        </main>
-      </div>
+      <AppLayout>
+        <p className="muted">Candidate not found.</p>
+        <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>
+          Go back
+        </button>
+      </AppLayout>
     )
   }
 
   const fullName = `${candidate.first_name} ${candidate.last_name}`
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <span className="wordmark">Primer</span>
-      </header>
-
-      <main className="app-main">
+    <AppLayout>
 
         {/* Page header */}
         <div className="page-header">
@@ -405,7 +387,6 @@ export default function CandidateCard() {
           )}
         </section>
 
-      </main>
-    </div>
+    </AppLayout>
   )
 }

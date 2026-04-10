@@ -612,3 +612,286 @@ body {
   color: var(--color-muted);
   font-size: 14px;
 }
+
+/* ── App nav ────────────────────────────────────────── */
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-link {
+  padding: 6px 12px;
+  font-size: 14px;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.nav-link:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.nav-link--active {
+  color: var(--color-text);
+  font-weight: 500;
+  background: var(--color-bg);
+}
+
+/* ── Queue page ─────────────────────────────────────── */
+
+.queue-header {
+  margin-bottom: 28px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0;
+}
+
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.filter-tab:hover {
+  color: var(--color-text);
+}
+
+.filter-tab--active {
+  color: var(--color-text);
+  font-weight: 500;
+  border-bottom-color: var(--color-text);
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--color-border);
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+}
+
+/* ── Message card ───────────────────────────────────── */
+
+.message-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-card--sent {
+  opacity: 0.65;
+}
+
+.message-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.message-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.message-card-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Channel badge */
+
+.channel-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* Status badge */
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.status-badge--approved { color: #16a34a; }
+.status-badge--sent     { color: var(--color-muted); }
+.status-badge--held_for_review { color: #d97706; }
+
+/* Candidate name + meta */
+
+.message-candidate {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.confidence-score {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.message-time {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.message-subject {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.message-preview {
+  font-size: 14px;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Inline edit */
+
+.message-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.message-textarea:focus {
+  border-color: var(--color-text);
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Action buttons */
+
+.message-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font);
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-action:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-action--approve {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.btn-action--approve:hover:not(:disabled) {
+  background: #dcfce7;
+}
+
+.btn-action--send {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: #fff;
+}
+
+.btn-action--send:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.btn-action--hold {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.btn-action--hold:hover:not(:disabled) {
+  background: #fef3c7;
+}

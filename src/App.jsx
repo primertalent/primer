@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Dashboard from './pages/Dashboard'
 import CandidateCard from './pages/CandidateCard'
+import Queue from './pages/Queue'
 
 export default function App() {
   return (
@@ -27,6 +28,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CandidateCard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/queue"
+            element={
+              <ProtectedRoute>
+                <Queue />
               </ProtectedRoute>
             }
           />
