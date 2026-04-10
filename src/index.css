@@ -1466,3 +1466,137 @@ select.field-input {
 .skills-text-input::placeholder {
   color: var(--color-muted);
 }
+
+/* ── Candidates list ────────────────────────────────── */
+
+.candidates-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.candidates-search {
+  flex: 1;
+  min-width: 200px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--color-text);
+  background: var(--color-surface);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.candidates-search:focus {
+  border-color: var(--color-text);
+}
+
+.candidates-search::placeholder {
+  color: var(--color-muted);
+}
+
+.candidates-source-filter {
+  height: 38px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.candidates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.candidate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--color-surface);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.1s;
+}
+
+.candidate-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.candidate-row:hover {
+  background: var(--color-bg);
+}
+
+.candidate-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.candidate-row-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.candidate-row-role {
+  font-size: 13px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.candidate-row-location {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.candidate-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  background: var(--color-bg);
+  white-space: nowrap;
+}
+
+.source-badge--inbound   { color: #1e40af; background: #eff6ff; border-color: #bfdbfe; }
+.source-badge--sourced   { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+.source-badge--referral  { color: #6b21a8; background: #faf5ff; border-color: #e9d5ff; }
+.source-badge--job_board { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.source-badge--other     { color: var(--color-muted); }
+
+.candidate-pipeline-count {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.candidate-fit-score {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
