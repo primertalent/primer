@@ -7,7 +7,7 @@ export default function AppLayout({ children }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="wordmark">Primer</span>
+        <span className="wordmark">Wren</span>
         <nav className="app-nav">
           <NavLink
             to="/dashboard"

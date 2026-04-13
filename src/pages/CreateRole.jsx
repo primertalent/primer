@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+import { generateText } from '../lib/ai/index.js'
+import { buildJdMessages } from '../lib/prompts/jdExtractor.js'
 
 const COMP_TYPES = [
   { value: 'salary',            label: 'Salary' },
@@ -199,8 +201,35 @@ export default function CreateRole() {
   const [steps, setSteps]       = useState(DEFAULT_STEPS)
   const [notes, setNotes]       = useState('')
 
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState(null)
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState(null)
+
+  // JD importer
+  const [jdText, setJdText]         = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState(null)
+
+  const VALID_COMP_TYPES = new Set(['salary', 'hourly', 'contract', 'equity_plus_salary'])
+
+  async function handleExtract() {
+    if (!jdText.trim()) return
+    setExtracting(true)
+    setExtractError(null)
+    try {
+      const raw = await generateText({ messages: buildJdMessages(jdText), maxTokens: 1024 })
+      const extracted = JSON.parse(raw)
+
+      if (extracted.title && !title.trim()) setTitle(extracted.title)
+      if (extracted.comp_min != null && !compMin) setCompMin(String(extracted.comp_min))
+      if (extracted.comp_max != null && !compMax) setCompMax(String(extracted.comp_max))
+      if (extracted.comp_type && VALID_COMP_TYPES.has(extracted.comp_type)) setCompType(extracted.comp_type)
+      if (extracted.notes) setNotes(extracted.notes)
+    } catch {
+      setExtractError('Could not extract role details. Check the text and try again.')
+    } finally {
+      setExtracting(false)
+    }
+  }
 
   // Fetch existing clients for combobox
   useEffect(() => {
@@ -284,6 +313,29 @@ export default function CreateRole() {
       </div>
 
       <form className="role-form" onSubmit={handleSubmit} noValidate>
+
+        {/* JD importer */}
+        <div className="jd-importer">
+          <h2 className="jd-importer-title">Import Job Description</h2>
+          <textarea
+            className="field-input field-textarea jd-textarea"
+            value={jdText}
+            onChange={e => setJdText(e.target.value)}
+            placeholder="Paste a job description, intake notes, or anything you have. No specific format required."
+            rows={6}
+          />
+          {extractError && <p className="error">{extractError}</p>}
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={handleExtract}
+            disabled={extracting || !jdText.trim()}
+          >
+            {extracting ? 'Extracting…' : 'Extract Role Details'}
+          </button>
+        </div>
+
+        <hr className="form-divider" />
 
         {/* Job title */}
         <div className="form-field">

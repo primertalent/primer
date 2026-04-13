@@ -992,6 +992,30 @@ body {
   gap: 24px;
 }
 
+.jd-importer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jd-importer-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.jd-textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
+.form-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 0;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;

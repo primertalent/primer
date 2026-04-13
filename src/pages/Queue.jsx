@@ -270,7 +270,7 @@ export default function Queue() {
     <AppLayout>
       <div className="queue-header">
         <h1 className="brief-headline">Queue</h1>
-        <p className="brief-date">Review and action messages drafted by Primer</p>
+        <p className="brief-date">Review and action messages drafted by Wren</p>
       </div>
 
       <div className="filter-tabs">

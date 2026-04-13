@@ -309,7 +309,7 @@ export default function CreateCandidate() {
         <div className="upload-section-header">
           <h2 className="section-heading-lg">Upload CV</h2>
           <p className="upload-hint">
-            Primer will extract candidate information automatically.
+            Wren will extract candidate information automatically.
           </p>
         </div>
         <DropZone onFile={handleFile} extracting={extracting} />

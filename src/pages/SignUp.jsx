@@ -31,7 +31,7 @@ export default function SignUp() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-header">
-            <h1 className="wordmark">Primer</h1>
+            <h1 className="wordmark">Wren</h1>
             <p>Check your email</p>
           </div>
           <p className="confirm-message">
@@ -49,7 +49,7 @@ export default function SignUp() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <h1 className="wordmark">Primer</h1>
+          <h1 className="wordmark">Wren</h1>
           <p>Create your account</p>
         </div>
 

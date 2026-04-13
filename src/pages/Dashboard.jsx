@@ -50,7 +50,7 @@ export default function Dashboard() {
         <div className="brief-card-inner">
           <p className="brief-card-eyebrow">Morning Brief</p>
           <p className="brief-card-body">
-            Your overnight brief will appear here once Primer has been running.
+            Your overnight brief will appear here once Wren has been running.
           </p>
         </div>
       </section>
