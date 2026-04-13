@@ -19,3 +19,19 @@ export function buildJdMessages(text) {
     content: `${EXTRACTION_PROMPT}\n\nTEXT:\n${text}`,
   }]
 }
+
+export function buildJdPdfMessages(base64) {
+  return [{
+    role: 'user',
+    content: [
+      {
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+      },
+      {
+        type: 'text',
+        text: 'Return the complete verbatim text of this document. No commentary, no formatting — just the raw text exactly as it appears.',
+      },
+    ],
+  }]
+}

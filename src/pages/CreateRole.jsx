@@ -4,7 +4,15 @@ import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 import { generateText } from '../lib/ai/index.js'
-import { buildJdMessages } from '../lib/prompts/jdExtractor.js'
+import { buildJdMessages, buildJdPdfMessages } from '../lib/prompts/jdExtractor.js'
+
+async function fileToBase64(file) {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
 
 const COMP_TYPES = [
   { value: 'salary',            label: 'Salary' },
@@ -205,11 +213,30 @@ export default function CreateRole() {
   const [error, setError]           = useState(null)
 
   // JD importer
-  const [jdText, setJdText]         = useState('')
-  const [extracting, setExtracting] = useState(false)
+  const [jdText, setJdText]             = useState('')
+  const [extracting, setExtracting]     = useState(false)
+  const [pdfLoading, setPdfLoading]     = useState(false)
   const [extractError, setExtractError] = useState(null)
+  const pdfInputRef                     = useRef(null)
 
   const VALID_COMP_TYPES = new Set(['salary', 'hourly', 'contract', 'equity_plus_salary'])
+
+  async function handlePdfUpload(e) {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    setPdfLoading(true)
+    setExtractError(null)
+    try {
+      const base64 = await fileToBase64(file)
+      const text = await generateText({ messages: buildJdPdfMessages(base64), maxTokens: 4096 })
+      setJdText(text)
+    } catch {
+      setExtractError('Could not extract text from PDF. Try pasting the text manually.')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   async function handleExtract() {
     if (!jdText.trim()) return
@@ -316,7 +343,24 @@ export default function CreateRole() {
 
         {/* JD importer */}
         <div className="jd-importer">
-          <h2 className="jd-importer-title">Import Job Description</h2>
+          <div className="jd-importer-header">
+            <h2 className="jd-importer-title">Import Job Description</h2>
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={pdfLoading || extracting}
+            >
+              {pdfLoading ? 'Reading PDF…' : '↑ Upload PDF'}
+            </button>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept=".pdf"
+              style={{ display: 'none' }}
+              onChange={handlePdfUpload}
+            />
+          </div>
           <textarea
             className="field-input field-textarea jd-textarea"
             value={jdText}
@@ -329,7 +373,7 @@ export default function CreateRole() {
             type="button"
             className="btn-ghost"
             onClick={handleExtract}
-            disabled={extracting || !jdText.trim()}
+            disabled={extracting || pdfLoading || !jdText.trim()}
           >
             {extracting ? 'Extracting…' : 'Extract Role Details'}
           </button>

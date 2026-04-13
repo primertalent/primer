@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
 import AppLayout from '../components/AppLayout'
@@ -419,13 +419,16 @@ export default function CandidateCard() {
               )}
             </div>
           </div>
-          <button
-            className="btn-primary"
-            onClick={handleGenerateNextAction}
-            disabled={generating}
-          >
-            {generating ? 'Generating…' : 'Generate Next Action'}
-          </button>
+          <div className="page-header-actions">
+            <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
+            <button
+              className="btn-primary"
+              onClick={handleGenerateNextAction}
+              disabled={generating}
+            >
+              {generating ? 'Generating…' : 'Generate Next Action'}
+            </button>
+          </div>
         </div>
 
         {/* AI suggestion */}

@@ -38,11 +38,6 @@ async function extractFromPdf(file) {
   return generateText({ messages: buildCvPdfMessages(base64) })
 }
 
-async function extractFromDocx(file) {
-  const text = await extractTextFromDocx(file)
-  return generateText({ messages: buildCvTextMessages(text) })
-}
-
 function parseExtraction(raw) {
   try {
     // Strip markdown code fences if Claude wrapped the JSON
@@ -203,17 +198,16 @@ export default function CreateCandidate() {
     setExtracting(true)
 
     try {
-      let rawJson
       const fileType = ACCEPTED_TYPES[file.type]
+      let rawJson
+      let docxRawText = null
 
       if (fileType === 'pdf') {
         rawJson = await extractFromPdf(file)
       } else {
-        // docx / doc
-        rawJson = await extractFromDocx(file)
-        // Also store text for the cv_text field
-        const text = await extractTextFromDocx(file)
-        setCvText(text)
+        // Extract text once — reuse for both the AI call and cv_text storage
+        docxRawText = await extractTextFromDocx(file)
+        rawJson = await generateText({ messages: buildCvTextMessages(docxRawText) })
       }
 
       const parsed = parseExtraction(rawJson)
@@ -221,14 +215,16 @@ export default function CreateCandidate() {
       if (!parsed) {
         setExtractError('Could not parse the extracted data. Please fill in the form manually.')
       } else {
-        if (parsed.first_name)    setFirstName(parsed.first_name)
-        if (parsed.last_name)     setLastName(parsed.last_name)
-        if (parsed.email)         setEmail(parsed.email)
-        if (parsed.phone)         setPhone(parsed.phone)
-        if (parsed.current_title) setCurrentTitle(parsed.current_title)
+        if (parsed.first_name)      setFirstName(parsed.first_name)
+        if (parsed.last_name)       setLastName(parsed.last_name)
+        if (parsed.email)           setEmail(parsed.email)
+        if (parsed.phone)           setPhone(parsed.phone)
+        if (parsed.current_title)   setCurrentTitle(parsed.current_title)
         if (parsed.current_company) setCurrentCompany(parsed.current_company)
-        if (parsed.location)      setLocation(parsed.location)
+        if (parsed.location)        setLocation(parsed.location)
         if (Array.isArray(parsed.skills)) setSkills(parsed.skills)
+        // For PDF, use cv_text returned by Claude. For DOCX, use the raw mammoth text.
+        setCvText(docxRawText ?? parsed.cv_text ?? '')
         setSource('inbound')
       }
     } catch (err) {

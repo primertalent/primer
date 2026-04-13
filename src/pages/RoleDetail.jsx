@@ -90,7 +90,7 @@ export default function RoleDetail() {
       const [roleRes, pipelineRes] = await Promise.all([
         supabase
           .from('roles')
-          .select('id, title, status, comp_min, comp_max, comp_type, process_steps, clients(name)')
+          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, clients(name)')
           .eq('id', id)
           .eq('recruiter_id', recruiter.id)
           .single(),
@@ -179,6 +179,14 @@ export default function RoleDetail() {
             />
           ))}
         </div>
+      )}
+
+      {/* Job description */}
+      {role.notes && (
+        <section className="role-jd-section">
+          <h2 className="section-heading">Job Description</h2>
+          <p className="role-jd-body">{role.notes}</p>
+        </section>
       )}
 
     </AppLayout>

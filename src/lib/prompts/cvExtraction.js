@@ -7,9 +7,11 @@ const EXTRACTION_PROMPT = `Extract structured information from the CV/resume and
   "current_title": string | null,
   "current_company": string | null,
   "location": string | null,
-  "skills": string[]
+  "skills": string[],
+  "cv_text": string
 }
 
+cv_text must contain the complete verbatim text of the CV — every word, every section, nothing omitted.
 Return only the JSON — no markdown, no explanation.`
 
 export function buildCvPdfMessages(base64) {
