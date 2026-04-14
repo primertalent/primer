@@ -525,6 +525,11 @@ body {
   margin-bottom: 10px;
 }
 
+.pipeline-advance-btn {
+  margin-left: auto;
+  text-transform: capitalize;
+}
+
 .stage-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -558,6 +563,66 @@ body {
 .due-date {
   font-size: 12px;
   color: var(--color-muted);
+}
+
+/* ── Interaction log form ───────────────────────────── */
+
+.log-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-form-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.log-select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.log-date {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  flex: 1;
+  min-width: 160px;
+}
+
+.log-textarea {
+  width: 100%;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.log-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.log-form-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* ── Interaction feed ───────────────────────────────── */
@@ -1988,6 +2053,28 @@ select.field-input {
   text-align: right;
   max-width: 300px;
   line-height: 1.4;
+}
+
+.scores-history-date {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.scores-history-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.scores-history-badge--pre-pipeline {
+  background: var(--color-surface-2, #f0f0f0);
+  color: var(--color-muted);
 }
 
 /* ── Role card as link ──────────────────────────────── */

@@ -132,9 +132,16 @@ function SkillTags({ skills }) {
   )
 }
 
-function PipelineEntry({ entry }) {
+const PIPELINE_STAGES = ['sourced', 'screening', 'shortlisted', 'interviewing', 'offer', 'placed']
+
+function PipelineEntry({ entry, onAdvance, advancing }) {
   const roleName = entry.roles?.title ?? 'Unknown role'
   const clientName = entry.roles?.clients?.name ?? 'Unknown client'
+  const currentStage = entry.current_stage?.toLowerCase()
+  const currentIdx = PIPELINE_STAGES.indexOf(currentStage)
+  const nextStage = currentIdx >= 0 && currentIdx < PIPELINE_STAGES.length - 1
+    ? PIPELINE_STAGES[currentIdx + 1]
+    : null
 
   return (
     <div className="pipeline-entry">
@@ -147,6 +154,14 @@ function PipelineEntry({ entry }) {
         {entry.fit_score != null && (
           <span className="fit-score">{Math.round(entry.fit_score)}<span className="fit-denom">/100</span></span>
         )}
+        <button
+          className="btn-ghost btn-sm pipeline-advance-btn"
+          onClick={() => onAdvance(entry)}
+          disabled={!nextStage || advancing}
+          title={nextStage ? `Advance to ${nextStage}` : 'Already placed'}
+        >
+          {advancing ? '…' : nextStage ? `→ ${nextStage}` : 'Placed'}
+        </button>
       </div>
       {entry.next_action && (
         <div className="pipeline-next-action">
@@ -169,7 +184,7 @@ function InteractionEntry({ interaction }) {
         {interaction.direction && (
           <span className="interaction-direction">{interaction.direction}</span>
         )}
-        <span className="interaction-date">{formatDate(interaction.occurred_at)}</span>
+        <span className="interaction-date">{formatDateShort(interaction.occurred_at)}</span>
       </div>
       {interaction.subject && (
         <p className="interaction-subject">{interaction.subject}</p>
@@ -444,6 +459,7 @@ export default function CandidateCard() {
   const [screening, setScreening] = useState(false)
   const [screenResult, setScreenResult] = useState(null)
   const [screenError, setScreenError] = useState(null)
+  const [screenerHistory, setScreenerHistory] = useState([])
 
   // Scorecard
   const [scorecard, setScorecard] = useState(null)
@@ -472,6 +488,12 @@ export default function CandidateCard() {
     text: null,
     error: null,
   })
+
+  // Interaction log form
+  const [logOpen, setLogOpen] = useState(false)
+  const [logForm, setLogForm] = useState({ type: 'call', direction: 'outbound', occurred_at: '', body: '' })
+  const [logSaving, setLogSaving] = useState(false)
+  const [logError, setLogError] = useState(null)
 
   // Delete
   const [deleting, setDeleting] = useState(false)
@@ -506,7 +528,7 @@ export default function CandidateCard() {
       console.debug('[CandidateCard] recruiter row:', recruiter)
       console.debug('[CandidateCard] fetching candidate id:', id)
 
-      const [candidateRes, pipelineRes, interactionRes, rolesRes] = await Promise.all([
+      const [candidateRes, pipelineRes, interactionRes, rolesRes, screenerHistoryRes] = await Promise.all([
         supabase
           .from('candidates')
           .select('*')
@@ -528,7 +550,7 @@ export default function CandidateCard() {
           .from('interactions')
           .select('*')
           .eq('candidate_id', id)
-          .order('occurred_at', { ascending: true }),
+          .order('occurred_at', { ascending: false }),
 
         supabase
           .from('roles')
@@ -536,6 +558,12 @@ export default function CandidateCard() {
           .eq('recruiter_id', recruiter.id)
           .eq('status', 'open')
           .order('created_at', { ascending: false }),
+
+        supabase
+          .from('screener_results')
+          .select('*, roles(title, clients(name))')
+          .eq('candidate_id', id)
+          .order('scored_at', { ascending: false }),
       ])
 
       console.debug('[CandidateCard] candidate result:', {
@@ -568,6 +596,7 @@ export default function CandidateCard() {
         setPipelines(pipelineRes.data ?? [])
         setInteractions(interactionRes.data ?? [])
         setOpenRoles(rolesRes.data ?? [])
+        setScreenerHistory(screenerHistoryRes.data ?? [])
 
         // Restore persisted career data if available
         if (c.career_timeline?.length > 0) {
@@ -617,25 +646,39 @@ export default function CandidateCard() {
       const result = JSON.parse(cleaned)
       setScreenResult(result)
 
-      // Persist score to the matching pipeline entry
+      // Always persist to screener_results — no pipeline entry required
+      const { data: savedResult, error: srErr } = await supabase
+        .from('screener_results')
+        .insert({
+          recruiter_id: recruiter.id,
+          candidate_id: id,
+          role_id:      screenerRoleId,
+          result,
+        })
+        .select()
+        .single()
+      if (srErr) console.error('screener_results save failed:', srErr)
+      else setScreenerHistory(prev => [savedResult, ...prev])
+
+      // Backfill pipeline entry if candidate is already in this role's pipeline
       const { data: freshEntry } = await supabase
         .from('pipeline')
         .select('id')
         .eq('candidate_id', id)
         .eq('role_id', screenerRoleId)
-        .single()
+        .maybeSingle()
 
       if (freshEntry && result.match_score != null) {
         const fitScore = result.match_score * 10
         const rationale = result.recommendation_reason ?? null
         const { error: scoreErr } = await supabase
           .from('pipeline')
-          .update({ fit_score: fitScore, fit_score_rationale: rationale })
+          .update({ fit_score: fitScore, fit_score_rationale: rationale, screener_result: result })
           .eq('id', freshEntry.id)
-        if (scoreErr) console.error('score save failed:', scoreErr)
+        if (scoreErr) console.error('pipeline score backfill failed:', scoreErr)
         setPipelines(prev => prev.map(p =>
           p.id === freshEntry.id
-            ? { ...p, fit_score: fitScore, fit_score_rationale: rationale }
+            ? { ...p, fit_score: fitScore, fit_score_rationale: rationale, screener_result: result }
             : p
         ))
       }
@@ -644,6 +687,74 @@ export default function CandidateCard() {
     } finally {
       setScreening(false)
     }
+  }
+
+  const [advancingId, setAdvancingId] = useState(null)
+
+  async function handleAdvanceStage(entry) {
+    const currentIdx = PIPELINE_STAGES.indexOf(entry.current_stage?.toLowerCase())
+    if (currentIdx < 0 || currentIdx >= PIPELINE_STAGES.length - 1) return
+    const nextStage = PIPELINE_STAGES[currentIdx + 1]
+    setAdvancingId(entry.id)
+
+    // Optimistic update
+    setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, current_stage: nextStage } : p))
+
+    const [updateRes, historyRes] = await Promise.all([
+      supabase
+        .from('pipeline')
+        .update({ current_stage: nextStage })
+        .eq('id', entry.id),
+      supabase
+        .from('pipeline_stage_history')
+        .insert({
+          pipeline_id:  entry.id,
+          recruiter_id: recruiter.id,
+          stage:        nextStage,
+        }),
+    ])
+
+    if (updateRes.error) {
+      console.error('stage advance failed:', updateRes.error)
+      // Roll back
+      setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p))
+    }
+    if (historyRes.error) console.error('stage history insert failed:', historyRes.error)
+
+    setAdvancingId(null)
+  }
+
+  function handleLogOpen() {
+    const today = new Date().toISOString().slice(0, 16) // "YYYY-MM-DDTHH:MM"
+    setLogForm({ type: 'call', direction: 'outbound', occurred_at: today, body: '' })
+    setLogError(null)
+    setLogOpen(true)
+  }
+
+  async function handleLogSave() {
+    if (!logForm.body.trim()) { setLogError('Notes are required.'); return }
+    setLogSaving(true)
+    setLogError(null)
+    const payload = {
+      recruiter_id: recruiter.id,
+      candidate_id: id,
+      type:         logForm.type,
+      direction:    logForm.type === 'note' ? null : logForm.direction,
+      occurred_at:  logForm.occurred_at || new Date().toISOString(),
+      body:         logForm.body.trim(),
+    }
+    const { data, error } = await supabase
+      .from('interactions')
+      .insert(payload)
+      .select()
+      .single()
+    if (error) {
+      setLogError(error.message)
+    } else {
+      setInteractions(prev => [data, ...prev])
+      setLogOpen(false)
+    }
+    setLogSaving(false)
   }
 
   async function handleDelete() {
@@ -722,6 +833,21 @@ export default function CandidateCard() {
       const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
       const result = JSON.parse(cleaned)
       setScorecard(result)
+
+      // Persist to pipeline entry for this candidate × role (may not exist yet)
+      const { data: freshEntry } = await supabase
+        .from('pipeline')
+        .select('id')
+        .eq('candidate_id', id)
+        .eq('role_id', screenerRoleId)
+        .maybeSingle()
+      if (freshEntry) {
+        const { error: scErr } = await supabase
+          .from('pipeline')
+          .update({ scorecard_result: result })
+          .eq('id', freshEntry.id)
+        if (scErr) console.error('scorecard save failed:', scErr)
+      }
     } catch (err) {
       setScorecardError(err.message ?? 'Scorecard generation failed.')
     } finally {
@@ -1007,7 +1133,12 @@ export default function CandidateCard() {
               <p className="muted">Not in any pipeline yet.</p>
             ) : (
               pipelines.map(entry => (
-                <PipelineEntry key={entry.id} entry={entry} />
+                <PipelineEntry
+                  key={entry.id}
+                  entry={entry}
+                  onAdvance={handleAdvanceStage}
+                  advancing={advancingId === entry.id}
+                />
               ))
             )}
           </section>
@@ -1143,52 +1274,106 @@ export default function CandidateCard() {
           )}
         </section>
 
-        {/* Scores History */}
-        {pipelines.some(p => p.fit_score != null) && (
+        {/* Scores History — sourced from screener_results, not pipeline */}
+        {screenerHistory.length > 0 && (
           <section className="candidate-section" style={{ marginTop: 24 }}>
             <h2 className="section-heading">Scores History</h2>
             <div className="scores-history">
-              {pipelines
-                .filter(p => p.fit_score != null)
-                .sort((a, b) => b.fit_score - a.fit_score)
-                .map(p => {
-                  const score = p.fit_score
-                  const tenth = score / 10
-                  const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
-                  let variant = 'none'
-                  if (score >= 80) variant = 'green'
-                  else if (score >= 50) variant = 'amber'
-                  else variant = 'red'
-                  return (
-                    <div key={p.id} className="scores-history-row">
-                      <div className="scores-history-role">
-                        <span className="scores-history-title">{p.roles?.title ?? 'Unknown role'}</span>
-                        {p.roles?.clients?.name && (
-                          <span className="scores-history-client">{p.roles.clients.name}</span>
-                        )}
-                      </div>
-                      <div className="scores-history-right">
-                        <span className={`fit-badge fit-badge--${variant}`}>
-                          {display}<span className="fit-badge-denom">/10</span>
-                        </span>
-                        {p.fit_score_rationale && (
-                          <p className="scores-history-rationale">{p.fit_score_rationale}</p>
-                        )}
-                      </div>
+              {screenerHistory.map(sr => {
+                const score = (sr.result?.match_score ?? 0) * 10
+                const tenth = score / 10
+                const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
+                let variant = 'none'
+                if (score >= 80) variant = 'green'
+                else if (score >= 50) variant = 'amber'
+                else variant = 'red'
+                const inPipeline = pipelines.some(p => p.role_id === sr.role_id)
+                return (
+                  <div key={sr.id} className="scores-history-row">
+                    <div className="scores-history-role">
+                      <span className="scores-history-title">{sr.roles?.title ?? 'Unknown role'}</span>
+                      {sr.roles?.clients?.name && (
+                        <span className="scores-history-client">{sr.roles.clients.name}</span>
+                      )}
+                      {!inPipeline && (
+                        <span className="scores-history-badge scores-history-badge--pre-pipeline">Pre-pipeline</span>
+                      )}
                     </div>
-                  )
-                })}
+                    <div className="scores-history-right">
+                      <span className={`fit-badge fit-badge--${variant}`}>
+                        {display}<span className="fit-badge-denom">/10</span>
+                      </span>
+                      <span className="scores-history-date">{formatDateShort(sr.scored_at)}</span>
+                      {sr.result?.recommendation_reason && (
+                        <p className="scores-history-rationale">{sr.result.recommendation_reason}</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}
 
         {/* Interaction history */}
         <section className="candidate-section" style={{ marginTop: 24 }}>
-          <h2 className="section-heading">Interaction History</h2>
+          <div className="section-heading-row">
+            <h2 className="section-heading">Interactions</h2>
+            {!logOpen && (
+              <button className="btn-ghost btn-sm" onClick={handleLogOpen}>+ Log</button>
+            )}
+          </div>
+
+          {logOpen && (
+            <div className="log-form">
+              <div className="log-form-row">
+                <select
+                  className="log-select"
+                  value={logForm.type}
+                  onChange={e => setLogForm(f => ({ ...f, type: e.target.value }))}
+                >
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                  <option value="note">Note</option>
+                </select>
+                {logForm.type !== 'note' && (
+                  <select
+                    className="log-select"
+                    value={logForm.direction}
+                    onChange={e => setLogForm(f => ({ ...f, direction: e.target.value }))}
+                  >
+                    <option value="outbound">Outbound</option>
+                    <option value="inbound">Inbound</option>
+                  </select>
+                )}
+                <input
+                  type="datetime-local"
+                  className="log-date"
+                  value={logForm.occurred_at}
+                  onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))}
+                />
+              </div>
+              <textarea
+                className="log-textarea"
+                placeholder="Notes…"
+                rows={3}
+                value={logForm.body}
+                onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))}
+              />
+              {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
+              <div className="log-form-actions">
+                <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>
+                  {logSaving ? 'Saving…' : 'Save'}
+                </button>
+                <button className="btn-ghost btn-sm" onClick={() => setLogOpen(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+
           {interactions.length === 0 ? (
-            <p className="muted">No interactions recorded yet.</p>
+            <p className="muted" style={{ marginTop: logOpen ? 16 : 0 }}>No interactions recorded yet.</p>
           ) : (
-            <div className="interaction-feed">
+            <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
               {interactions.map(i => (
                 <InteractionEntry key={i.id} interaction={i} />
               ))}
