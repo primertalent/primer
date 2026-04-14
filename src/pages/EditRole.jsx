@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+import { generateText } from '../lib/ai/index.js'
+import { buildJobDescriptionMessages } from '../lib/prompts/jobDescriptionWriter.js'
 
 const COMP_TYPES = [
   { value: 'salary',             label: 'Salary' },
@@ -94,6 +96,11 @@ export default function EditRole() {
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState(null)
 
+  // JD writer
+  const [jdWriter, setJdWriter] = useState({ phase: 'idle', result: '', error: '' })
+  // hold full role context after load for comp hints
+  const [roleContext, setRoleContext] = useState(null)
+
   useEffect(() => {
     if (!id || !recruiter?.id) return
 
@@ -115,10 +122,28 @@ export default function EditRole() {
           setSteps(data.process_steps ?? [])
           setNotes(data.notes ?? '')
           setClientName(data.clients?.name ?? '')
+          setRoleContext({ title: data.title, clients: { name: data.clients?.name }, comp_min: data.comp_min, comp_max: data.comp_max, comp_type: data.comp_type })
         }
         setLoading(false)
       })
   }, [id, recruiter?.id])
+
+  async function handleGenerateJD() {
+    if (!notes.trim()) return
+    setJdWriter({ phase: 'generating', result: '', error: '' })
+    try {
+      const ctx = roleContext ?? { title: title.trim() || null, clients: { name: clientName || null }, comp_min: compMin ? Number(compMin) : null, comp_max: compMax ? Number(compMax) : null, comp_type: compType || null }
+      const result = await generateText({ messages: buildJobDescriptionMessages(notes, ctx), maxTokens: 2048 })
+      setJdWriter({ phase: 'confirm', result, error: '' })
+    } catch {
+      setJdWriter({ phase: 'error', result: '', error: 'Could not generate job description. Try again.' })
+    }
+  }
+
+  function confirmJD() {
+    setNotes(jdWriter.result)
+    setJdWriter({ phase: 'idle', result: '', error: '' })
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -257,7 +282,17 @@ export default function EditRole() {
         </div>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="notes">Notes</label>
+          <div className="jd-notes-header">
+            <label className="form-label" htmlFor="notes">Notes</label>
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              onClick={handleGenerateJD}
+              disabled={jdWriter.phase === 'generating' || !notes.trim()}
+            >
+              {jdWriter.phase === 'generating' ? 'Generating…' : 'Generate JD'}
+            </button>
+          </div>
           <textarea
             id="notes"
             className="field-input field-textarea"
@@ -265,7 +300,25 @@ export default function EditRole() {
             onChange={e => setNotes(e.target.value)}
             rows={4}
           />
+          {jdWriter.phase === 'error' && <p className="error">{jdWriter.error}</p>}
         </div>
+
+        {/* JD writer confirmation modal */}
+        {jdWriter.phase === 'confirm' && (
+          <div className="modal-overlay">
+            <div className="modal modal--wide">
+              <div className="modal-header">
+                <h3 className="modal-title">Generated Job Description</h3>
+                <button className="modal-close" onClick={() => setJdWriter({ phase: 'idle', result: '', error: '' })}>×</button>
+              </div>
+              <pre className="jd-preview">{jdWriter.result}</pre>
+              <div className="modal-footer">
+                <button className="btn-primary" onClick={confirmJD}>Use this JD</button>
+                <button className="btn-ghost" onClick={() => setJdWriter({ phase: 'idle', result: '', error: '' })}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
 

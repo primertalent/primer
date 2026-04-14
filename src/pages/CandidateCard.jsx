@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -7,6 +7,11 @@ import { generateText } from '../lib/ai'
 import { buildNextActionMessages } from '../lib/prompts/nextAction'
 import { buildScreenerMessages } from '../lib/prompts/resumeScreener'
 import { buildCareerTimelineMessages } from '../lib/prompts/careerTimeline'
+import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
+import { buildCandidatePitchMessages } from '../lib/prompts/candidatePitchBuilder'
+import { buildScorecardMessages } from '../lib/prompts/candidateScorecard'
+import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmail'
+import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -350,6 +355,66 @@ function ScreenerResult({ result }) {
   )
 }
 
+// ── Scorecard result ──────────────────────────────────────
+
+const REC_SCORECARD_STYLES = {
+  advance: { label: 'Advance',  cls: 'screener-rec--advance' },
+  hold:    { label: 'Hold',     cls: 'screener-rec--hold'    },
+  probe:   { label: 'Probe',    cls: 'screener-rec--hold'    },
+  pass:    { label: 'Pass',     cls: 'screener-rec--pass'    },
+}
+
+const DIMENSION_LABELS = {
+  experience_fit:    'Experience Fit',
+  skills_match:      'Skills Match',
+  career_trajectory: 'Career Trajectory',
+  culture_signals:   'Culture Signals',
+  red_flags:         'Red Flags',
+}
+
+function ScoreDots({ score, max = 5, inverted = false }) {
+  return (
+    <span className="score-dots">
+      {Array.from({ length: max }, (_, i) => {
+        const filled = inverted ? i >= max - score : i < score
+        return <span key={i} className={`score-dot${filled ? ' score-dot--filled' : ''}`} />
+      })}
+    </span>
+  )
+}
+
+function ScorecardResult({ result }) {
+  const rec = REC_SCORECARD_STYLES[result.recommendation] ?? { label: result.recommendation, cls: '' }
+  return (
+    <div className="scorecard-result">
+      <div className="scorecard-header">
+        <div className="scorecard-overall">
+          <span className="scorecard-score-value">{result.overall_score}</span>
+          <span className="screener-score-denom">/10</span>
+        </div>
+        <div className="scorecard-header-right">
+          <span className={`screener-rec-badge ${rec.cls}`}>{rec.label}</span>
+          {result.verdict && <p className="screener-rec-reason">{result.verdict}</p>}
+        </div>
+      </div>
+      <div className="scorecard-dimensions">
+        {Object.entries(result.dimensions ?? {}).map(([key, dim]) => (
+          <div key={key} className="scorecard-dimension-row">
+            <div className="scorecard-dim-left">
+              <span className="scorecard-dim-label">{DIMENSION_LABELS[key] ?? key}</span>
+              <span className="scorecard-dim-rationale">{dim.rationale}</span>
+            </div>
+            <div className="scorecard-dim-right">
+              <ScoreDots score={dim.score} inverted={key === 'red_flags'} />
+              <span className="scorecard-dim-score">{dim.score}/5</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 export default function CandidateCard() {
@@ -380,6 +445,34 @@ export default function CandidateCard() {
   const [screenResult, setScreenResult] = useState(null)
   const [screenError, setScreenError] = useState(null)
 
+  // Scorecard
+  const [scorecard, setScorecard] = useState(null)
+  const [scorecardGenerating, setScorecardGenerating] = useState(false)
+  const [scorecardError, setScorecardError] = useState(null)
+
+  // Candidate pitch
+  const [pitchText, setPitchText] = useState(null)
+  const [pitchGenerating, setPitchGenerating] = useState(false)
+  const [pitchError, setPitchError] = useState(null)
+
+  // Outreach email modal
+  const [outreachModal, setOutreachModal] = useState({
+    open: false,
+    phase: 'pick',  // 'pick' | 'generating' | 'done' | 'error'
+    roleId: '',
+    result: null,   // { subject, body }
+    error: null,
+  })
+
+  // LinkedIn message modal
+  const [linkedinModal, setLinkedinModal] = useState({
+    open: false,
+    phase: 'pick',  // 'pick' | 'generating' | 'done' | 'error'
+    roleId: '',
+    text: null,
+    error: null,
+  })
+
   // Delete
   const [deleting, setDeleting] = useState(false)
 
@@ -388,6 +481,20 @@ export default function CandidateCard() {
   const [signals, setSignals] = useState(null)
   const [parsingCareer, setParsingCareer] = useState(false)
   const [careerError, setCareerError] = useState(null)
+
+  // Submission draft modal
+  const [subModal, setSubModal] = useState({
+    open: false,
+    phase: 'pick',    // 'pick' | 'generating' | 'done' | 'error'
+    format: 'email',  // 'email' | 'bullet'
+    mode: null,       // 'jd' | 'generic'
+    roleId: '',
+    text: '',
+    error: null,
+  })
+  const [subSaving, setSubSaving] = useState(false)
+  const [subSaved, setSubSaved] = useState(false)
+  const subTextareaRef = useRef(null)
 
   useEffect(() => {
     if (!id || !recruiter?.id) return
@@ -601,6 +708,159 @@ export default function CandidateCard() {
     setAddingRoleId(null)
   }
 
+  // ── Scorecard handler ────────────────────────────────────
+
+  async function handleGenerateScorecard() {
+    const role = openRoles?.find(r => r.id === screenerRoleId)
+    if (!role || !candidate?.cv_text) return
+    setScorecard(null)
+    setScorecardError(null)
+    setScorecardGenerating(true)
+    try {
+      const messages = buildScorecardMessages(candidate, role, screenResult)
+      const raw = await generateText({ messages, maxTokens: 1024 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const result = JSON.parse(cleaned)
+      setScorecard(result)
+    } catch (err) {
+      setScorecardError(err.message ?? 'Scorecard generation failed.')
+    } finally {
+      setScorecardGenerating(false)
+    }
+  }
+
+  // ── Candidate pitch handler ──────────────────────────────
+
+  async function handleGeneratePitch() {
+    const role = openRoles?.find(r => r.id === screenerRoleId)
+    if (!role || !candidate) return
+    setPitchText(null)
+    setPitchError(null)
+    setPitchGenerating(true)
+    try {
+      const messages = buildCandidatePitchMessages(candidate, role)
+      const text = await generateText({ messages, maxTokens: 1024 })
+      setPitchText(text)
+    } catch (err) {
+      setPitchError(err.message ?? 'Pitch generation failed.')
+    } finally {
+      setPitchGenerating(false)
+    }
+  }
+
+  // ── Outreach email handlers ──────────────────────────────
+
+  function openOutreachModal() {
+    setOutreachModal({ open: true, phase: 'pick', roleId: '', result: null, error: null })
+  }
+
+  function closeOutreachModal() {
+    setOutreachModal({ open: false, phase: 'pick', roleId: '', result: null, error: null })
+  }
+
+  async function handleGenerateOutreach() {
+    const role = outreachModal.roleId
+      ? openRoles?.find(r => r.id === outreachModal.roleId) ?? null
+      : null
+
+    setOutreachModal(prev => ({ ...prev, phase: 'generating', result: null, error: null }))
+
+    try {
+      const messages = buildOutreachEmailMessages(candidate, role)
+      const raw = await generateText({ messages, maxTokens: 512 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const result = JSON.parse(cleaned)
+      setOutreachModal(prev => ({ ...prev, phase: 'done', result }))
+    } catch (err) {
+      setOutreachModal(prev => ({ ...prev, phase: 'error', error: err.message ?? 'Generation failed.' }))
+    }
+  }
+
+  // ── LinkedIn message handlers ────────────────────────────
+
+  function openLinkedinModal() {
+    setLinkedinModal({ open: true, phase: 'pick', roleId: '', text: null, error: null })
+  }
+
+  function closeLinkedinModal() {
+    setLinkedinModal({ open: false, phase: 'pick', roleId: '', text: null, error: null })
+  }
+
+  async function handleGenerateLinkedIn() {
+    const role = linkedinModal.roleId
+      ? openRoles?.find(r => r.id === linkedinModal.roleId) ?? null
+      : null
+
+    setLinkedinModal(prev => ({ ...prev, phase: 'generating', text: null, error: null }))
+
+    try {
+      const messages = buildLinkedInMessageMessages(candidate, role)
+      const text = await generateText({ messages, maxTokens: 256 })
+      setLinkedinModal(prev => ({ ...prev, phase: 'done', text: text.trim() }))
+    } catch (err) {
+      setLinkedinModal(prev => ({ ...prev, phase: 'error', error: err.message ?? 'Generation failed.' }))
+    }
+  }
+
+  // ── Submission draft handlers ────────────────────────────
+
+  function openSubModal() {
+    setSubModal({ open: true, phase: 'pick', format: 'email', mode: null, roleId: '', text: '', error: null })
+    setSubSaved(false)
+  }
+
+  function closeSubModal() {
+    setSubModal({ open: false, phase: 'pick', format: 'email', mode: null, roleId: '', text: '', error: null })
+    setSubSaved(false)
+  }
+
+  async function handleSubGenerate() {
+    const { format, mode, roleId } = subModal
+    setSubModal(prev => ({ ...prev, phase: 'generating', text: '', error: null }))
+    setSubSaved(false)
+
+    try {
+      let role
+      if (mode === 'jd') {
+        const found = openRoles?.find(r => r.id === roleId)
+        if (!found) throw new Error('Role not found.')
+        // Find matching pipeline entry for fit score
+        const pipelineEntry = pipelines.find(p => p.role_id === roleId)
+        role = found
+        const messages = buildSubmissionMessages(candidate, role, pipelineEntry?.fit_score ?? null, format)
+        const text = await generateText({ messages, maxTokens: 1024 })
+        setSubModal(prev => ({ ...prev, phase: 'done', text }))
+      } else {
+        // Generic — no JD, no role context
+        const genericRole = { title: 'Open Role', clients: null, notes: null, comp_min: null, comp_max: null, comp_type: null }
+        const messages = buildSubmissionMessages(candidate, genericRole, null, format)
+        const text = await generateText({ messages, maxTokens: 1024 })
+        setSubModal(prev => ({ ...prev, phase: 'done', text }))
+      }
+    } catch (err) {
+      setSubModal(prev => ({ ...prev, phase: 'error', error: err.message ?? 'Generation failed.' }))
+    }
+  }
+
+  async function handleSubSaveToQueue() {
+    if (!subModal.text || subSaving) return
+    setSubSaving(true)
+    const roleName = subModal.mode === 'jd'
+      ? openRoles?.find(r => r.id === subModal.roleId)?.title ?? 'Role'
+      : 'General Submission'
+    const subject = `${candidate.first_name} ${candidate.last_name} — ${roleName}`
+    const { error } = await supabase.from('messages').insert({
+      recruiter_id:  recruiter.id,
+      candidate_id:  id,
+      channel:       'email',
+      subject,
+      body:          subModal.text,
+      status:        'drafted',
+    })
+    if (!error) setSubSaved(true)
+    setSubSaving(false)
+  }
+
   // ── Render states ────────────────────────────────────────
 
   if (loading) {
@@ -638,6 +898,15 @@ export default function CandidateCard() {
             <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
             <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+            <button className="btn-ghost" onClick={openLinkedinModal}>
+              Draft LinkedIn
+            </button>
+            <button className="btn-ghost" onClick={openOutreachModal}>
+              Draft Outreach
+            </button>
+            <button className="btn-ghost" onClick={openSubModal}>
+              Draft Submission
             </button>
             <button
               className="btn-primary"
@@ -756,6 +1025,10 @@ export default function CandidateCard() {
                 setScreenerRoleId(e.target.value)
                 setScreenResult(null)
                 setScreenError(null)
+                setPitchText(null)
+                setPitchError(null)
+                setScorecard(null)
+                setScorecardError(null)
               }}
               disabled={!openRoles}
             >
@@ -775,6 +1048,15 @@ export default function CandidateCard() {
             >
               {screening ? 'Screening…' : 'Screen Against Role'}
             </button>
+            {pipelines.length > 0 && (
+              <button
+                className="btn-ghost"
+                onClick={handleGeneratePitch}
+                disabled={!screenerRoleId || pitchGenerating}
+              >
+                {pitchGenerating ? 'Generating…' : 'Generate Pitch'}
+              </button>
+            )}
           </div>
 
           {screenError && (
@@ -785,6 +1067,50 @@ export default function CandidateCard() {
           )}
 
           {screenResult && <ScreenerResult result={screenResult} />}
+
+          {/* Full Scorecard — only when cv_text exists and candidate is in pipeline for selected role */}
+          {candidate.cv_text && screenerRoleId && pipelines.some(p => p.role_id === screenerRoleId) && (
+            <div style={{ marginTop: 16 }}>
+              <button
+                className="btn-ghost"
+                onClick={handleGenerateScorecard}
+                disabled={scorecardGenerating}
+              >
+                {scorecardGenerating ? 'Generating…' : scorecard ? 'Regenerate Scorecard' : 'Full Scorecard'}
+              </button>
+            </div>
+          )}
+
+          {scorecardError && (
+            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
+              <p className="ai-card-eyebrow">Error</p>
+              <p className="ai-card-body">{scorecardError}</p>
+            </div>
+          )}
+
+          {scorecard && <ScorecardResult result={scorecard} />}
+
+          {pitchError && (
+            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
+              <p className="ai-card-eyebrow">Error</p>
+              <p className="ai-card-body">{pitchError}</p>
+            </div>
+          )}
+
+          {pitchText && (
+            <div className="pitch-result" style={{ marginTop: 16 }}>
+              <div className="pitch-result-header">
+                <p className="screener-block-label">Candidate Pitch</p>
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => navigator.clipboard.writeText(pitchText)}
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="pitch-body">{pitchText}</p>
+            </div>
+          )}
         </section>
 
         {/* Career Timeline */}
@@ -869,6 +1195,268 @@ export default function CandidateCard() {
             </div>
           )}
         </section>
+
+      {/* LinkedIn message modal */}
+      {linkedinModal.open && (
+        <div className="modal-overlay" onClick={closeLinkedinModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Draft LinkedIn Message</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name} · 300 characters max</p>
+              </div>
+              <button className="modal-close" onClick={closeLinkedinModal}>✕</button>
+            </div>
+
+            {linkedinModal.phase === 'pick' && (
+              <>
+                <div className="sub-mode-section">
+                  <p className="sub-mode-label">Role (optional)</p>
+                  <p className="sub-mode-hint">Personalizes the message against a specific role and comp range.</p>
+                  <select
+                    className="field-input"
+                    value={linkedinModal.roleId}
+                    onChange={e => setLinkedinModal(prev => ({ ...prev, roleId: e.target.value }))}
+                  >
+                    <option value="">No role — general message</option>
+                    {openRoles?.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-primary" onClick={handleGenerateLinkedIn}>Generate</button>
+                  <button className="btn-ghost" onClick={closeLinkedinModal}>Cancel</button>
+                </div>
+              </>
+            )}
+
+            {linkedinModal.phase === 'generating' && (
+              <p className="muted modal-generating">Drafting message…</p>
+            )}
+
+            {linkedinModal.phase === 'error' && (
+              <p className="error" style={{ marginTop: 8 }}>{linkedinModal.error}</p>
+            )}
+
+            {linkedinModal.phase === 'done' && linkedinModal.text && (
+              <>
+                <div className="outreach-field">
+                  <div className="outreach-field-header">
+                    <p className="sub-mode-label">
+                      Message
+                      <span className={`char-count${linkedinModal.text.length > 300 ? ' char-count--over' : ''}`}>
+                        {' '}· {linkedinModal.text.length}/300
+                      </span>
+                    </p>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() => navigator.clipboard.writeText(linkedinModal.text)}
+                    >Copy</button>
+                  </div>
+                  <p className="outreach-body">{linkedinModal.text}</p>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={handleGenerateLinkedIn}>Regenerate</button>
+                  <button className="btn-ghost" onClick={closeLinkedinModal}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Outreach email modal */}
+      {outreachModal.open && (
+        <div className="modal-overlay" onClick={closeOutreachModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Draft Outreach</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name}</p>
+              </div>
+              <button className="modal-close" onClick={closeOutreachModal}>✕</button>
+            </div>
+
+            {outreachModal.phase === 'pick' && (
+              <>
+                <div className="sub-mode-section">
+                  <p className="sub-mode-label">Role (optional)</p>
+                  <p className="sub-mode-hint">Personalizes the email against a specific JD and comp range. Leave blank for a general outreach.</p>
+                  <select
+                    className="field-input"
+                    value={outreachModal.roleId}
+                    onChange={e => setOutreachModal(prev => ({ ...prev, roleId: e.target.value }))}
+                  >
+                    <option value="">No role — general outreach</option>
+                    {openRoles?.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-primary" onClick={handleGenerateOutreach}>Generate</button>
+                  <button className="btn-ghost" onClick={closeOutreachModal}>Cancel</button>
+                </div>
+              </>
+            )}
+
+            {outreachModal.phase === 'generating' && (
+              <p className="muted modal-generating">Drafting outreach…</p>
+            )}
+
+            {outreachModal.phase === 'error' && (
+              <p className="error" style={{ marginTop: 8 }}>{outreachModal.error}</p>
+            )}
+
+            {outreachModal.phase === 'done' && outreachModal.result && (
+              <>
+                <div className="outreach-field">
+                  <div className="outreach-field-header">
+                    <p className="sub-mode-label">Subject</p>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() => navigator.clipboard.writeText(outreachModal.result.subject)}
+                    >Copy</button>
+                  </div>
+                  <p className="outreach-subject">{outreachModal.result.subject}</p>
+                </div>
+                <div className="outreach-field">
+                  <div className="outreach-field-header">
+                    <p className="sub-mode-label">Body</p>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() => navigator.clipboard.writeText(outreachModal.result.body)}
+                    >Copy</button>
+                  </div>
+                  <p className="outreach-body">{outreachModal.result.body}</p>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={handleGenerateOutreach}>Regenerate</button>
+                  <button className="btn-ghost" onClick={closeOutreachModal}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Submission draft modal */}
+      {subModal.open && (
+        <div className="modal-overlay" onClick={closeSubModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Draft Submission</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name}</p>
+              </div>
+              <button className="modal-close" onClick={closeSubModal}>✕</button>
+            </div>
+
+            {/* Format toggle */}
+            {(subModal.phase === 'pick' || subModal.phase === 'done') && (
+              <div className="format-toggle">
+                <button
+                  className={`format-toggle-btn${subModal.format === 'email' ? ' format-toggle-btn--active' : ''}`}
+                  onClick={() => setSubModal(prev => ({ ...prev, format: 'email' }))}
+                >Email</button>
+                <button
+                  className={`format-toggle-btn${subModal.format === 'bullet' ? ' format-toggle-btn--active' : ''}`}
+                  onClick={() => setSubModal(prev => ({ ...prev, format: 'bullet' }))}
+                >Bullet</button>
+              </div>
+            )}
+
+            {/* Pick phase — choose mode and role */}
+            {subModal.phase === 'pick' && (
+              <div className="sub-mode-picker">
+                {pipelines.length > 0 && (
+                  <div className="sub-mode-section">
+                    <p className="sub-mode-label">JD Specific</p>
+                    <p className="sub-mode-hint">Tailor the submission to a specific role's job description.</p>
+                    <select
+                      className="field-input"
+                      value={subModal.roleId}
+                      onChange={e => setSubModal(prev => ({ ...prev, roleId: e.target.value, mode: e.target.value ? 'jd' : null }))}
+                    >
+                      <option value="">Select a role…</option>
+                      {pipelines.map(p => (
+                        <option key={p.id} value={p.role_id ?? p.roles?.id}>
+                          {p.roles?.title ?? 'Unknown role'}{p.roles?.clients?.name ? ` — ${p.roles.clients.name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="sub-mode-section">
+                  <p className="sub-mode-label">Generic</p>
+                  <p className="sub-mode-hint">Write based on the candidate's record alone — no JD context.</p>
+                  <button
+                    className={`btn-ghost${subModal.mode === 'generic' ? ' btn-ghost--selected' : ''}`}
+                    onClick={() => setSubModal(prev => ({ ...prev, mode: 'generic', roleId: '' }))}
+                  >
+                    Use Generic
+                  </button>
+                </div>
+                <div className="modal-actions" style={{ marginTop: 8 }}>
+                  <button
+                    className="btn-primary"
+                    onClick={handleSubGenerate}
+                    disabled={!subModal.mode}
+                  >
+                    Generate
+                  </button>
+                  <button className="btn-ghost" onClick={closeSubModal}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {subModal.phase === 'generating' && (
+              <p className="muted modal-generating">Drafting submission…</p>
+            )}
+
+            {subModal.phase === 'error' && (
+              <p className="error" style={{ marginTop: 8 }}>{subModal.error}</p>
+            )}
+
+            {subModal.phase === 'done' && (
+              <>
+                <textarea
+                  ref={subTextareaRef}
+                  className="submission-textarea"
+                  value={subModal.text}
+                  onChange={e => setSubModal(prev => ({ ...prev, text: e.target.value }))}
+                  rows={12}
+                />
+                <div className="modal-actions">
+                  <button
+                    className="btn-primary"
+                    onClick={handleSubSaveToQueue}
+                    disabled={subSaving || subSaved}
+                  >
+                    {subSaved ? 'Saved ✓' : subSaving ? 'Saving…' : 'Save to Queue'}
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(subModal.text)
+                      subTextareaRef.current?.select()
+                    }}
+                  >
+                    Copy
+                  </button>
+                  <button className="btn-ghost" onClick={handleSubGenerate}>Regenerate</button>
+                  <button className="btn-ghost" onClick={closeSubModal}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
     </AppLayout>
   )

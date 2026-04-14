@@ -5,6 +5,8 @@ import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 import { generateText } from '../lib/ai/index.js'
 import { buildJdMessages, buildJdPdfMessages } from '../lib/prompts/jdExtractor.js'
+import { buildBooleanSearchMessages } from '../lib/prompts/booleanSearchBuilder.js'
+import { buildJobDescriptionMessages } from '../lib/prompts/jobDescriptionWriter.js'
 
 async function fileToBase64(file) {
   const buffer = await file.arrayBuffer()
@@ -212,6 +214,9 @@ export default function CreateRole() {
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState(null)
 
+  // JD writer
+  const [jdWriter, setJdWriter] = useState({ phase: 'idle', result: '', error: '' })
+
   // JD importer
   const [jdText, setJdText]             = useState('')
   const [extracting, setExtracting]     = useState(false)
@@ -236,6 +241,24 @@ export default function CreateRole() {
     } finally {
       setPdfLoading(false)
     }
+  }
+
+  async function handleGenerateJD() {
+    const source = notes.trim() || jdText.trim()
+    if (!source) return
+    setJdWriter({ phase: 'generating', result: '', error: '' })
+    try {
+      const roleContext = { title: title.trim() || null, clients: { name: client.name || null }, comp_min: compMin ? Number(compMin) : null, comp_max: compMax ? Number(compMax) : null, comp_type: compType || null }
+      const result = await generateText({ messages: buildJobDescriptionMessages(source, roleContext), maxTokens: 2048 })
+      setJdWriter({ phase: 'confirm', result, error: '' })
+    } catch {
+      setJdWriter({ phase: 'error', result: '', error: 'Could not generate job description. Try again.' })
+    }
+  }
+
+  function confirmJD() {
+    setNotes(jdWriter.result)
+    setJdWriter({ phase: 'idle', result: '', error: '' })
   }
 
   async function handleExtract() {
@@ -307,23 +330,43 @@ export default function CreateRole() {
         clientId = data.id
       }
 
-      // Create role
-      const { error: roleErr } = await supabase
+      // Create role — get ID back for search string generation
+      const rolePayload = {
+        recruiter_id:  recruiter.id,
+        client_id:     clientId,
+        title:         title.trim(),
+        comp_min:      compMin ? Number(compMin) : null,
+        comp_max:      compMax ? Number(compMax) : null,
+        comp_currency: 'USD',
+        comp_type:     compType || null,
+        process_steps: steps.filter(s => s.trim()),
+        notes:         notes.trim() || null,
+        status:        'open',
+      }
+
+      const { data: newRole, error: roleErr } = await supabase
         .from('roles')
-        .insert({
-          recruiter_id:  recruiter.id,
-          client_id:     clientId,
-          title:         title.trim(),
-          comp_min:      compMin ? Number(compMin) : null,
-          comp_max:      compMax ? Number(compMax) : null,
-          comp_currency: 'USD',
-          comp_type:     compType || null,
-          process_steps: steps.filter(s => s.trim()),
-          notes:         notes.trim() || null,
-          status:        'open',
-        })
+        .insert(rolePayload)
+        .select('id')
+        .single()
 
       if (roleErr) throw new Error(`Failed to create role: ${roleErr.message}`)
+
+      // Auto-generate search strings in background — doesn't block navigation
+      if (newRole?.id) {
+        const roleForSearch = {
+          ...rolePayload,
+          id: newRole.id,
+          clients: { name: client.name },
+        }
+        generateText({ messages: buildBooleanSearchMessages(roleForSearch), maxTokens: 1024 })
+          .then(raw => {
+            const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+            const result = JSON.parse(cleaned)
+            return supabase.from('roles').update({ search_strings: result }).eq('id', newRole.id)
+          })
+          .catch(err => console.warn('Auto search string generation failed:', err.message))
+      }
 
       navigate('/roles')
     } catch (err) {
@@ -453,7 +496,17 @@ export default function CreateRole() {
 
         {/* Notes */}
         <div className="form-field">
-          <label className="form-label" htmlFor="notes">Notes</label>
+          <div className="jd-notes-header">
+            <label className="form-label" htmlFor="notes">Notes</label>
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              onClick={handleGenerateJD}
+              disabled={jdWriter.phase === 'generating' || (!notes.trim() && !jdText.trim())}
+            >
+              {jdWriter.phase === 'generating' ? 'Generating…' : 'Generate JD'}
+            </button>
+          </div>
           <textarea
             id="notes"
             className="field-input field-textarea"
@@ -462,7 +515,25 @@ export default function CreateRole() {
             placeholder="Anything else relevant to this role…"
             rows={4}
           />
+          {jdWriter.phase === 'error' && <p className="error">{jdWriter.error}</p>}
         </div>
+
+        {/* JD writer confirmation modal */}
+        {jdWriter.phase === 'confirm' && (
+          <div className="modal-overlay">
+            <div className="modal modal--wide">
+              <div className="modal-header">
+                <h3 className="modal-title">Generated Job Description</h3>
+                <button className="modal-close" onClick={() => setJdWriter({ phase: 'idle', result: '', error: '' })}>×</button>
+              </div>
+              <pre className="jd-preview">{jdWriter.result}</pre>
+              <div className="modal-footer">
+                <button className="btn-primary" onClick={confirmJD}>Use this JD</button>
+                <button className="btn-ghost" onClick={() => setJdWriter({ phase: 'idle', result: '', error: '' })}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
 

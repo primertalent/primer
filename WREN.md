@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-14.
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-14 (session 3).
 
 ---
 
@@ -51,6 +51,10 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - Career timeline saves to `career_timeline` JSONB column on candidates table
 - Career signals save to `career_signals` JSONB column on candidates table
 - Screener fit score saves to `pipeline` table after screening
+- **Candidate submission drafting** — ✉ button on each kanban card in RoleDetail. Fetches full candidate record, calls AI with JD context. Modal with Email/Bullet format toggle, editable textarea, Save to Queue or Copy. Saved drafts appear in /queue as status: drafted.
+- **Bidirectional pipeline movement** — ← and → buttons on every kanban card. ← only appears when there's a previous stage, → only when there's a next. Optimistic UI with rollback on error.
+- **Two submission formats** — Email (narrative, under 250 words) and Bullet (structured plain-text bullets, under 150 words). Toggle appears before generation and after — switch format and Regenerate.
+- **Submission draft on Candidate Card** — "Draft Submission" button in the page header. Supports JD Specific (pick a pipeline role, pulls its JD) or Generic (candidate record only). Same modal pattern: format toggle, Generate, editable textarea, Save to Queue or Copy.
 
 ---
 
@@ -77,6 +81,7 @@ Key tables:
 - `MorningBrief.jsx` — daily brief with stat cards
 - `ClientDetail.jsx` — client view with contacts
 - `api/ai.js` — all Anthropic API calls go through here server-side
+- `src/lib/prompts/submissionDraft.js` — prompt builder for submission drafts. Accepts `format` ('email' | 'bullet'). Email = narrative under 250 words. Bullet = structured plain-text under 150 words.
 
 ---
 
@@ -121,12 +126,15 @@ Wren should surface what matters without being asked. Signal badges on a candida
 
 ## Current Priority Queue
 
-1. **Candidate submission drafting** — Given a candidate record + JD, Wren drafts a compelling Paraform/ATS/email submission. One click, review, send. High value, directly saves time on real placements today.
-2. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
-3. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
-4. **Call mode screen** — A focused view for during/after a candidate or client call.
-5. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record.
-6. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
+1. ~~**Candidate submission drafting**~~ ✓ Shipped 2026-04-14
+2. ~~**Bidirectional pipeline movement**~~ ✓ Shipped 2026-04-14
+3. ~~**Two submission formats (Email / Bullet)**~~ ✓ Shipped 2026-04-14
+4. ~~**Submission draft on Candidate Card**~~ ✓ Shipped 2026-04-14
+5. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
+6. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
+7. **Call mode screen** — A focused view for during/after a candidate or client call.
+8. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record.
+9. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
 
 ---
 
