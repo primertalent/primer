@@ -82,6 +82,7 @@ export default function RoleDetail() {
   const [pipeline, setPipeline] = useState([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!id || !recruiter?.id) return
@@ -114,6 +115,13 @@ export default function RoleDetail() {
 
     fetchRole()
   }, [id, recruiter?.id])
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete "${role.title}"? This cannot be undone.`)) return
+    setDeleting(true)
+    await supabase.from('roles').delete().eq('id', id)
+    navigate('/roles')
+  }
 
   if (loading) {
     return <AppLayout><p className="muted">Loading…</p></AppLayout>
@@ -161,9 +169,12 @@ export default function RoleDetail() {
             </p>
           </div>
         </div>
-        <Link to={`/roles/${id}/edit`} className="btn-ghost">
-          Edit
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link to={`/roles/${id}/edit`} className="btn-ghost">Edit</Link>
+          <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
       </div>
 
       {/* Pipeline board */}

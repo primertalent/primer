@@ -166,6 +166,9 @@ export default function ClientDetail() {
   // Contact add
   const [addingContact, setAddingContact] = useState(false)
 
+  // Delete
+  const [deleting, setDeleting] = useState(false)
+
   useEffect(() => {
     if (!id || !recruiter?.id) return
 
@@ -206,6 +209,13 @@ export default function ClientDetail() {
 
     fetchAll()
   }, [id, recruiter?.id])
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete "${client.name}"? This cannot be undone.`)) return
+    setDeleting(true)
+    await supabase.from('clients').delete().eq('id', id)
+    navigate('/clients')
+  }
 
   function startEditing() {
     setEditName(client.name)
@@ -338,7 +348,12 @@ export default function ClientDetail() {
         </div>
 
         {!editing && (
-          <button className="btn-ghost" onClick={startEditing}>Edit</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost" onClick={startEditing}>Edit</button>
+            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
         )}
       </div>
 

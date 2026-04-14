@@ -162,6 +162,17 @@ body {
   border-color: var(--color-text);
 }
 
+.btn-ghost.btn-danger {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.btn-ghost.btn-danger:hover {
+  background: var(--color-error);
+  color: #fff;
+  border-color: var(--color-error);
+}
+
 /* ── Error ──────────────────────────────────────────── */
 
 .error {
@@ -1636,6 +1647,347 @@ select.field-input {
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
+}
+
+/* ── Candidates table ───────────────────────────────── */
+
+.candidates-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.candidates-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.candidates-th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.candidates-th--sortable { padding: 0; }
+
+.sort-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.1s;
+}
+
+.sort-btn:hover { color: var(--color-text); }
+
+.candidates-th--active .sort-btn { color: var(--color-text); }
+
+.candidates-tr:not(:last-child) td { border-bottom: 1px solid var(--color-border); }
+
+.candidates-tr:hover td { background: var(--color-bg); }
+
+.candidates-td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  background: var(--color-surface);
+  transition: background 0.1s;
+}
+
+.candidates-td--name { white-space: nowrap; }
+
+.candidate-table-name {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.candidate-table-name:hover { text-decoration: underline; }
+
+.candidate-table-role {
+  font-size: 12px;
+  color: var(--color-muted);
+  max-width: 200px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-table-location {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.candidate-table-roles {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.candidate-table-touch {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* Skill tags (small variant for table) */
+
+.skill-tags-sm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 220px;
+}
+
+.skill-tag-sm {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 11px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.skill-tag-sm--more {
+  font-weight: 600;
+  color: var(--color-text);
+  border-style: dashed;
+}
+
+/* Fit score badge */
+
+.fit-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fit-badge-denom {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.fit-badge--none  { background: var(--color-bg); color: var(--color-muted); border: 1px solid var(--color-border); }
+.fit-badge--green { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.fit-badge--amber { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.fit-badge--red   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+/* ── Signal badges ──────────────────────────────────── */
+
+.signal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.signal-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* ── Tenure summary ─────────────────────────────────── */
+
+.tenure-summary {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tenure-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 80px;
+}
+
+.tenure-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.tenure-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.tenure-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--color-border);
+  margin: 0 24px;
+}
+
+/* ── Career timeline ────────────────────────────────── */
+
+.career-entry {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.career-entry:last-child { border-bottom: none; }
+
+.career-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.career-entry-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.career-company {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.career-title {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.career-entry-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.career-dates {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.career-duration {
+  font-size: 11px;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+
+.career-achievements {
+  margin: 10px 0 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.career-achievements li {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* ── Scores history ─────────────────────────────────── */
+
+.scores-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.scores-history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--color-surface);
+}
+
+.scores-history-row:not(:last-child) { border-bottom: 1px solid var(--color-border); }
+
+.scores-history-role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scores-history-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.scores-history-client {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.scores-history-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.scores-history-rationale {
+  font-size: 12px;
+  color: var(--color-muted);
+  text-align: right;
+  max-width: 300px;
+  line-height: 1.4;
 }
 
 /* ── Role card as link ──────────────────────────────── */

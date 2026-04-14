@@ -16,12 +16,6 @@ export default function AppLayout({ children }) {
             Brief
           </NavLink>
           <NavLink
-            to="/candidates"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Candidates
-          </NavLink>
-          <NavLink
             to="/clients"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
@@ -32,6 +26,12 @@ export default function AppLayout({ children }) {
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
             Roles
+          </NavLink>
+          <NavLink
+            to="/candidates"
+            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+          >
+            Candidates
           </NavLink>
           <NavLink
             to="/queue"

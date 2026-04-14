@@ -4,6 +4,8 @@ import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 
+// ── Constants ─────────────────────────────────────────
+
 const SOURCE_LABELS = {
   sourced:   'Sourced',
   inbound:   'Inbound',
@@ -12,92 +14,170 @@ const SOURCE_LABELS = {
   other:     'Other',
 }
 
-function CandidateRow({ candidate }) {
-  const activePipeline = (candidate.pipeline ?? []).filter(p => p.status === 'active').length
+// ── Helpers ───────────────────────────────────────────
 
-  const highestFit = (candidate.pipeline ?? []).reduce((max, p) => {
+function highestFit(pipeline) {
+  return (pipeline ?? []).reduce((max, p) => {
     if (p.fit_score != null && p.fit_score > max) return p.fit_score
     return max
   }, -1)
+}
 
+function activePipelineCount(pipeline) {
+  return (pipeline ?? []).filter(p => p.status === 'active').length
+}
+
+function formatLastTouch(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  const now = new Date()
+  const diffDays = Math.floor((now - d) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
+  return `${Math.floor(diffDays / 365)}y ago`
+}
+
+// ── Sub-components ────────────────────────────────────
+
+function FitBadge({ score }) {
+  if (score < 0) return <span className="fit-badge fit-badge--none">—</span>
+  const tenth = score / 10
+  const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
+  let variant = 'none'
+  if (score >= 80) variant = 'green'
+  else if (score >= 50) variant = 'amber'
+  else variant = 'red'
   return (
-    <Link to={`/candidates/${candidate.id}`} className="candidate-row">
-      <div className="candidate-row-main">
-        <span className="candidate-row-name">
-          {candidate.first_name} {candidate.last_name}
-        </span>
-        {(candidate.current_title || candidate.current_company) && (
-          <span className="candidate-row-role">
-            {[candidate.current_title, candidate.current_company].filter(Boolean).join(' · ')}
-          </span>
-        )}
-        {candidate.location && (
-          <span className="candidate-row-location">{candidate.location}</span>
-        )}
-      </div>
-
-      <div className="candidate-row-meta">
-        {candidate.source && (
-          <span className={`source-badge source-badge--${candidate.source}`}>
-            {SOURCE_LABELS[candidate.source] ?? candidate.source}
-          </span>
-        )}
-        {activePipeline > 0 && (
-          <span className="candidate-pipeline-count">
-            {activePipeline} {activePipeline === 1 ? 'role' : 'roles'}
-          </span>
-        )}
-        {highestFit >= 0 && (
-          <span className="candidate-fit-score">
-            {Math.round(highestFit)}<span className="fit-denom">/100</span>
-          </span>
-        )}
-      </div>
-    </Link>
+    <span className={`fit-badge fit-badge--${variant}`}>
+      {display}<span className="fit-badge-denom">/10</span>
+    </span>
   )
 }
+
+function SkillTags({ skills }) {
+  if (!skills?.length) return <span className="muted" style={{ fontSize: 12 }}>—</span>
+  const visible = skills.slice(0, 3)
+  const extra = skills.length - 3
+  return (
+    <div className="skill-tags-sm">
+      {visible.map(s => <span key={s} className="skill-tag-sm">{s}</span>)}
+      {extra > 0 && <span className="skill-tag-sm skill-tag-sm--more">+{extra}</span>}
+    </div>
+  )
+}
+
+function SortHeader({ label, col, sortCol, sortDir, onSort }) {
+  const active = sortCol === col
+  const indicator = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+  return (
+    <th className={`candidates-th candidates-th--sortable${active ? ' candidates-th--active' : ''}`}>
+      <button className="sort-btn" onClick={() => onSort(col)}>
+        {label}{indicator}
+      </button>
+    </th>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────
 
 export default function Candidates() {
   const { recruiter } = useRecruiter()
   const navigate = useNavigate()
 
   const [candidates, setCandidates] = useState([])
+  const [lastTouchMap, setLastTouchMap] = useState({})
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+
+  const [search, setSearch]           = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
+  const [skillFilter, setSkillFilter] = useState('')
+  const [sortCol, setSortCol]         = useState('name')
+  const [sortDir, setSortDir]         = useState('asc')
 
   useEffect(() => {
     if (!recruiter?.id) return
 
-    async function fetchCandidates() {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select(`
-          id, first_name, last_name, current_title, current_company,
-          location, source,
-          pipeline ( id, status, fit_score )
-        `)
-        .eq('recruiter_id', recruiter.id)
-        .order('created_at', { ascending: false })
+    async function fetchAll() {
+      const [candidatesRes, interactionsRes] = await Promise.all([
+        supabase
+          .from('candidates')
+          .select(`
+            id, first_name, last_name, current_title, current_company,
+            location, source, skills,
+            pipeline ( id, status, fit_score )
+          `)
+          .eq('recruiter_id', recruiter.id)
+          .order('created_at', { ascending: false }),
 
-      if (!error) setCandidates(data ?? [])
+        supabase
+          .from('interactions')
+          .select('candidate_id, occurred_at')
+          .eq('recruiter_id', recruiter.id)
+          .order('occurred_at', { ascending: false }),
+      ])
+
+      if (!candidatesRes.error) setCandidates(candidatesRes.data ?? [])
+
+      // Build candidate_id → most recent interaction date map
+      const map = {}
+      for (const row of interactionsRes.data ?? []) {
+        if (!map[row.candidate_id]) map[row.candidate_id] = row.occurred_at
+      }
+      setLastTouchMap(map)
       setLoading(false)
     }
 
-    fetchCandidates()
+    fetchAll()
   }, [recruiter?.id])
+
+  // Unique skills across all candidates for the filter dropdown
+  const allSkills = useMemo(() => {
+    const set = new Set()
+    for (const c of candidates) {
+      for (const s of c.skills ?? []) set.add(s)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [candidates])
+
+  function handleSort(col) {
+    setSortCol(prev => {
+      if (prev === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return col }
+      setSortDir('asc')
+      return col
+    })
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return candidates.filter(c => {
+    let list = candidates.filter(c => {
       if (sourceFilter && c.source !== sourceFilter) return false
+      if (skillFilter && !(c.skills ?? []).includes(skillFilter)) return false
       if (!q) return true
       const name = `${c.first_name} ${c.last_name}`.toLowerCase()
       const title = (c.current_title ?? '').toLowerCase()
       const company = (c.current_company ?? '').toLowerCase()
       return name.includes(q) || title.includes(q) || company.includes(q)
     })
-  }, [candidates, search, sourceFilter])
+
+    list = [...list].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'name') {
+        cmp = `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+      } else if (sortCol === 'fit') {
+        cmp = highestFit(b.pipeline) - highestFit(a.pipeline)
+      } else if (sortCol === 'lastTouch') {
+        const aD = lastTouchMap[a.id] ? new Date(lastTouchMap[a.id]).getTime() : 0
+        const bD = lastTouchMap[b.id] ? new Date(lastTouchMap[b.id]).getTime() : 0
+        cmp = bD - aD
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+    return list
+  }, [candidates, search, sourceFilter, skillFilter, sortCol, sortDir, lastTouchMap])
 
   return (
     <AppLayout>
@@ -105,7 +185,9 @@ export default function Candidates() {
         <div>
           <h1 className="brief-headline">Candidates</h1>
           <p className="brief-date">
-            {loading ? 'Loading…' : `${candidates.length} ${candidates.length === 1 ? 'candidate' : 'candidates'}`}
+            {loading
+              ? 'Loading…'
+              : `${filtered.length} of ${candidates.length} ${candidates.length === 1 ? 'candidate' : 'candidates'}`}
           </p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/candidates/new')}>
@@ -132,6 +214,16 @@ export default function Candidates() {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+          <select
+            className="field-input candidates-source-filter"
+            value={skillFilter}
+            onChange={e => setSkillFilter(e.target.value)}
+          >
+            <option value="">All skills</option>
+            {allSkills.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -149,10 +241,70 @@ export default function Candidates() {
           <p className="muted">No candidates match your filters.</p>
         </div>
       ) : (
-        <div className="candidates-list">
-          {filtered.map(c => (
-            <CandidateRow key={c.id} candidate={c} />
-          ))}
+        <div className="candidates-table-wrap">
+          <table className="candidates-table">
+            <thead>
+              <tr>
+                <SortHeader label="Name" col="name" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <th className="candidates-th">Title / Company</th>
+                <th className="candidates-th">Location</th>
+                <th className="candidates-th">Source</th>
+                <th className="candidates-th">Skills</th>
+                <SortHeader label="Fit" col="fit" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <th className="candidates-th">Roles</th>
+                <SortHeader label="Last Touch" col="lastTouch" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => {
+                const fit = highestFit(c.pipeline)
+                const active = activePipelineCount(c.pipeline)
+                const lastTouch = lastTouchMap[c.id] ?? null
+                return (
+                  <tr key={c.id} className="candidates-tr">
+                    <td className="candidates-td candidates-td--name">
+                      <Link to={`/candidates/${c.id}`} className="candidate-table-name">
+                        {c.first_name} {c.last_name}
+                      </Link>
+                    </td>
+                    <td className="candidates-td">
+                      {(c.current_title || c.current_company) ? (
+                        <span className="candidate-table-role">
+                          {[c.current_title, c.current_company].filter(Boolean).join(' · ')}
+                        </span>
+                      ) : <span className="muted">—</span>}
+                    </td>
+                    <td className="candidates-td">
+                      <span className="candidate-table-location">{c.location || '—'}</span>
+                    </td>
+                    <td className="candidates-td">
+                      {c.source ? (
+                        <span className={`source-badge source-badge--${c.source}`}>
+                          {SOURCE_LABELS[c.source] ?? c.source}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="candidates-td">
+                      <SkillTags skills={c.skills} />
+                    </td>
+                    <td className="candidates-td">
+                      <FitBadge score={fit} />
+                    </td>
+                    <td className="candidates-td">
+                      {active > 0
+                        ? <span className="candidate-table-roles">{active} {active === 1 ? 'role' : 'roles'}</span>
+                        : <span className="muted">—</span>}
+                    </td>
+                    <td className="candidates-td">
+                      <span className="candidate-table-touch">
+                        {formatLastTouch(lastTouch) ?? <span className="muted">—</span>}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </AppLayout>

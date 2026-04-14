@@ -6,6 +6,7 @@ import AppLayout from '../components/AppLayout'
 import { generateText } from '../lib/ai'
 import { buildNextActionMessages } from '../lib/prompts/nextAction'
 import { buildScreenerMessages } from '../lib/prompts/resumeScreener'
+import { buildCareerTimelineMessages } from '../lib/prompts/careerTimeline'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -42,6 +43,65 @@ function formatDateShort(iso) {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+// ── Tenure helpers ────────────────────────────────────
+
+const MONTH_NAMES = ['january','february','march','april','may','june','july','august','september','october','november','december']
+
+function parseDate(str) {
+  if (!str) return null
+  const s = str.trim().toLowerCase()
+  if (s === 'present' || s === 'current' || s === 'now') return new Date()
+  // "Month Year" or "Year"
+  const parts = s.split(/\s+/)
+  if (parts.length === 1) {
+    const yr = parseInt(parts[0])
+    return isNaN(yr) ? null : new Date(yr, 0)
+  }
+  const monthIdx = MONTH_NAMES.indexOf(parts[0])
+  const yr = parseInt(parts[1])
+  if (monthIdx === -1 || isNaN(yr)) return null
+  return new Date(yr, monthIdx)
+}
+
+function monthsBetween(start, end) {
+  const s = parseDate(start)
+  const e = parseDate(end)
+  if (!s || !e) return null
+  return Math.max(0, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()))
+}
+
+function formatTenure(months) {
+  if (months === null) return '—'
+  const yrs = Math.floor(months / 12)
+  const mos = months % 12
+  if (yrs === 0) return `${mos}mo`
+  if (mos === 0) return `${yrs}yr`
+  return `${yrs}yr ${mos}mo`
+}
+
+function computeTenureSummary(timeline) {
+  if (!timeline?.length) return null
+  const durations = timeline.map(e => monthsBetween(e.start, e.end)).filter(m => m !== null)
+  if (!durations.length) return null
+  const total = durations.reduce((s, m) => s + m, 0)
+  const avg = Math.round(total / durations.length)
+  const first = timeline[0]
+  const isCurrentRole = first?.end?.toLowerCase().includes('present') || first?.end?.toLowerCase().includes('current') || first?.end?.toLowerCase().includes('now')
+  const current = isCurrentRole ? monthsBetween(first.start, 'Present') : null
+  return { total, avg, current }
+}
+
+// ── Signal badge config ───────────────────────────────
+
+const SIGNAL_CONFIG = {
+  'Promoted':        { color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
+  'Long Tenure':     { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  'Fast Riser':      { color: '#6b21a8', bg: '#faf5ff', border: '#e9d5ff' },
+  'AI Experience':   { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc' },
+  "President's Club":{ color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
+  'Quota Buster':    { color: '#166534', bg: '#dcfce7', border: '#86efac' },
 }
 
 // ── Sub-components ────────────────────────────────────────
@@ -111,6 +171,86 @@ function InteractionEntry({ interaction }) {
       )}
       {interaction.body && (
         <p className="interaction-body">{interaction.body}</p>
+      )}
+    </div>
+  )
+}
+
+// ── Signal badges ─────────────────────────────────────
+
+function SignalBadges({ signals }) {
+  if (!signals?.length) return null
+  return (
+    <div className="signal-badges">
+      {signals.map(sig => {
+        const cfg = SIGNAL_CONFIG[sig]
+        if (!cfg) return null
+        return (
+          <span
+            key={sig}
+            className="signal-badge"
+            style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
+          >
+            {sig}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Career timeline ───────────────────────────────────
+
+function TenureSummary({ summary }) {
+  if (!summary) return null
+  return (
+    <div className="tenure-summary">
+      <div className="tenure-stat">
+        <span className="tenure-value">{formatTenure(summary.total)}</span>
+        <span className="tenure-label">Total Experience</span>
+      </div>
+      <div className="tenure-divider" />
+      <div className="tenure-stat">
+        <span className="tenure-value">{formatTenure(summary.avg)}</span>
+        <span className="tenure-label">Avg Tenure</span>
+      </div>
+      {summary.current !== null && (
+        <>
+          <div className="tenure-divider" />
+          <div className="tenure-stat">
+            <span className="tenure-value">{formatTenure(summary.current)}</span>
+            <span className="tenure-label">Current Role</span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function CareerEntry({ entry }) {
+  const duration = monthsBetween(entry.start, entry.end)
+  return (
+    <div className="career-entry">
+      <div className="career-entry-header">
+        <div className="career-entry-identity">
+          <span className="career-company">{entry.company}</span>
+          <span className="career-title">{entry.title}</span>
+        </div>
+        <div className="career-entry-meta">
+          {entry.start && (
+            <span className="career-dates">
+              {entry.start} – {entry.end ?? 'Present'}
+            </span>
+          )}
+          {duration !== null && (
+            <span className="career-duration">{formatTenure(duration)}</span>
+          )}
+        </div>
+      </div>
+      {entry.achievements?.length > 0 && (
+        <ul className="career-achievements">
+          {entry.achievements.map((a, i) => <li key={i}>{a}</li>)}
+        </ul>
       )}
     </div>
   )
@@ -240,8 +380,17 @@ export default function CandidateCard() {
   const [screenResult, setScreenResult] = useState(null)
   const [screenError, setScreenError] = useState(null)
 
+  // Delete
+  const [deleting, setDeleting] = useState(false)
+
+  // Career timeline
+  const [timeline, setTimeline] = useState(null)
+  const [signals, setSignals] = useState(null)
+  const [parsingCareer, setParsingCareer] = useState(false)
+  const [careerError, setCareerError] = useState(null)
+
   useEffect(() => {
-    if (!id) return
+    if (!id || !recruiter?.id) return
 
     async function fetchAll() {
       // Log auth state and recruiter context for debugging
@@ -307,10 +456,17 @@ export default function CandidateCard() {
         )
         setNotFound(true)
       } else {
-        setCandidate(candidateRes.data)
+        const c = candidateRes.data
+        setCandidate(c)
         setPipelines(pipelineRes.data ?? [])
         setInteractions(interactionRes.data ?? [])
         setOpenRoles(rolesRes.data ?? [])
+
+        // Restore persisted career data if available
+        if (c.career_timeline?.length > 0) {
+          setTimeline(c.career_timeline)
+          setSignals(c.career_signals ?? [])
+        }
       }
 
       setLoading(false)
@@ -351,11 +507,63 @@ export default function CandidateCard() {
       const messages = buildScreenerMessages(candidate, role)
       const raw = await generateText({ messages, maxTokens: 2048 })
       const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
-      setScreenResult(JSON.parse(cleaned))
+      const result = JSON.parse(cleaned)
+      setScreenResult(result)
+
+      // Persist score to the matching pipeline entry
+      const pipelineEntry = pipelines.find(p => p.role_id === screenerRoleId)
+      if (pipelineEntry && result.match_score != null) {
+        const fitScore = result.match_score * 10
+        const rationale = result.recommendation_reason ?? null
+        await supabase
+          .from('pipeline')
+          .update({ fit_score: fitScore, fit_score_rationale: rationale })
+          .eq('id', pipelineEntry.id)
+        // Update local state so Scores History reflects immediately
+        setPipelines(prev => prev.map(p =>
+          p.id === pipelineEntry.id
+            ? { ...p, fit_score: fitScore, fit_score_rationale: rationale }
+            : p
+        ))
+      }
     } catch (err) {
       setScreenError(err.message ?? 'Screening failed.')
     } finally {
       setScreening(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete ${candidate.first_name} ${candidate.last_name}? This cannot be undone.`)) return
+    setDeleting(true)
+    await supabase.from('candidates').delete().eq('id', id)
+    navigate('/candidates')
+  }
+
+  async function handleParseCareer() {
+    if (!candidate?.cv_text) return
+    setTimeline(null)
+    setSignals(null)
+    setCareerError(null)
+    setParsingCareer(true)
+    try {
+      const messages = buildCareerTimelineMessages(candidate.cv_text)
+      const raw = await generateText({ messages, maxTokens: 2048 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const parsed = JSON.parse(cleaned)
+      const tl = parsed.timeline ?? []
+      const sg = parsed.signals ?? []
+      setTimeline(tl)
+      setSignals(sg)
+      // Persist to DB (fire-and-forget — UI already has the data)
+      supabase
+        .from('candidates')
+        .update({ career_timeline: tl, career_signals: sg })
+        .eq('id', id)
+    } catch (err) {
+      setCareerError(err.message ?? 'Failed to parse career history.')
+    } finally {
+      setParsingCareer(false)
     }
   }
 
@@ -396,7 +604,7 @@ export default function CandidateCard() {
     return (
       <AppLayout>
         <p className="muted">Candidate not found.</p>
-        <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>
+        <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate('/candidates')}>
           Go back
         </button>
       </AppLayout>
@@ -411,7 +619,7 @@ export default function CandidateCard() {
         {/* Page header */}
         <div className="page-header">
           <div className="page-header-left">
-            <button className="btn-back" onClick={() => navigate(-1)}>← Back</button>
+            <button className="btn-back" onClick={() => navigate('/candidates')}>← Back</button>
             <div>
               <h1 className="page-title">{fullName}</h1>
               {candidate.current_title && candidate.current_company && (
@@ -421,6 +629,9 @@ export default function CandidateCard() {
           </div>
           <div className="page-header-actions">
             <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
+            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
             <button
               className="btn-primary"
               onClick={handleGenerateNextAction}
@@ -430,6 +641,9 @@ export default function CandidateCard() {
             </button>
           </div>
         </div>
+
+        {/* Signal badges */}
+        {signals?.length > 0 && <SignalBadges signals={signals} />}
 
         {/* AI suggestion */}
         {(suggestion || genError) && (
@@ -565,6 +779,75 @@ export default function CandidateCard() {
 
           {screenResult && <ScreenerResult result={screenResult} />}
         </section>
+
+        {/* Career Timeline */}
+        <section className="candidate-section" style={{ marginTop: 24 }}>
+          <div className="section-heading-row">
+            <h2 className="section-heading">Career Timeline</h2>
+            {candidate.cv_text && !timeline && (
+              <button
+                className="btn-ghost btn-sm"
+                onClick={handleParseCareer}
+                disabled={parsingCareer}
+              >
+                {parsingCareer ? 'Parsing…' : 'Parse from CV'}
+              </button>
+            )}
+          </div>
+          {careerError && <p className="error" style={{ marginTop: 8 }}>{careerError}</p>}
+          {!candidate.cv_text && <p className="muted">No CV text available. Upload a resume to enable career parsing.</p>}
+          {timeline !== null && (
+            <>
+              {(() => {
+                const summary = computeTenureSummary(timeline)
+                return summary ? <TenureSummary summary={summary} /> : null
+              })()}
+              {timeline.length === 0
+                ? <p className="muted">No career history could be extracted.</p>
+                : timeline.map((entry, i) => <CareerEntry key={i} entry={entry} />)
+              }
+            </>
+          )}
+        </section>
+
+        {/* Scores History */}
+        {pipelines.some(p => p.fit_score != null) && (
+          <section className="candidate-section" style={{ marginTop: 24 }}>
+            <h2 className="section-heading">Scores History</h2>
+            <div className="scores-history">
+              {pipelines
+                .filter(p => p.fit_score != null)
+                .sort((a, b) => b.fit_score - a.fit_score)
+                .map(p => {
+                  const score = p.fit_score
+                  const tenth = score / 10
+                  const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
+                  let variant = 'none'
+                  if (score >= 80) variant = 'green'
+                  else if (score >= 50) variant = 'amber'
+                  else variant = 'red'
+                  return (
+                    <div key={p.id} className="scores-history-row">
+                      <div className="scores-history-role">
+                        <span className="scores-history-title">{p.roles?.title ?? 'Unknown role'}</span>
+                        {p.roles?.clients?.name && (
+                          <span className="scores-history-client">{p.roles.clients.name}</span>
+                        )}
+                      </div>
+                      <div className="scores-history-right">
+                        <span className={`fit-badge fit-badge--${variant}`}>
+                          {display}<span className="fit-badge-denom">/10</span>
+                        </span>
+                        {p.fit_score_rationale && (
+                          <p className="scores-history-rationale">{p.fit_score_rationale}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </section>
+        )}
 
         {/* Interaction history */}
         <section className="candidate-section" style={{ marginTop: 24 }}>
