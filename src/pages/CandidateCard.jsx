@@ -555,11 +555,12 @@ export default function CandidateCard() {
       const sg = parsed.signals ?? []
       setTimeline(tl)
       setSignals(sg)
-      // Persist to DB (fire-and-forget — UI already has the data)
-      supabase
+      // Persist to DB
+      const { error: saveErr } = await supabase
         .from('candidates')
         .update({ career_timeline: tl, career_signals: sg })
         .eq('id', id)
+      if (saveErr) console.error('career save failed:', saveErr)
     } catch (err) {
       setCareerError(err.message ?? 'Failed to parse career history.')
     } finally {
