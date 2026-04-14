@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { useStats } from '../hooks/useStats'
+import WrenCommand from '../components/WrenCommand'
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -60,6 +61,8 @@ export default function Dashboard() {
         <StatCard label="Candidates in Pipeline" value={stats?.candidatesInPipeline} loading={statsLoading} to="/candidates" />
         <StatCard label="Messages to Review" value={stats?.messagesToReview} loading={statsLoading} to="/queue" />
       </section>
+
+      <WrenCommand />
 
       <section className="dashboard-candidates">
         <div className="dashboard-section-header">

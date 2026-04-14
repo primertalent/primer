@@ -16,12 +16,13 @@ export class ClaudeProvider {
     }
   }
 
-  async generateText({ messages, maxTokens = 1024 }) {
+  async generateText({ messages, maxTokens = 1024, system }) {
     if (import.meta.env.DEV) {
       const response = await this._client.messages.create({
         model: this._model,
         max_tokens: maxTokens,
         messages,
+        ...(system && { system }),
       })
       return response.content[0]?.text ?? ''
     }
@@ -29,7 +30,7 @@ export class ClaudeProvider {
     const res = await fetch('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, maxTokens }),
+      body: JSON.stringify({ messages, maxTokens, ...(system && { system }) }),
     })
 
     if (!res.ok) {
