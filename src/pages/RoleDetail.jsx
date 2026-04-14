@@ -7,6 +7,7 @@ import { generateText } from '../lib/ai'
 import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
 import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
 import { buildBooleanSearchMessages } from '../lib/prompts/booleanSearchBuilder'
+import { urgencyClass } from '../lib/urgency'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -24,6 +25,10 @@ const COMP_TYPE_SUFFIXES = {
   equity_plus_salary: '/yr + equity',
 }
 
+function formatDateShort(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 function formatComp(min, max, type) {
   if (!min && !max) return null
   const fmt = n => `$${Number(n).toLocaleString()}`
@@ -38,6 +43,7 @@ function formatComp(min, max, type) {
 // ── Sub-components ────────────────────────────────────────
 
 function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission }) {
+  const uClass = urgencyClass(entry.next_action_due_at)
   return (
     <div className="pipeline-candidate-card">
       <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-info">
@@ -50,6 +56,12 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission }) {
         {entry.fit_score != null && (
           <span className="pipeline-candidate-fit">
             {Math.round(entry.fit_score)}<span className="fit-denom">/100</span>
+          </span>
+        )}
+        {entry.next_action_due_at && (
+          <span className="due-date">
+            {uClass && <span className={`urgency-dot ${uClass}`} />}
+            {formatDateShort(entry.next_action_due_at)}
           </span>
         )}
       </Link>
@@ -159,7 +171,7 @@ export default function RoleDetail() {
 
         supabase
           .from('pipeline')
-          .select('id, current_stage, fit_score, candidate_id, candidates(id, first_name, last_name, current_title)')
+          .select('id, current_stage, fit_score, next_action_due_at, candidate_id, candidates(id, first_name, last_name, current_title)')
           .eq('role_id', id)
           .eq('status', 'active'),
       ])

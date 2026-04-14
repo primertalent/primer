@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+import { highestUrgencyClass } from '../lib/urgency'
 
 // ── Constants ─────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export default function Candidates() {
           .select(`
             id, first_name, last_name, current_title, current_company,
             location, source, skills,
-            pipeline ( id, status, fit_score )
+            pipeline ( id, status, fit_score, next_action_due_at )
           `)
           .eq('recruiter_id', recruiter.id)
           .order('created_at', { ascending: false }),
@@ -291,9 +292,12 @@ export default function Candidates() {
                       <FitBadge score={fit} />
                     </td>
                     <td className="candidates-td">
-                      {active > 0
-                        ? <span className="candidate-table-roles">{active} {active === 1 ? 'role' : 'roles'}</span>
-                        : <span className="muted">—</span>}
+                      {active > 0 ? (
+                        <span className="candidate-table-roles">
+                          {(() => { const uc = highestUrgencyClass(c.pipeline); return uc ? <span className={`urgency-dot ${uc}`} /> : null })()}
+                          {active} {active === 1 ? 'role' : 'roles'}
+                        </span>
+                      ) : <span className="muted">—</span>}
                     </td>
                     <td className="candidates-td">
                       <span className="candidate-table-touch">

@@ -4,7 +4,8 @@
       "Bash(npm run:*)",
       "Bash(cat \"C:/Users/Ryan McGuinness/primer/supabase/migrations/\"*.sql)",
       "Bash(git:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(netstat -ano)"
     ]
   }
 }

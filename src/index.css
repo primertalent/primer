@@ -563,7 +563,21 @@ body {
 .due-date {
   font-size: 12px;
   color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
+
+.urgency-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.urgency-dot.urgency--overdue  { background: #ef4444; }
+.urgency-dot.urgency--today    { background: #eab308; }
+.urgency-dot.urgency--upcoming { background: #9ca3af; }
 
 /* ── Interaction log form ───────────────────────────── */
 
@@ -1806,6 +1820,9 @@ select.field-input {
   font-size: 12px;
   color: var(--color-muted);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .candidate-table-touch {

@@ -12,6 +12,7 @@ import { buildCandidatePitchMessages } from '../lib/prompts/candidatePitchBuilde
 import { buildScorecardMessages } from '../lib/prompts/candidateScorecard'
 import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmail'
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
+import { urgencyClass } from '../lib/urgency'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -168,7 +169,12 @@ function PipelineEntry({ entry, onAdvance, advancing }) {
           <span className="detail-label">Next action</span>
           <span className="detail-value">{entry.next_action}</span>
           {entry.next_action_due_at && (
-            <span className="due-date">Due {formatDateShort(entry.next_action_due_at)}</span>
+            <span className="due-date">
+              {urgencyClass(entry.next_action_due_at) && (
+                <span className={`urgency-dot ${urgencyClass(entry.next_action_due_at)}`} />
+              )}
+              Due {formatDateShort(entry.next_action_due_at)}
+            </span>
           )}
         </div>
       )}
