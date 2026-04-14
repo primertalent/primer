@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-14 (session 3).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-14 (session 4).
 
 ---
 
@@ -55,6 +55,10 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - **Bidirectional pipeline movement** — ← and → buttons on every kanban card. ← only appears when there's a previous stage, → only when there's a next. Optimistic UI with rollback on error.
 - **Two submission formats** — Email (narrative, under 250 words) and Bullet (structured plain-text bullets, under 150 words). Toggle appears before generation and after — switch format and Regenerate.
 - **Submission draft on Candidate Card** — "Draft Submission" button in the page header. Supports JD Specific (pick a pipeline role, pulls its JD) or Generic (candidate record only). Same modal pattern: format toggle, Generate, editable textarea, Save to Queue or Copy.
+- **Screener result persistence** — full AI screener output (skills match, red flags, strengths, trajectory) now saves to a standalone `screener_results` table on every run, regardless of whether the candidate is in the pipeline. Pre-pipeline evaluations are no longer lost. If the candidate is in the pipeline for that role, `pipeline.screener_result` is also backfilled. Scores History section on the candidate card now reads from `screener_results` and shows a "Pre-pipeline" badge for evaluations made before the candidate was added to a role.
+- **Scorecard result persistence** — full scorecard output saves to `pipeline.scorecard_result` JSONB column on generation.
+- **Interaction logging UI** — "Log" button in the Interactions section heading on the candidate card. Inline form with Type (Call / Email / Note), Direction (Inbound / Outbound, hidden for notes), Date (defaults to now), and Notes textarea. Saves to `interactions` table. New entry prepends to the list instantly. Interactions list is now most-recent-first.
+- **Stage advance from candidate card** — each pipeline entry row has a "→ [next stage]" button. One click advances the candidate, updates `pipeline.current_stage`, inserts a row into `pipeline_stage_history`, and updates the UI optimistically with rollback on failure. Disables at "placed".
 
 ---
 
@@ -67,7 +71,8 @@ Key tables:
 - `pipeline` — candidate × role junction. Tracks `current_stage`, `fit_score`, stage history
 - `clients` — companies, with contacts
 - `client_contacts` — contacts linked to clients
-- `interactions` — permanent record of all touchpoints
+- `interactions` — permanent record of all touchpoints (writable from candidate card)
+- `screener_results` — standalone screener run history per candidate × role, no pipeline dependency
 - `messages` — drafted/queued outreach (status: drafted, approved, sent, held)
 - `daily_briefs` — morning brief data
 
@@ -90,6 +95,8 @@ Key tables:
 - **Fixed (2026-04-14):** Null recruiter guard in CandidateCard.jsx useEffect. Changed `if (!id)` to `if (!id || !recruiter?.id)`. This was preventing career timeline from persisting.
 - **Fixed (2026-04-14):** Screener score now fetches pipeline entry fresh before saving to avoid stale state overwrite.
 - **Fixed (2026-04-14):** One-click stage advance on kanban — advance button on each candidate card updates stage in Supabase and re-renders column instantly without page navigation.
+- **Fixed (2026-04-14):** Screener pipeline fetch changed from `.single()` to `.maybeSingle()` — was returning 406 when candidate not yet in pipeline for the selected role.
+- **Fixed (2026-04-14):** Screener results were dropped on page refresh — full result now persists to `screener_results` table regardless of pipeline status.
 
 ---
 
@@ -130,11 +137,14 @@ Wren should surface what matters without being asked. Signal badges on a candida
 2. ~~**Bidirectional pipeline movement**~~ ✓ Shipped 2026-04-14
 3. ~~**Two submission formats (Email / Bullet)**~~ ✓ Shipped 2026-04-14
 4. ~~**Submission draft on Candidate Card**~~ ✓ Shipped 2026-04-14
-5. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
-6. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
-7. **Call mode screen** — A focused view for during/after a candidate or client call.
-8. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record.
-9. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
+5. ~~**Screener result persistence**~~ ✓ Shipped 2026-04-14
+6. ~~**Interaction logging UI**~~ ✓ Shipped 2026-04-14
+7. ~~**Stage advance from candidate card**~~ ✓ Shipped 2026-04-14
+8. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
+9. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
+10. **Call mode screen** — A focused view for during/after a candidate or client call.
+11. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record.
+12. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
 
 ---
 
