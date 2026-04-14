@@ -511,17 +511,23 @@ export default function CandidateCard() {
       setScreenResult(result)
 
       // Persist score to the matching pipeline entry
-      const pipelineEntry = pipelines.find(p => p.role_id === screenerRoleId)
-      if (pipelineEntry && result.match_score != null) {
+      const { data: freshEntry } = await supabase
+        .from('pipeline')
+        .select('id')
+        .eq('candidate_id', id)
+        .eq('role_id', screenerRoleId)
+        .single()
+
+      if (freshEntry && result.match_score != null) {
         const fitScore = result.match_score * 10
         const rationale = result.recommendation_reason ?? null
-        await supabase
+        const { error: scoreErr } = await supabase
           .from('pipeline')
           .update({ fit_score: fitScore, fit_score_rationale: rationale })
-          .eq('id', pipelineEntry.id)
-        // Update local state so Scores History reflects immediately
+          .eq('id', freshEntry.id)
+        if (scoreErr) console.error('score save failed:', scoreErr)
         setPipelines(prev => prev.map(p =>
-          p.id === pipelineEntry.id
+          p.id === freshEntry.id
             ? { ...p, fit_score: fitScore, fit_score_rationale: rationale }
             : p
         ))
