@@ -33,25 +33,36 @@ function formatComp(min, max, type) {
 
 // ── Sub-components ────────────────────────────────────────
 
-function PipelineCandidate({ entry }) {
+function PipelineCandidate({ entry, onAdvance }) {
   return (
-    <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-card">
-      <span className="pipeline-candidate-name">
-        {entry.candidates.first_name} {entry.candidates.last_name}
-      </span>
-      {entry.candidates.current_title && (
-        <span className="pipeline-candidate-title">{entry.candidates.current_title}</span>
-      )}
-      {entry.fit_score != null && (
-        <span className="pipeline-candidate-fit">
-          {Math.round(entry.fit_score)}<span className="fit-denom">/100</span>
+    <div className="pipeline-candidate-card">
+      <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-info">
+        <span className="pipeline-candidate-name">
+          {entry.candidates.first_name} {entry.candidates.last_name}
         </span>
+        {entry.candidates.current_title && (
+          <span className="pipeline-candidate-title">{entry.candidates.current_title}</span>
+        )}
+        {entry.fit_score != null && (
+          <span className="pipeline-candidate-fit">
+            {Math.round(entry.fit_score)}<span className="fit-denom">/100</span>
+          </span>
+        )}
+      </Link>
+      {onAdvance && (
+        <button
+          className="btn-advance-stage"
+          onClick={e => { e.preventDefault(); onAdvance(entry) }}
+          title="Advance to next stage"
+        >→</button>
       )}
-    </Link>
+    </div>
   )
 }
 
-function PipelineColumn({ stage, entries }) {
+function PipelineColumn({ stage, entries, stages, onAdvance }) {
+  const currentIndex = stages.indexOf(stage)
+  const nextStage = stages[currentIndex + 1] ?? null
   return (
     <div className="pipeline-column">
       <div className="pipeline-col-header">
@@ -63,7 +74,11 @@ function PipelineColumn({ stage, entries }) {
           <p className="pipeline-col-empty">No candidates</p>
         ) : (
           entries.map(entry => (
-            <PipelineCandidate key={entry.id} entry={entry} />
+            <PipelineCandidate
+              key={entry.id}
+              entry={entry}
+              onAdvance={nextStage ? onAdvance : null}
+            />
           ))
         )}
       </div>
@@ -149,6 +164,25 @@ export default function RoleDetail() {
     }
   }
 
+  async function handleAdvanceStage(entry) {
+    const currentIndex = stages.indexOf(entry.current_stage)
+    const nextStage = stages[currentIndex + 1]
+    if (!nextStage) return
+    setPipeline(prev => prev.map(p =>
+      p.id === entry.id ? { ...p, current_stage: nextStage } : p
+    ))
+    const { error } = await supabase
+      .from('pipeline')
+      .update({ current_stage: nextStage })
+      .eq('id', entry.id)
+    if (error) {
+      console.error('advance stage failed:', error)
+      setPipeline(prev => prev.map(p =>
+        p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p
+      ))
+    }
+  }
+
   return (
     <AppLayout>
 
@@ -187,6 +221,8 @@ export default function RoleDetail() {
               key={stage}
               stage={stage}
               entries={byStage[stage] ?? []}
+              stages={stages}
+              onAdvance={handleAdvanceStage}
             />
           ))}
         </div>

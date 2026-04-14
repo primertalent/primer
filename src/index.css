@@ -2112,20 +2112,51 @@ select.field-input {
 
 .pipeline-candidate-card {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 12px 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  text-decoration: none;
-  color: inherit;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
 
 .pipeline-candidate-card:hover {
   border-color: #a1a1aa;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.pipeline-candidate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.btn-advance-stage {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  padding: 0;
+}
+
+.btn-advance-stage:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border-color: var(--color-text);
 }
 
 .pipeline-candidate-name {
