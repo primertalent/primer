@@ -42,7 +42,7 @@ function formatComp(min, max, type) {
 
 // ── Sub-components ────────────────────────────────────────
 
-function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRemove }) {
+function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRemove, advancing }) {
   const uClass = urgencyClass(entry.next_action_due_at)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -97,14 +97,16 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
             className="btn-go-back-stage"
             onClick={e => { e.preventDefault(); onGoBack(entry) }}
             title="Move back a stage"
-          >←</button>
+            disabled={advancing}
+          >{advancing ? '…' : '←'}</button>
         )}
         {onAdvance && (
           <button
             className="btn-advance-stage"
             onClick={e => { e.preventDefault(); onAdvance(entry) }}
             title="Advance to next stage"
-          >→</button>
+            disabled={advancing}
+          >{advancing ? '…' : '→'}</button>
         )}
         <button
           className="btn-kanban-remove"
@@ -131,7 +133,7 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
   )
 }
 
-function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSubmission, onRemove }) {
+function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSubmission, onRemove, advancingId }) {
   const currentIndex = stages.indexOf(stage)
   const nextStage = stages[currentIndex + 1] ?? null
   const prevStage = stages[currentIndex - 1] ?? null
@@ -153,6 +155,7 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
               onGoBack={prevStage ? onGoBack : null}
               onDraftSubmission={onDraftSubmission}
               onRemove={onRemove}
+              advancing={advancingId === entry.id}
             />
           ))
         )}
@@ -174,6 +177,7 @@ export default function RoleDetail() {
   const [notFound, setNotFound] = useState(false)
   const [fetchError, setFetchError] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [advancingId, setAdvancingId] = useState(null)
 
   // Interview questions
   const [interviewQuestions, setInterviewQuestions] = useState(null)
@@ -404,9 +408,11 @@ export default function RoleDetail() {
   }
 
   async function handleAdvanceStage(entry) {
+    if (advancingId) return
     const currentIndex = stages.indexOf(entry.current_stage)
     const nextStage = stages[currentIndex + 1]
     if (!nextStage) return
+    setAdvancingId(entry.id)
     setPipeline(prev => prev.map(p =>
       p.id === entry.id ? { ...p, current_stage: nextStage } : p
     ))
@@ -420,12 +426,15 @@ export default function RoleDetail() {
         p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p
       ))
     }
+    setAdvancingId(null)
   }
 
   async function handleGoBackStage(entry) {
+    if (advancingId) return
     const currentIndex = stages.indexOf(entry.current_stage)
     const prevStage = stages[currentIndex - 1]
     if (!prevStage) return
+    setAdvancingId(entry.id)
     setPipeline(prev => prev.map(p =>
       p.id === entry.id ? { ...p, current_stage: prevStage } : p
     ))
@@ -439,6 +448,7 @@ export default function RoleDetail() {
         p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p
       ))
     }
+    setAdvancingId(null)
   }
 
   async function handleRemoveFromPipeline(pipelineId) {
@@ -535,6 +545,7 @@ export default function RoleDetail() {
               key={stage}
               stage={stage}
               entries={byStage[stage] ?? []}
+              advancingId={advancingId}
               stages={stages}
               onAdvance={handleAdvanceStage}
               onGoBack={handleGoBackStage}

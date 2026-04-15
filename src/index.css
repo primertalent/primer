@@ -4138,3 +4138,361 @@ select.field-input {
   display: flex;
   gap: 8px;
 }
+
+/* ── Call Mode ───────────────────────────────────────────── */
+
+.call-mode-shell {
+  min-height: 100svh;
+  background: var(--color-bg);
+  padding: 24px;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.call-mode-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.call-mode-back {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: var(--font);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.call-mode-back:hover { color: var(--color-text); }
+
+.call-mode-candidate { flex: 1; }
+
+.call-mode-name {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.call-mode-title {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+
+.call-mode-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.call-mode-pipeline-chip {
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  color: var(--color-text);
+}
+
+.call-mode-stage {
+  color: var(--color-muted);
+}
+
+.call-mode-quick-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.call-mode-contact-link {
+  font-size: 14px;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.call-mode-contact-link:hover { color: var(--color-text); }
+
+.call-mode-note-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.call-mode-type-row {
+  display: flex;
+  gap: 6px;
+}
+
+.call-mode-type-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.call-mode-type-btn--active {
+  background: var(--color-text);
+  color: #fff;
+  border-color: var(--color-text);
+}
+
+.call-mode-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-family: var(--font);
+  line-height: 1.6;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.call-mode-textarea:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.call-mode-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.call-mode-save-btn {
+  height: 44px;
+  padding: 0 24px;
+  background: var(--color-text);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.15s;
+  flex: 1;
+}
+
+.call-mode-save-btn:hover:not(:disabled) { background: var(--color-accent-hover); }
+.call-mode-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.call-mode-done-btn {
+  height: 44px;
+  padding: 0 20px;
+  background: transparent;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.call-mode-done-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
+.call-mode-not-found {
+  font-size: 15px;
+  color: var(--color-muted);
+  margin-bottom: 16px;
+}
+
+/* ── Mobile responsive ───────────────────────────────────── */
+
+@media (max-width: 768px) {
+
+  /* App shell */
+  .app-header {
+    padding: 0 16px;
+    height: 52px;
+  }
+
+  .app-main {
+    padding: 24px 16px;
+  }
+
+  /* Hide sign out on small screens, keep nav visible */
+  .app-header > .btn-ghost:last-child {
+    display: none;
+  }
+
+  .app-nav {
+    gap: 4px;
+  }
+
+  .nav-link {
+    font-size: 13px;
+    padding: 4px 8px;
+  }
+
+  /* Page headers — stack actions below title */
+  .page-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .page-header-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Role detail header */
+  .role-detail-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  /* Headlines */
+  .brief-headline {
+    font-size: 26px;
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  /* Pipeline board — horizontal scroll */
+  .pipeline-board {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
+  }
+
+  .pipeline-column {
+    min-width: 200px;
+  }
+
+  /* Candidates table — horizontal scroll */
+  .candidates-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .candidates-table {
+    min-width: 600px;
+  }
+
+  /* Candidate sections — tighter spacing */
+  .candidate-section {
+    padding: 16px;
+  }
+
+  /* Brief card */
+  .brief-card-inner {
+    padding: 20px;
+  }
+
+  /* Modals — full screen */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-height: 90svh;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Wren command bar */
+  .wren-command {
+    padding: 16px;
+  }
+
+  /* Screener controls — stack */
+  .screener-controls {
+    flex-wrap: wrap;
+  }
+
+  /* Two-column layouts — single column */
+  .multiscreen-two-col,
+  .screener-grid,
+  .candidate-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  /* Format toggle */
+  .format-toggle {
+    flex-wrap: wrap;
+  }
+
+  /* Roles header */
+  .roles-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* Call mode — tighter */
+  .call-mode-shell {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .call-mode-name {
+    font-size: 24px;
+  }
+
+  .call-mode-textarea {
+    min-height: 160px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Nav — compress further */
+  .wordmark {
+    font-size: 18px;
+  }
+
+  .nav-link {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+
+  /* Stats — single column (already handled at 600px, keep for safety) */
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Multiscreen rankings — single column */
+  .multiscreen-rankings {
+    gap: 12px;
+  }
+
+  /* Intake result */
+  .intake-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Candidate table actions */
+  .page-header-actions .btn-ghost {
+    font-size: 12px;
+    padding: 0 10px;
+    height: 32px;
+  }
+}

@@ -737,6 +737,8 @@ export default function CandidateCard() {
   const [pitchText, setPitchText] = useState(null)
   const [pitchGenerating, setPitchGenerating] = useState(false)
   const [pitchError, setPitchError] = useState(null)
+  const [pitchSaving, setPitchSaving] = useState(false)
+  const [pitchSaved, setPitchSaved] = useState(false)
 
   // Outreach email modal
   const [outreachModal, setOutreachModal] = useState({
@@ -1118,7 +1120,11 @@ export default function CandidateCard() {
       .single()
 
     if (error) {
-      setAddError(error.message)
+      if (error.code === '23505') {
+        setAddError('Already in pipeline for this role.')
+      } else {
+        setAddError('Couldn\'t add to pipeline. Try again.')
+      }
     } else {
       setPipelines(prev => [...prev, entry])
       setPickerOpen(false)
@@ -1169,6 +1175,7 @@ export default function CandidateCard() {
     if (!role || !candidate) return
     setPitchText(null)
     setPitchError(null)
+    setPitchSaved(false)
     setPitchGenerating(true)
     try {
       const messages = buildCandidatePitchMessages(candidate, role)
@@ -1179,6 +1186,24 @@ export default function CandidateCard() {
     } finally {
       setPitchGenerating(false)
     }
+  }
+
+  async function handleSavePitch() {
+    if (!pitchText || pitchSaving) return
+    setPitchSaving(true)
+    const role = openRoles?.find(r => r.id === screenerRoleId)
+    const roleKey = role ? `pitch_${role.id}` : 'pitch_general'
+    const { error } = await supabase
+      .from('candidates')
+      .update({
+        enrichment_data: {
+          ...(candidate.enrichment_data || {}),
+          [roleKey]: pitchText,
+        },
+      })
+      .eq('id', id)
+    if (!error) setPitchSaved(true)
+    setPitchSaving(false)
   }
 
   // ── Outreach email handlers ──────────────────────────────
@@ -1329,6 +1354,7 @@ export default function CandidateCard() {
             </div>
           </div>
           <div className="page-header-actions">
+            <Link className="btn-ghost" to={`/candidates/${id}/call`}>Call Mode</Link>
             <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
             <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete'}
@@ -1570,12 +1596,21 @@ export default function CandidateCard() {
             <div className="pitch-result" style={{ marginTop: 16 }}>
               <div className="pitch-result-header">
                 <p className="screener-block-label">Candidate Pitch</p>
-                <button
-                  className="btn-ghost btn-sm"
-                  onClick={() => navigator.clipboard.writeText(pitchText)}
-                >
-                  Copy
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={() => navigator.clipboard.writeText(pitchText)}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={handleSavePitch}
+                    disabled={pitchSaving || pitchSaved}
+                  >
+                    {pitchSaving ? 'Saving…' : pitchSaved ? 'Saved ✓' : 'Save Pitch'}
+                  </button>
+                </div>
               </div>
               <p className="pitch-body">{pitchText}</p>
             </div>

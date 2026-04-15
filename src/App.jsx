@@ -15,6 +15,7 @@ import EditRole from './pages/EditRole'
 import Clients from './pages/Clients'
 import ClientDetail from './pages/ClientDetail'
 import EditCandidate from './pages/EditCandidate'
+import CallMode from './pages/CallMode'
 
 export default function App() {
   return (
@@ -61,6 +62,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <EditCandidate />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/candidates/:id/call"
+            element={
+              <ProtectedRoute>
+                <CallMode />
               </ProtectedRoute>
             }
           />
