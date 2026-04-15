@@ -232,8 +232,8 @@ export default function Dashboard() {
       try {
         const raw = localStorage.getItem(cacheKey)
         if (raw) {
-          const { text, ts } = JSON.parse(raw)
-          if (Date.now() - ts < BRIEF_TTL) {
+          const { text, ts, v } = JSON.parse(raw)
+          if (v === 2 && Date.now() - ts < BRIEF_TTL) {
             setBriefText(text)
             setBriefLoading(false)
             return
@@ -285,7 +285,7 @@ export default function Dashboard() {
       setBriefText(trimmed)
 
       try {
-        localStorage.setItem(cacheKey, JSON.stringify({ text: trimmed, ts: Date.now() }))
+        localStorage.setItem(cacheKey, JSON.stringify({ text: trimmed, ts: Date.now(), v: 2 }))
       } catch {}
 
     } catch (err) {
