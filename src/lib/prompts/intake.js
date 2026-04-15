@@ -53,6 +53,8 @@ Rules:
 - Score is 1-10. score_label is one of: Strong Pass, Pass, Borderline, Weak, No Match.
 - one_liner is under 140 characters.
 - Return only valid JSON. No explanation, no markdown.
+- role.company: the name of the hiring company only. Never use a technology, tool, framework, or product name as the company. If the input mentions "they use React" or "primary stack is Llama Index", those are tools — not the company. Leave null if the actual employer is unclear.
+- candidate.current_company: the name of the company the candidate currently works at. Same rule — tools and tech stacks are not companies.
 
 Writing rules for all text fields (one_liner, bullets, next_actions, freeform_answer, reasoning):
 - No em dashes (—), en dashes (–), or dashes as punctuation breaks. Use periods or commas.
