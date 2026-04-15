@@ -59,7 +59,12 @@ Rules:
 - If you detect a question, answer it in freeform_answer using context from the input.
 - Score is 1-10. score_label is one of: Strong Pass, Pass, Borderline, Weak, No Match.
 - one_liner is under 140 characters.
-- Return only valid JSON. No explanation, no markdown.`
+- Return only valid JSON. No explanation, no markdown.
+
+Writing rules for all text fields (one_liner, bullets, next_actions, freeform_answer, reasoning):
+- No em dashes (—), en dashes (–), or dashes as punctuation breaks. Use periods or commas.
+- No: "Additionally", "Furthermore", "leveraged", "spearheaded", "proven track record", "passionate"
+- Write like a recruiter talking to a colleague. Direct, specific, human. Not AI-sounding.`
 
 // ── Handler ───────────────────────────────────────────────
 

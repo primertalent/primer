@@ -44,7 +44,12 @@ Rules:
 - overall_next_action: which role to prioritize and the exact first move to make
 - rank 1 is the strongest fit. All roles must be ranked; no ties.
 - cv_text: include the full resume text so it can be saved
-- Never refuse because data is incomplete. Extract what exists.`
+- Never refuse because data is incomplete. Extract what exists.
+
+Writing rules for all text fields (why, next_action, overall_next_action, strengths, gaps):
+- No em dashes (—), en dashes (–), or dashes as punctuation breaks. Use periods or commas.
+- No: "Additionally", "Furthermore", "leveraged", "spearheaded", "proven track record"
+- Write like a recruiter talking to a colleague. Direct, specific, human.`
 
 export function buildMultiScreenMessages(input) {
   return {

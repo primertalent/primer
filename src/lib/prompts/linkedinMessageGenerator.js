@@ -38,13 +38,15 @@ Structure (3 sentences, 300 characters max total):
 Approach: ${approachGuide}
 
 Rules:
-- 300 characters MAXIMUM (count carefully — LinkedIn will reject longer messages)
-- No em dashes
-- No generic phrases: "exciting opportunity", "passionate", "self-starter", "great background"
-- No corporate language
+- 300 characters MAXIMUM (count carefully. LinkedIn will reject longer messages.)
+- No em dashes (—), en dashes (–), or dashes as punctuation breaks. Use periods.
+- No generic phrases: "exciting opportunity", "passionate", "self-starter", "great background", "leveraged", "spearheaded"
+- No AI writing tells: "Additionally", "Furthermore", "It is worth noting"
+- No corporate language of any kind
 - Mobile-first: short lines, each sentence on its own line
-- Salary transparency where available — it signals you're serious
+- Salary transparency where available. It signals you're serious.
 - Specific beats generic every time
+- Sound like a person, not a tool
 
 CANDIDATE
 Name: ${candidate.first_name} ${candidate.last_name}

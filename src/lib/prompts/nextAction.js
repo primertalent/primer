@@ -58,6 +58,12 @@ export function buildNextActionMessages(candidate, pipelines, interactions) {
 
 Analyze the following candidate profile and their full interaction history, then recommend the single most important next action the recruiter should take. Be specific, actionable, and concise. If a message needs to be sent, include suggested talking points or a brief draft.
 
+Writing rules — sound like a sharp recruiter, not AI:
+- No em dashes (—), en dashes (–), or dashes used as punctuation breaks. Use periods or commas.
+- No: "Additionally", "Furthermore", "It is worth noting", "leveraged", "spearheaded"
+- No filler. Every sentence earns its place.
+- Write how a recruiter talks to a colleague. Direct. Human. Specific.
+
 CANDIDATE PROFILE
 Name: ${candidate.first_name} ${candidate.last_name}
 Current Role: ${candidate.current_title ?? 'Unknown'} at ${candidate.current_company ?? 'Unknown'}
