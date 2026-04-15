@@ -45,6 +45,8 @@ Rules:
 - rank 1 is the strongest fit. All roles must be ranked; no ties.
 - cv_text: include the full resume text so it can be saved
 - Never refuse because data is incomplete. Extract what exists.
+- role_title: the job title only — no company name, no parentheticals, no context
+- company: one company name only — the hiring company from that specific JD. Never combine multiple company names. Never include parenthetical notes like "(primary)" or "(secondary)". If unclear, use the most prominent company name in the document.
 
 Writing rules for all text fields (why, next_action, overall_next_action, strengths, gaps):
 - No em dashes (—), en dashes (–), or dashes as punctuation breaks. Use periods or commas.
