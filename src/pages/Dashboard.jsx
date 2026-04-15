@@ -22,7 +22,9 @@ function getFormattedDate() {
 function StatCard({ label, value, loading, to }) {
   const content = (
     <>
-      <span className="stat-value">{loading ? '—' : value}</span>
+      <span className={`stat-value${loading ? ' stat-value--loading' : ''}`}>
+        {loading ? '—' : value}
+      </span>
       <span className="stat-label">{label}</span>
     </>
   )
@@ -51,7 +53,15 @@ export default function Dashboard() {
         <div className="brief-card-inner">
           <p className="brief-card-eyebrow">Morning Brief</p>
           <p className="brief-card-body">
-            Your overnight brief will appear here once Wren has been running.
+            Nothing to report yet.{' '}
+            <Link to="/roles/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
+              Add a role
+            </Link>
+            {' '}or{' '}
+            <Link to="/candidates/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
+              add a candidate
+            </Link>
+            {' '}to get started.
           </p>
         </div>
       </section>
@@ -64,17 +74,6 @@ export default function Dashboard() {
 
       <WrenCommand />
 
-      <section className="dashboard-candidates">
-        <div className="dashboard-section-header">
-          <h2 className="dashboard-section-title">Candidates</h2>
-          <Link to="/candidates/new" className="btn-primary btn-sm">
-            New Candidate
-          </Link>
-        </div>
-        <p className="dashboard-section-hint">
-          Upload a CV or enter manually to add a candidate to your pipeline.
-        </p>
-      </section>
     </AppLayout>
   )
 }

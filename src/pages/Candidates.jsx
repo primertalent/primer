@@ -91,6 +91,7 @@ export default function Candidates() {
   const [candidates, setCandidates] = useState([])
   const [lastTouchMap, setLastTouchMap] = useState({})
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
   const [search, setSearch]           = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
@@ -120,7 +121,8 @@ export default function Candidates() {
           .order('occurred_at', { ascending: false }),
       ])
 
-      if (!candidatesRes.error) setCandidates(candidatesRes.data ?? [])
+      if (candidatesRes.error) setFetchError('Couldn\'t load candidates. Try refreshing.')
+      else setCandidates(candidatesRes.data ?? [])
 
       // Build candidate_id → most recent interaction date map
       const map = {}
@@ -229,17 +231,32 @@ export default function Candidates() {
       )}
 
       {loading ? (
-        <p className="muted">Loading…</p>
+        <div className="loading-state"><div className="spinner" /></div>
+      ) : fetchError ? (
+        <div className="page-error">
+          <p className="page-error-title">Something went wrong</p>
+          <p className="page-error-body">{fetchError}</p>
+        </div>
       ) : candidates.length === 0 ? (
         <div className="empty-state">
-          <p className="muted" style={{ marginBottom: 16 }}>No candidates yet.</p>
+          <p className="empty-state-title">No candidates yet.</p>
+          <p className="empty-state-body">Drop a resume in the command bar or add one manually to get started.</p>
           <button className="btn-primary" onClick={() => navigate('/candidates/new')}>
-            Upload your first candidate
+            Add a candidate
           </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          <p className="muted">No candidates match your filters.</p>
+          <p className="empty-state-title">No candidates match your filters.</p>
+          <p className="empty-state-body" style={{ marginBottom: 0 }}>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => { setSearch(''); setSourceFilter(''); setSkillFilter('') }}
+              style={{ marginTop: 12 }}
+            >
+              Clear filters
+            </button>
+          </p>
         </div>
       ) : (
         <div className="candidates-table-wrap">

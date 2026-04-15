@@ -47,6 +47,7 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
   const [editBody, setEditBody] = useState(message.body)
   const [saving, setSaving]     = useState(false)
   const [acting, setActing]     = useState(false)
+  const [actionError, setActionError] = useState(null)
 
   const candidateName = message.candidates
     ? `${message.candidates.first_name} ${message.candidates.last_name}`
@@ -64,19 +65,25 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
 
   async function handleApprove() {
     setActing(true)
-    await onApprove(message.id)
+    setActionError(null)
+    const err = await onApprove(message.id)
+    if (err) setActionError('Couldn\'t approve. Try again.')
     setActing(false)
   }
 
   async function handleHold() {
     setActing(true)
-    await onHold(message.id)
+    setActionError(null)
+    const err = await onHold(message.id)
+    if (err) setActionError('Couldn\'t hold. Try again.')
     setActing(false)
   }
 
   async function handleSend() {
     setActing(true)
-    await onSend(message.id)
+    setActionError(null)
+    const err = await onSend(message.id)
+    if (err) setActionError('Couldn\'t mark as sent. Try again.')
     setActing(false)
   }
 
@@ -145,39 +152,42 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
 
       {/* Actions */}
       {!isSent && (
-        <div className="message-actions">
-          {(isDrafted || isHeld) && (
-            <button
-              className="btn-action btn-action--approve"
-              onClick={handleApprove}
-              disabled={acting}
-            >
-              Approve
-            </button>
-          )}
-          {isApproved && (
-            <button
-              className="btn-action btn-action--send"
-              onClick={handleSend}
-              disabled={acting}
-            >
-              Send
-            </button>
-          )}
-          {!editing && (
-            <button className="btn-action" onClick={() => setEditing(true)}>
-              Edit
-            </button>
-          )}
-          {(isDrafted || isApproved) && (
-            <button
-              className="btn-action btn-action--hold"
-              onClick={handleHold}
-              disabled={acting}
-            >
-              Hold
-            </button>
-          )}
+        <div>
+          <div className="message-actions">
+            {(isDrafted || isHeld) && (
+              <button
+                className="btn-action btn-action--approve"
+                onClick={handleApprove}
+                disabled={acting}
+              >
+                Approve
+              </button>
+            )}
+            {isApproved && (
+              <button
+                className="btn-action btn-action--send"
+                onClick={handleSend}
+                disabled={acting}
+              >
+                Send
+              </button>
+            )}
+            {!editing && (
+              <button className="btn-action" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+            )}
+            {(isDrafted || isApproved) && (
+              <button
+                className="btn-action btn-action--hold"
+                onClick={handleHold}
+                disabled={acting}
+              >
+                Hold
+              </button>
+            )}
+          </div>
+          {actionError && <p className="inline-error">{actionError}</p>}
         </div>
       )}
     </div>
@@ -190,6 +200,7 @@ export default function Queue() {
   const { recruiter } = useRecruiter()
   const [messages, setMessages]   = useState([])
   const [loading, setLoading]     = useState(true)
+  const [fetchError, setFetchError] = useState(null)
   const [activeTab, setActiveTab] = useState('all')
 
   useEffect(() => {
@@ -205,7 +216,8 @@ export default function Queue() {
         .eq('recruiter_id', recruiter.id)
         .order('created_at', { ascending: false })
 
-      if (!error) setMessages(data ?? [])
+      if (error) setFetchError('Couldn\'t load the queue. Try refreshing.')
+      else setMessages(data ?? [])
       setLoading(false)
     }
 
@@ -219,9 +231,8 @@ export default function Queue() {
       .from('messages')
       .update({ status: 'approved' })
       .eq('id', id)
-    if (!error) {
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'approved' } : m))
-    }
+    if (!error) setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'approved' } : m))
+    return error ?? null
   }
 
   async function handleHold(id) {
@@ -229,9 +240,8 @@ export default function Queue() {
       .from('messages')
       .update({ status: 'held_for_review' })
       .eq('id', id)
-    if (!error) {
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'held_for_review' } : m))
-    }
+    if (!error) setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'held_for_review' } : m))
+    return error ?? null
   }
 
   async function handleSend(id) {
@@ -240,11 +250,10 @@ export default function Queue() {
       .from('messages')
       .update({ status: 'sent', sent_at: sentAt })
       .eq('id', id)
-    if (!error) {
-      setMessages(prev => prev.map(m =>
-        m.id === id ? { ...m, status: 'sent', sent_at: sentAt } : m
-      ))
-    }
+    if (!error) setMessages(prev => prev.map(m =>
+      m.id === id ? { ...m, status: 'sent', sent_at: sentAt } : m
+    ))
+    return error ?? null
   }
 
   async function handleSaveEdit(id, body) {
@@ -268,9 +277,13 @@ export default function Queue() {
 
   return (
     <AppLayout>
-      <div className="queue-header">
-        <h1 className="brief-headline">Queue</h1>
-        <p className="brief-date">Review and action messages drafted by Wren</p>
+      <div className="roles-header">
+        <div>
+          <h1 className="brief-headline">Queue</h1>
+          <p className="brief-date">
+            {loading ? 'Loading…' : `${messages.length} ${messages.length === 1 ? 'message' : 'messages'}`}
+          </p>
+        </div>
       </div>
 
       <div className="filter-tabs">
@@ -293,10 +306,26 @@ export default function Queue() {
 
       <div className="message-list">
         {loading ? (
-          <p className="muted">Loading…</p>
+          <div className="loading-state"><div className="spinner" /></div>
+        ) : fetchError ? (
+          <div className="page-error">
+            <p className="page-error-title">Something went wrong</p>
+            <p className="page-error-body">{fetchError}</p>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <p className="muted">No messages here.</p>
+            <p className="empty-state-title">{
+              activeTab === 'drafted'  ? 'Nothing to review.' :
+              activeTab === 'approved' ? 'No approved messages.' :
+              activeTab === 'sent'     ? 'Nothing sent yet.' :
+              activeTab === 'held_for_review' ? 'Nothing held.' :
+              'Queue is clear.'
+            }</p>
+            {activeTab === 'all' && (
+              <p className="empty-state-body">
+                Draft a submission from a candidate card or kanban board to populate your queue.
+              </p>
+            )}
           </div>
         ) : (
           filtered.map(message => (

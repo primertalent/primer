@@ -733,8 +733,8 @@ body {
 
 .nav-link--active {
   color: var(--color-text);
-  font-weight: 500;
-  background: var(--color-bg);
+  font-weight: 600;
+  background: var(--color-border);
 }
 
 /* ── Queue page ─────────────────────────────────────── */
@@ -3678,4 +3678,109 @@ select.field-input {
 .intake-save-error {
   font-size: 12px;
   color: var(--color-error);
+}
+
+/* ── Loading state ───────────────────────────────────────── */
+
+.loading-state {
+  padding: 48px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-muted);
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner--sm {
+  width: 14px;
+  height: 14px;
+  border-width: 1.5px;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.empty-state-body {
+  font-size: 14px;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+/* ── Page error ──────────────────────────────────────────── */
+
+.page-error {
+  padding: 48px 0;
+  text-align: center;
+}
+
+.page-error-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.page-error-body {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin-bottom: 20px;
+}
+
+/* ── Pulse animation (stat card loading) ─────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.stat-value--loading {
+  animation: pulse 1.4s ease-in-out infinite;
+  color: var(--color-muted);
+  letter-spacing: -1px;
+}
+
+/* ── Inline action error ─────────────────────────────────── */
+
+.inline-error {
+  font-size: 12px;
+  color: var(--color-error);
+  margin-top: 6px;
+}
+
+/* ── AI loading indicator inside modals ──────────────────── */
+
+.modal-generating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--color-muted);
+  font-style: normal;
+}
+
+/* ── Saved confirmation ──────────────────────────────────── */
+
+.saved-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #15803d;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

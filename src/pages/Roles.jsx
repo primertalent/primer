@@ -64,6 +64,7 @@ export default function Roles() {
   const navigate            = useNavigate()
   const [roles, setRoles]   = useState([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!recruiter?.id) return
@@ -79,7 +80,8 @@ export default function Roles() {
         .eq('recruiter_id', recruiter.id)
         .order('created_at', { ascending: false })
 
-      if (!error) setRoles(data ?? [])
+      if (error) setFetchError('Couldn\'t load roles. Try refreshing.')
+      else setRoles(data ?? [])
       setLoading(false)
     }
 
@@ -91,7 +93,7 @@ export default function Roles() {
       <div className="roles-header">
         <div>
           <h1 className="brief-headline">Roles</h1>
-          <p className="brief-date">Open positions you are working</p>
+          <p className="brief-date">Active positions in your pipeline</p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/roles/new')}>
           Create Role
@@ -99,10 +101,19 @@ export default function Roles() {
       </div>
 
       {loading ? (
-        <p className="muted">Loading…</p>
+        <div className="loading-state"><div className="spinner" /></div>
+      ) : fetchError ? (
+        <div className="page-error">
+          <p className="page-error-title">Something went wrong</p>
+          <p className="page-error-body">{fetchError}</p>
+        </div>
       ) : roles.length === 0 ? (
         <div className="empty-state">
-          <p className="muted">No roles yet. Create your first role to get started.</p>
+          <p className="empty-state-title">No roles yet.</p>
+          <p className="empty-state-body">Create your first role to start building a pipeline.</p>
+          <button className="btn-primary" onClick={() => navigate('/roles/new')}>
+            Create a role
+          </button>
         </div>
       ) : (
         <div className="roles-list">

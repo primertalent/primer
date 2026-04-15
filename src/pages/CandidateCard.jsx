@@ -996,16 +996,17 @@ export default function CandidateCard() {
   // ── Render states ────────────────────────────────────────
 
   if (loading) {
-    return <AppLayout><p className="muted">Loading…</p></AppLayout>
+    return <AppLayout><div className="loading-state"><div className="spinner" /></div></AppLayout>
   }
 
   if (notFound) {
     return (
       <AppLayout>
-        <p className="muted">Candidate not found.</p>
-        <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate('/candidates')}>
-          Go back
-        </button>
+        <div className="page-error">
+          <p className="page-error-title">Candidate not found.</p>
+          <p className="page-error-body">This record may have been deleted or you may not have access.</p>
+          <button className="btn-ghost" onClick={() => navigate('/candidates')}>Back to Candidates</button>
+        </div>
       </AppLayout>
     )
   }
@@ -1054,12 +1055,15 @@ export default function CandidateCard() {
         {signals?.length > 0 && <SignalBadges signals={signals} />}
 
         {/* AI suggestion */}
-        {(suggestion || genError) && (
+        {(generating || suggestion || genError) && (
           <div className={`ai-card ${genError ? 'ai-card--error' : ''}`}>
             <p className="ai-card-eyebrow">
               {genError ? 'Error' : 'Suggested Next Action'}
             </p>
-            <p className="ai-card-body">{genError || suggestion}</p>
+            {generating
+              ? <div className="modal-generating"><div className="spinner spinner--sm" />Thinking…</div>
+              : <p className="ai-card-body">{genError ? 'Couldn\'t generate a suggestion. Try again.' : suggestion}</p>
+            }
           </div>
         )}
 
@@ -1135,8 +1139,8 @@ export default function CandidateCard() {
               </div>
             )}
 
-            {pipelines.length === 0 ? (
-              <p className="muted">Not in any pipeline yet.</p>
+            {pipelines.length === 0 && !pickerOpen ? (
+              <p className="muted" style={{ marginTop: 8 }}>Not in any pipeline yet. Use + Add to Role to place this candidate.</p>
             ) : (
               pipelines.map(entry => (
                 <PipelineEntry
@@ -1196,10 +1200,17 @@ export default function CandidateCard() {
             )}
           </div>
 
+          {screening && (
+            <div className="modal-generating" style={{ marginTop: 12 }}>
+              <div className="spinner spinner--sm" />
+              Screening against role…
+            </div>
+          )}
+
           {screenError && (
             <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
               <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">{screenError}</p>
+              <p className="ai-card-body">Couldn't screen this candidate. Try again.</p>
             </div>
           )}
 
@@ -1218,19 +1229,33 @@ export default function CandidateCard() {
             </div>
           )}
 
+          {scorecardGenerating && (
+            <div className="modal-generating" style={{ marginTop: 12 }}>
+              <div className="spinner spinner--sm" />
+              Building scorecard…
+            </div>
+          )}
+
           {scorecardError && (
             <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
               <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">{scorecardError}</p>
+              <p className="ai-card-body">Couldn't generate scorecard. Try again.</p>
             </div>
           )}
 
           {scorecard && <ScorecardResult result={scorecard} />}
 
+          {pitchGenerating && (
+            <div className="modal-generating" style={{ marginTop: 12 }}>
+              <div className="spinner spinner--sm" />
+              Generating pitch…
+            </div>
+          )}
+
           {pitchError && (
             <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
               <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">{pitchError}</p>
+              <p className="ai-card-body">Couldn't generate pitch. Try again.</p>
             </div>
           )}
 
@@ -1264,8 +1289,21 @@ export default function CandidateCard() {
               </button>
             )}
           </div>
-          {careerError && <p className="error" style={{ marginTop: 8 }}>{careerError}</p>}
-          {!candidate.cv_text && <p className="muted">No CV text available. Upload a resume to enable career parsing.</p>}
+          {parsingCareer && (
+            <div className="modal-generating" style={{ marginTop: 8 }}>
+              <div className="spinner spinner--sm" />
+              Parsing career history…
+            </div>
+          )}
+
+          {careerError && (
+            <div className="ai-card ai-card--error" style={{ marginTop: 8 }}>
+              <p className="ai-card-eyebrow">Error</p>
+              <p className="ai-card-body">Couldn't parse career history. Try again.</p>
+            </div>
+          )}
+
+          {!candidate.cv_text && <p className="muted" style={{ marginTop: 8 }}>No CV on file. Upload a resume to enable career parsing.</p>}
           {timeline !== null && (
             <>
               {(() => {
@@ -1281,9 +1319,11 @@ export default function CandidateCard() {
         </section>
 
         {/* Scores History — sourced from screener_results, not pipeline */}
-        {screenerHistory.length > 0 && (
-          <section className="candidate-section" style={{ marginTop: 24 }}>
-            <h2 className="section-heading">Scores History</h2>
+        <section className="candidate-section" style={{ marginTop: 24 }}>
+          <h2 className="section-heading">Scores History</h2>
+          {screenerHistory.length === 0 ? (
+            <p className="muted" style={{ marginTop: 4 }}>No screener results yet. Run the screener against a role to build history.</p>
+          ) : (
             <div className="scores-history">
               {screenerHistory.map(sr => {
                 const score = (sr.result?.match_score ?? 0) * 10
@@ -1318,8 +1358,8 @@ export default function CandidateCard() {
                 )
               })}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* Interaction history */}
         <section className="candidate-section" style={{ marginTop: 24 }}>
@@ -1377,7 +1417,7 @@ export default function CandidateCard() {
           )}
 
           {interactions.length === 0 ? (
-            <p className="muted" style={{ marginTop: logOpen ? 16 : 0 }}>No interactions recorded yet.</p>
+            <p className="muted" style={{ marginTop: logOpen ? 16 : 4 }}>No interactions logged yet. Use + Log to record a call, email, or note.</p>
           ) : (
             <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
               {interactions.map(i => (
@@ -1425,11 +1465,14 @@ export default function CandidateCard() {
             )}
 
             {linkedinModal.phase === 'generating' && (
-              <p className="muted modal-generating">Drafting message…</p>
+              <div className="modal-generating">
+                <div className="spinner spinner--sm" />
+                Drafting message…
+              </div>
             )}
 
             {linkedinModal.phase === 'error' && (
-              <p className="error" style={{ marginTop: 8 }}>{linkedinModal.error}</p>
+              <p className="error" style={{ marginTop: 8 }}>Couldn't generate the message. Try again.</p>
             )}
 
             {linkedinModal.phase === 'done' && linkedinModal.text && (
@@ -1497,11 +1540,14 @@ export default function CandidateCard() {
             )}
 
             {outreachModal.phase === 'generating' && (
-              <p className="muted modal-generating">Drafting outreach…</p>
+              <div className="modal-generating">
+                <div className="spinner spinner--sm" />
+                Drafting outreach…
+              </div>
             )}
 
             {outreachModal.phase === 'error' && (
-              <p className="error" style={{ marginTop: 8 }}>{outreachModal.error}</p>
+              <p className="error" style={{ marginTop: 8 }}>Couldn't generate outreach. Try again.</p>
             )}
 
             {outreachModal.phase === 'done' && outreachModal.result && (
@@ -1607,11 +1653,14 @@ export default function CandidateCard() {
             )}
 
             {subModal.phase === 'generating' && (
-              <p className="muted modal-generating">Drafting submission…</p>
+              <div className="modal-generating">
+                <div className="spinner spinner--sm" />
+                Drafting submission…
+              </div>
             )}
 
             {subModal.phase === 'error' && (
-              <p className="error" style={{ marginTop: 8 }}>{subModal.error}</p>
+              <p className="error" style={{ marginTop: 8 }}>Couldn't generate submission. Try again.</p>
             )}
 
             {subModal.phase === 'done' && (

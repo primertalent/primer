@@ -200,16 +200,17 @@ export default function RoleDetail() {
   }
 
   if (loading) {
-    return <AppLayout><p className="muted">Loading…</p></AppLayout>
+    return <AppLayout><div className="loading-state"><div className="spinner" /></div></AppLayout>
   }
 
   if (notFound) {
     return (
       <AppLayout>
-        <p className="muted">Role not found.</p>
-        <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => navigate('/roles')}>
-          Go back
-        </button>
+        <div className="page-error">
+          <p className="page-error-title">Role not found.</p>
+          <p className="page-error-body">This role may have been deleted or you may not have access.</p>
+          <button className="btn-ghost" onClick={() => navigate('/roles')}>Back to Roles</button>
+        </div>
       </AppLayout>
     )
   }
@@ -393,7 +394,7 @@ export default function RoleDetail() {
 
       {/* Pipeline board */}
       {stages.length === 0 ? (
-        <p className="muted">No hiring stages defined for this role.</p>
+        <p className="muted" style={{ marginBottom: 32 }}>No hiring stages defined. Edit this role to add stages.</p>
       ) : (
         <div className="pipeline-board">
           {stages.map(stage => (
@@ -423,8 +424,15 @@ export default function RoleDetail() {
           </button>
         </div>
 
+        {searchGenerating && (
+          <div className="modal-generating">
+            <div className="spinner spinner--sm" />
+            Building search strings…
+          </div>
+        )}
+
         {searchError && (
-          <p className="error" style={{ marginTop: 8 }}>{searchError}</p>
+          <p className="error" style={{ marginTop: 8 }}>Couldn't build search strings. Try again.</p>
         )}
 
         {searchStrings && (
@@ -462,8 +470,15 @@ export default function RoleDetail() {
           </button>
         </div>
 
+        {interviewGenerating && (
+          <div className="modal-generating">
+            <div className="spinner spinner--sm" />
+            Generating questions…
+          </div>
+        )}
+
         {interviewError && (
-          <p className="error" style={{ marginTop: 8 }}>{interviewError}</p>
+          <p className="error" style={{ marginTop: 8 }}>Couldn't generate questions. Try again.</p>
         )}
 
         {interviewQuestions && (
@@ -542,11 +557,14 @@ export default function RoleDetail() {
             )}
 
             {draftModal.phase === 'generating' && (
-              <p className="muted modal-generating">Drafting submission…</p>
+              <div className="modal-generating">
+                <div className="spinner spinner--sm" />
+                Drafting submission…
+              </div>
             )}
 
             {draftModal.phase === 'error' && (
-              <p className="error" style={{ marginTop: 8 }}>{draftModal.error}</p>
+              <p className="error" style={{ marginTop: 8 }}>Couldn't generate submission. Try again.</p>
             )}
 
             {draftModal.phase === 'done' && (

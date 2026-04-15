@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-14 (session 4).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 6).
 
 ---
 
@@ -59,6 +59,7 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - **Scorecard result persistence** — full scorecard output saves to `pipeline.scorecard_result` JSONB column on generation.
 - **Interaction logging UI** — "Log" button in the Interactions section heading on the candidate card. Inline form with Type (Call / Email / Note), Direction (Inbound / Outbound, hidden for notes), Date (defaults to now), and Notes textarea. Saves to `interactions` table. New entry prepends to the list instantly. Interactions list is now most-recent-first.
 - **Stage advance from candidate card** — each pipeline entry row has a "→ [next stage]" button. One click advances the candidate, updates `pipeline.current_stage`, inserts a row into `pipeline_stage_history`, and updates the UI optimistically with rollback on failure. Disables at "placed".
+- **Wren Command Bar** — persistent input surface on the Dashboard/Brief page. Accepts paste, file attachment (PDF + DOCX), or any combination. Auto-classifies inputs into labeled chips (Resume, JD, Transcript, Notes) via a fast classify call. Assembles all inputs as labeled `<document>` blocks for the intake prompt. Full intake runs in one pass: candidate + company + role created or matched, screener scored, call signals extracted, interaction logged, pipeline entry created. Save All writes all 7 records to Supabase in sequence. View/Edit links appear inline after save.
 
 ---
 
@@ -84,9 +85,23 @@ Key tables:
 - `RoleDetail.jsx` — role view with kanban pipeline board
 - `Candidates.jsx` — candidate database table
 - `MorningBrief.jsx` — daily brief with stat cards
+- `WrenCommand.jsx` — command bar on the brief/dashboard page. Two components: WrenCommand (input surface with chips + textarea + file attach) and IntakeResult (structured output card with score, signals, pitch, bullets, next actions, Save All)
 - `ClientDetail.jsx` — client view with contacts
-- `api/ai.js` — all Anthropic API calls go through here server-side
+- `api/ai.js` — all Anthropic API calls go through here server-side. Actions: intake, classify, screen, scorecard, submission_draft, career_parse, next_action
 - `src/lib/prompts/submissionDraft.js` — prompt builder for submission drafts. Accepts `format` ('email' | 'bullet'). Email = narrative under 250 words. Bullet = structured plain-text under 150 words.
+- `src/lib/prompts/intake.js` — prompt builders for intake and classify actions. buildIntakeMessages assembles document blocks + freeform. buildClassifyMessages is fast/minimal, 100 token max.
+
+---
+
+## Polish Pass (session 6 — 2026-04-15)
+
+Full product polish pass. No new features. Changes:
+- **CSS foundations** — Added `.loading-state` + `.spinner` / `.spinner--sm` (standardized across all pages). Added `.empty-state-title` / `.empty-state-body` sub-classes for structured empty states. Added `.page-error` / `.page-error-title` / `.page-error-body` for not-found and fetch failure states. Added `.modal-generating` (spinner + text, replaces italic muted paragraphs in all modal generating phases). Added `.saved-label` (green "Saved ✓" confirmation). Added `@keyframes pulse` + `.stat-value--loading` (animated dash on stat cards while loading). Strengthened `.nav-link--active` from font-weight 500 + #fafafa bg to font-weight 600 + #e4e4e7 bg (much more visible).
+- **Dashboard** — Stat card loading is now animated pulse instead of a dash. Brief card empty state copy updated to be actionable. Removed redundant `dashboard-candidates` section (WrenCommand replaces it).
+- **Clients / Roles / Candidates / Queue** — All replaced bare `<p className="muted">Loading…</p>` with `.loading-state` spinner. All upgraded empty states to title + body + action structure. All added fetch error state. Roles subtitle copy fixed: "Open positions you are working" → "Active positions in your pipeline". Candidates filtered empty state now has a "Clear filters" button. Queue header aligned to `.roles-header` pattern with message count. Queue empty states are now tab-aware. Queue action errors (approve/hold/send) now surface inline per card.
+- **RoleDetail** — Loading and not-found states use standardized patterns. Search strings and interview questions show spinners while generating. All error messages are human-readable. Submission draft modal generating state uses spinner.
+- **CandidateCard** — Loading and not-found states use standardized patterns. Next action generating shows spinner in the AI card. All screener/scorecard/pitch/career/modal generating states show spinners. All error states use `.ai-card--error` pattern with human-readable copy. Screener history section always visible (shows empty state instead of hiding). Interactions and pipeline sections have meaningful empty state copy.
+- **WrenCommand** — Placeholder copy updated to "Drop anything. Resume, JD, call notes, a question. Wren handles it." Save All confirmation changed from button toggling to a green "Saved ✓" label (button disappears after save). Save error copy changed to "Couldn't save. Try again." Intake processing shows spinner + "Wren is processing…" while running.
 
 ---
 
@@ -133,18 +148,12 @@ Wren should surface what matters without being asked. Signal badges on a candida
 
 ## Current Priority Queue
 
-1. ~~**Candidate submission drafting**~~ ✓ Shipped 2026-04-14
-2. ~~**Bidirectional pipeline movement**~~ ✓ Shipped 2026-04-14
-3. ~~**Two submission formats (Email / Bullet)**~~ ✓ Shipped 2026-04-14
-4. ~~**Submission draft on Candidate Card**~~ ✓ Shipped 2026-04-14
-5. ~~**Screener result persistence**~~ ✓ Shipped 2026-04-14
-6. ~~**Interaction logging UI**~~ ✓ Shipped 2026-04-14
-7. ~~**Stage advance from candidate card**~~ ✓ Shipped 2026-04-14
-8. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
-9. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
-10. **Call mode screen** — A focused view for during/after a candidate or client call.
-11. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record.
-12. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
+1. **Wren Command Bar: Google Doc URL input** — paste a URL, Wren fetches and chips it. Same classify flow as paste and file.
+2. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
+3. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
+4. **Call mode screen** — A focused view for during/after a candidate or client call.
+5. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record. (Note: the Command Bar already handles this via paste — call mode is the dedicated flow.)
+6. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
 
 ---
 
@@ -155,6 +164,8 @@ Wren should surface what matters without being asked. Signal badges on a candida
 - **One-click as the design bar.** Any action that takes more than one motion gets flagged for redesign.
 - **No LinkedIn API.** Too locked down. LinkedIn strategy is: (1) draft outreach inside Wren, copy/paste to send, (2) accept manual profile paste as a CV input source, (3) Chrome extension is the right v2 play for frictionless candidate capture from LinkedIn profiles.
 - **Paraform is the primary submission channel.** Wren needs to make submissions faster and more compelling than what a tired recruiter writes at 4pm.
+- **Document block pattern for multi-input AI calls.** When sending multiple inputs to the model (resume + JD + transcript), each is wrapped as a labeled `<document>` block with type and name attributes. This gives the model clean context boundaries and is the standard pattern for all future multi-input features.
+- **Classify call is intentionally minimal.** 100 token max, 2000 char input slice, no schema. Speed is the priority. Fallback to { type: 'notes', label: 'Document' } rather than erroring. Never block the UI waiting on classification.
 
 ---
 

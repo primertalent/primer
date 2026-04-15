@@ -103,6 +103,7 @@ export default function Clients() {
 
   const [clients, setClients]   = useState([])
   const [loading, setLoading]   = useState(true)
+  const [fetchError, setFetchError] = useState(null)
   const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
@@ -112,7 +113,11 @@ export default function Clients() {
       .select('id, name, industry, website, roles(id, status), client_contacts(id)')
       .eq('recruiter_id', recruiter.id)
       .order('name')
-      .then(({ data }) => { setClients(data ?? []); setLoading(false) })
+      .then(({ data, error }) => {
+        if (error) setFetchError('Couldn\'t load clients. Try refreshing.')
+        else setClients(data ?? [])
+        setLoading(false)
+      })
   }, [recruiter?.id])
 
   function handleCreated(client) {
@@ -149,12 +154,18 @@ export default function Clients() {
       )}
 
       {loading ? (
-        <p className="muted">Loading…</p>
+        <div className="loading-state"><div className="spinner" /></div>
+      ) : fetchError ? (
+        <div className="page-error">
+          <p className="page-error-title">Something went wrong</p>
+          <p className="page-error-body">{fetchError}</p>
+        </div>
       ) : clients.length === 0 && !showForm ? (
         <div className="empty-state">
-          <p className="muted" style={{ marginBottom: 16 }}>No clients yet.</p>
+          <p className="empty-state-title">No clients yet.</p>
+          <p className="empty-state-body">Add your first client to track open roles and contacts.</p>
           <button className="btn-primary" onClick={() => setShowForm(true)}>
-            Add your first client
+            Add a client
           </button>
         </div>
       ) : (

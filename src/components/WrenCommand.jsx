@@ -303,14 +303,18 @@ function IntakeResult({ result, recruiter }) {
           </button>
         )}
         <div className="intake-actions-right">
-          {saveError && <span className="intake-save-error">{saveError}</span>}
-          <button
-            className={saved ? 'btn-ghost' : 'btn-primary'}
-            onClick={handleSaveAll}
-            disabled={saving || saved}
-          >
-            {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save All'}
-          </button>
+          {saveError && <span className="intake-save-error">Couldn't save. Try again.</span>}
+          {saved ? (
+            <span className="saved-label">Saved ✓</span>
+          ) : (
+            <button
+              className="btn-primary"
+              onClick={handleSaveAll}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save All'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -470,7 +474,7 @@ export default function WrenCommand() {
       {/* Textarea */}
       <textarea
         className="wren-command-textarea"
-        placeholder="Paste anything, or type a question. Wren figures it out."
+        placeholder="Drop anything. Resume, JD, call notes, a question. Wren handles it."
         value={freeform}
         onChange={e => setFreeform(e.target.value)}
         onPaste={handlePaste}
@@ -513,6 +517,13 @@ export default function WrenCommand() {
           </button>
         </div>
       </div>
+
+      {loading && (
+        <div className="modal-generating" style={{ marginTop: 16 }}>
+          <div className="spinner spinner--sm" />
+          Wren is processing…
+        </div>
+      )}
 
       {error && <p className="wren-command-error">{error}</p>}
       {result && <IntakeResult result={result} recruiter={recruiter} />}
