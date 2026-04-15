@@ -12,6 +12,7 @@
   --color-muted: #71717a;
   --color-accent: #18181b;
   --color-accent-hover: #3f3f46;
+  --color-primary: #18181b;
   --color-error: #dc2626;
   --color-error-bg: #fef2f2;
 
@@ -221,7 +222,7 @@ body {
 /* ── Morning brief — greeting ───────────────────────── */
 
 .brief-greeting {
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 .brief-headline {
@@ -4711,3 +4712,156 @@ select.field-input {
     height: 32px;
   }
 }
+
+/* ── Brief overhaul — Activity Digest ──────────────────── */
+
+.digest-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 20px 16px;
+  margin-bottom: 16px;
+}
+
+.digest-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 10px;
+}
+
+.digest-loading {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+}
+
+.digest-empty {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.digest-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  margin: 0;
+  padding: 0;
+}
+
+.digest-item {
+  font-size: 14px;
+  color: var(--color-text);
+  width: 100%;
+  padding: 1px 0;
+}
+
+.digest-item::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--color-muted);
+}
+
+/* ── Brief overhaul — Today's Pipeline ─────────────────── */
+
+.today-pipeline-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.today-pipeline-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  padding: 14px 20px 10px;
+  margin: 0;
+}
+
+.today-pipeline-loading {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px 16px;
+}
+
+.today-pipeline-empty {
+  font-size: 14px;
+  color: var(--color-muted);
+  padding: 4px 20px 16px;
+  margin: 0;
+}
+
+.today-pipeline-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.today-pipeline-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 20px;
+  border-top: 1px solid var(--color-border);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background 0.1s;
+}
+
+.today-pipeline-row:hover {
+  background: var(--color-bg);
+}
+
+.today-pipeline-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.today-pipeline-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-pipeline-client {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.today-pipeline-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.today-pipeline-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.today-pipeline-stages {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* ── Unscreened variant for Needs Attention ─────────────── */
+
+.today-dot--unscreened { background: #a1a1aa; }
+.today-action-row--unscreened .today-action-label { color: var(--color-muted); }

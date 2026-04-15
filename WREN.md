@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 9).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 11b).
 
 ---
 
@@ -62,6 +62,7 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - **Wren Command Bar** — persistent input surface on the Dashboard/Brief page. Accepts paste, file attachment (PDF + DOCX), or any combination. Auto-classifies inputs into labeled chips (Resume, JD, Transcript, Notes) via a fast classify call. Assembles all inputs as labeled `<document>` blocks for the intake prompt. Full intake runs in one pass: candidate + company + role created or matched, screener scored, call signals extracted, interaction logged, pipeline entry created. Save All writes all 7 records to Supabase in sequence. View/Edit links appear inline after save. ✕ Clear button dismisses the result card and resets to input.
 - **Recruiter judgment layer** — every pipeline entry on the CandidateCard has an "Add your take" inline form: recruiter score (1–10) + freeform note. Both persist to `pipeline.recruiter_score` and `pipeline.recruiter_note`. Never touched by AI reruns. Recruiter score displays alongside the AI fit score with a distinct purple badge. Same badge visible on kanban cards in RoleDetail. Screener history rows (Scores History) also accept a per-run recruiter note, persisted to `screener_results.recruiter_note`. The delta between AI score and recruiter score is preserved — both visible simultaneously.
 - **Edit/Delete everything** — every AI-generated or user-logged record is now deletable inline. Pattern: × button on row hover → "Delete? Yes / Cancel" inline confirm → optimistic delete with rollback on error. Surfaces: screener result rows (Scores History), interaction rows, pipeline entries (CandidateCard), kanban cards (RoleDetail), drafted queue messages. Career timeline: Clear button in section heading → wipes `career_timeline` + `career_signals` from DB. Reparse button replaces "Parse from CV" when timeline exists. Search strings + interview questions: Clear button in section heading. Next action AI card: Regenerate button in card header. WrenCommand IntakeResult: ✕ Clear button in top-right of card.
+- **Brief as homepage** — Dashboard replaced AI brief card + stat cards with three structured sections: Activity Digest (since yesterday counts), Needs Attention (overdue/due today/drafts/unscreened/unscheduled), Active Roles (pipeline grouped by role with stage breakdown). No API call on load. Nav reordered: Home | Roles | Candidates | Queue | Clients. Queue defaults to "To Review" tab. CandidateCard header reordered: primary actions first.
 - **Multi-screen mode** — WrenCommand auto-detects 1 resume chip + 2+ JD chips and routes to a comparative AI call. Rankings returned as stack-ranked cards (rank, score, recommendation, strengths, gaps, salary_range, next action per role). Graduated recommendations: advance, hold/advance, hold, hold/pass, pass. Save All loops all rankings → client → role → pipeline → screener_result.
 - **Per-card pitch generation** — each multi-screen ranking card has a "Generate Pitch" button. Fires two parallel calls and returns both email pitch and bullets simultaneously. Each with Copy and Save to Queue buttons. Save to Candidate persists both formats to enrichment_data. No navigation required.
 - **JD text saved from chips** — when a role is created via WrenCommand (single intake or multi-screen), the JD chip's raw text is now saved to `roles.notes`. The Job Description section and Format button appear on RoleDetail for all chip-created roles.
@@ -166,9 +167,180 @@ Wren should surface what matters without being asked. Signal badges on a candida
 
 ---
 
+## External Review — Standing Constraints (Session 11)
+
+These are not one-time notes. They are standing constraints that apply to every future build decision.
+
+### What's Working — Lock These In
+
+**WrenCommand is the highest-leverage surface.**
+Replacing "create candidate / create role / run screener" with "drop anything" was correct product thinking. It is the right intake model. Do not complicate it.
+
+**Everything persists.**
+Screener results, recruiter notes, interactions, drafts. This is what makes Wren an OS instead of a tool. Ephemeral AI output is a product antipattern. Wren avoids it. Hold this standard on every new feature.
+
+**One-click is real, not aspirational.**
+Stage advance, draft generation, interaction logging. These actually ship as one motion. That is the bar. Hold it.
+
+### Active Constraints
+
+**Risk 1: Feature inventory thinking.**
+The product is not "a better ATS." It is a system that reduces cognitive load for a solo recruiter. Every proposed feature must pass this test: does this reduce thinking, or add to it? If it adds to it, cut it or defer it.
+
+**Risk 2: Too many surfaces for v1.**
+Current surfaces: CandidateCard, RoleDetail, Queue, WrenCommand, Dashboard, Clients. The risk is fragmentation of attention. The recruiter should never have to think "which screen do I go to?" New surfaces require a strong case.
+
+**Risk 3: AI generates a lot but does not prioritize.**
+Wren produces screeners, next actions, drafts, pitches. The real job is surfacing what matters right now. "Needs Attention" and the morning brief are the start of solving this. They must become the core loop, not a feature on the dashboard.
+
+### The Daily Loop (Product North Star)
+
+Everything must serve this loop. If a feature does not plug into it, cut it or hide it.
+
+1. Open Wren — see what matters (not everything)
+2. Take action — advance, message, log
+3. Close — queue is clean
+
+Every surface, every AI call, every UI decision should make this loop faster and lower-friction. This is the test.
+
+### Before Proposing or Building Anything New
+
+Ask all four:
+- Does it serve the daily loop?
+- Does it reduce cognitive load or add to it?
+- Does it compound toward the autonomous OS vision?
+- Can it be done in one motion?
+
+If the answer to any of these is no, redesign or defer.
+
+---
+
+## Wren v1 — The Perfect Daily Workflow (Behavioral Spec)
+
+This is the target experience. Every build decision should make this workflow faster, cleaner, and lower-friction.
+
+### 7:45am — Ryan opens Wren
+
+He lands on the Brief. Not a dashboard. Not a feed. A brief.
+
+The page answers three questions immediately, no scrolling:
+
+**What happened since yesterday?**
+New candidates processed. Stages advanced. Responses received. Screeners run. Shown as a tight activity digest, 5 lines max.
+
+**What needs attention right now?**
+Candidates who went cold. Roles with no movement in 5+ days. Pipeline entries sitting unscreened. Drafts waiting in queue. Each item is a link. One click takes him directly to the thing that needs action.
+
+**What does today look like?**
+Roles with active candidates. Next actions queued. Anything time-sensitive flagged at the top.
+
+He does not hunt. He reads, clicks, works. Total time on the Brief: 90 seconds.
+
+### 8:00am — He works his roles
+
+He clicks into a role from the Brief. Lands on the kanban. The board shows where every candidate stands. Fit score visible on every card. Recruiter score where he has added one. Unscreened badge where he has not.
+
+He sees a candidate he forgot about. Clicks the card. CandidateCard opens. Wren has already generated a next action. He clicks "Draft Submission." Modal opens. Pre-filled. He edits one sentence. Saves to Queue.
+
+Total time on this candidate: 4 minutes.
+
+He advances two other candidates with single arrow clicks. No page loads. No confirmation dialogs.
+
+### 9:30am — New resume lands in his inbox
+
+He copies the text. Opens Wren. Drops it into WrenCommand along with the JD URL. Wren classifies, runs intake, returns candidate record, fit score, signals, red flags, next action, submission draft in both formats. He clicks Save All. Done.
+
+Total time: 3 minutes.
+
+### 11:00am — Client call
+
+He checks the client record before dialing. Last interaction, open roles, candidates in flight. He makes the call. Takes rough notes in the interaction log while talking. Saves on hang-up.
+
+### 2:00pm — Candidate calls him back
+
+He logs the interaction. Adds his recruiter score: 8. Note: "Strong communicator. More senior than the resume reads." AI had scored this candidate a 6. The delta is now visible. Wren stores it. Ryan moves on.
+
+### 4:30pm — End of day
+
+He opens the Queue. Three drafted submissions waiting. He reads each one. Edits one. Approves all three. Pastes them into Paraform or emails them directly. One copy action per submission. Queue is clean. He closes Wren.
+
+### What Wren Did Today (Invisible Work)
+
+Ryan made the calls. Ryan built the relationships. Ryan made the judgment calls. Wren did everything in between: classified and parsed two new resumes, scored four candidates against three roles, generated three submission drafts, logged five interactions, surfaced two "needs attention" items he would have missed, updated six pipeline records, kept the candidate database current without a single manual data entry.
+
+That is the product. Not features. That workflow.
+
+**The Brief is the start. The Queue is the end. Everything in between is the middle that Wren owns.**
+
+### Build Test for This Workflow
+
+- Where does this live in the daily loop?
+- Does it make one of these steps faster?
+- Does it reduce a decision Ryan has to make?
+- Can it be done without navigating away from where he already is?
+
+If a feature does not show up in this workflow, it either belongs in the background (invisible Wren work) or it does not ship yet.
+
+---
+
 ## Current Priority Queue
 
-_All previous items cleared. Next audit needed._
+_Session 11 audit complete and executed. All 4 priorities shipped._
+
+### Completed session 11b
+
+**Priority 1 — Brief overhaul (shipped)**
+- Removed AI brief card and stat cards from Dashboard
+- Added `ActivityDigest` component: counts since yesterday (new candidates, stage advances, screeners run, interactions logged). Pure DB count queries, no API call.
+- Enhanced `NeedsAttention` (was TodayActions): added 5th query for unscreened pipeline entries (fit_score IS NULL, not placed). Deduplication prevents same candidate appearing twice.
+- Added `TodayPipeline` component: groups active pipeline by role, shows candidate count and stage breakdown. Each row links directly to the role's kanban.
+- Page structure: Greeting → Since Yesterday → Needs Attention → Active Roles → WrenCommand
+
+**Priority 2 — Speed audit (shipped)**
+- Added `--color-primary: #18181b` to CSS root (was undefined, caused silent rendering bugs in queue dot and action label colors)
+- Removed AI brief generation on page load (was firing an Anthropic API call every 4 hours; page now loads purely from DB queries)
+- All async states confirmed: spinners on all three new sections
+
+**Priority 3 — Surface audit (shipped)**
+- Nav reordered: Home | Roles | Candidates | Queue | Clients. Clients de-emphasized to last position.
+- Queue default tab changed from 'all' to 'drafted'. Opens to "To Review" — the actionable state.
+- CandidateCard header reordered: Draft Submission | Next Action (primary) | Outreach | LinkedIn | Edit | Call Mode | Delete. High-frequency actions first.
+
+**Priority 4 — Recruiter vs. AI delta**
+No code. Data is preserved. Build path is clear.
+
+---
+
+### Priority 1 — Brief overhaul: make it the real homepage (not a dashboard)
+
+The Brief must answer three questions without scrolling, in under 90 seconds:
+1. Activity digest — what happened since yesterday (5 lines max): new candidates processed, stages advanced, screeners run, responses received
+2. Needs Attention — who is at risk, who is hot, what is stalled, what is unscreened, drafts waiting. Every item is a clickable link directly to the thing. No hunting.
+3. Today's view — roles with active candidates, next actions queued, time-sensitive items flagged at top
+
+This replaces the current stat-card dashboard pattern as the mental model. The Brief is where Ryan starts and where the day is organized.
+
+### Priority 2 — Speed audit: enforce "speed is respect" as a hard standard
+
+Apply to every surface before adding anything new:
+- Every async state has a spinner or skeleton (no blank areas while loading)
+- Every action has instant feedback (optimistic update or spinner within 100ms)
+- Zero dead clicks (no buttons that do nothing, no nav that doesn't go somewhere useful)
+- No confirmation dialogs on low-stakes actions (advance stage, add to pipeline, log interaction)
+
+### Priority 3 — Surface audit: kill dead weight
+
+Audit each surface against the daily workflow spec:
+- **Queue** — does Ryan open it daily? If not, is it findable from the Brief (end-of-day close)? Simplify to match the "4:30pm" workflow step.
+- **Clients page** — is it part of the core loop? If it is only used pre-call, collapse it or make it accessible from the Brief or role context. Do not give it nav weight it has not earned.
+- **CandidateCard** — density audit. Is every section visible on first load justified? Candidates Ryan has not touched in 7+ days should not demand the same visual weight as hot candidates.
+- **Nav order** — currently: Brief, Clients, Roles, Candidates, Queue. Evaluate whether Clients belongs between Brief and Roles or whether it should be lower.
+
+### Priority 4 — Recruiter vs. AI delta (do not build yet, do not block)
+
+The data is already stored: `pipeline.recruiter_score` vs `pipeline.fit_score`. The next step is surfacing patterns. Do not build this now. But do not build anything that makes it harder to build later. When the time comes: "You have rated backend engineers consistently higher than AI" or "You passed on 5 candidates AI scored 8+."
+
+---
 
 _Completed session 10:_ Multi-screen prompt quality (named resume items, graduated recs, salary range), per-card pitch with both email+bullets, next action setter on pipeline entries, role close/reopen, queue Copy & Send, DB-level candidate search, pitch save to candidate from multi-screen, next action recruiter override, always-on "Needs Attention" dashboard section, brief renamed from "Morning Brief" to "Wren", 4-hour localStorage cache, revenue-first brief prompt.
 

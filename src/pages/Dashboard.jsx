@@ -2,13 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
-import { useStats } from '../hooks/useStats'
 import { supabase } from '../lib/supabase'
-import { generateText } from '../lib/ai'
-import { buildDailyBriefMessages } from '../lib/prompts/dailyBrief'
 import WrenCommand from '../components/WrenCommand'
-
-const BRIEF_TTL = 4 * 60 * 60 * 1000 // 4 hours
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -25,30 +20,84 @@ function getFormattedDate() {
   })
 }
 
-function todayDateString() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function daysSince(isoString) {
   return Math.floor((Date.now() - new Date(isoString).getTime()) / 86400000)
 }
 
-function StatCard({ label, value, loading, to }) {
-  const content = (
-    <>
-      <span className={`stat-value${loading ? ' stat-value--loading' : ''}`}>
-        {loading ? '—' : value}
-      </span>
-      <span className="stat-label">{label}</span>
-    </>
-  )
-  if (to) {
-    return <Link to={to} className="stat-card stat-card--link">{content}</Link>
+// ── Activity Digest ───────────────────────────────────────
+
+function ActivityDigest({ recruiter }) {
+  const [digest, setDigest] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!recruiter?.id) return
+    load()
+  }, [recruiter?.id])
+
+  async function load() {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const [candidatesRes, stagesRes, screenersRes, interactionsRes] = await Promise.allSettled([
+      supabase
+        .from('candidates')
+        .select('*', { count: 'exact', head: true })
+        .eq('recruiter_id', recruiter.id)
+        .gte('created_at', yesterday),
+
+      supabase
+        .from('pipeline_stage_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('recruiter_id', recruiter.id)
+        .gte('created_at', yesterday),
+
+      supabase
+        .from('screener_results')
+        .select('*', { count: 'exact', head: true })
+        .eq('recruiter_id', recruiter.id)
+        .gte('created_at', yesterday),
+
+      supabase
+        .from('interactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('recruiter_id', recruiter.id)
+        .gte('created_at', yesterday),
+    ])
+
+    setDigest({
+      newCandidates: candidatesRes.status === 'fulfilled' ? (candidatesRes.value.count ?? 0) : 0,
+      stageAdvances: stagesRes.status     === 'fulfilled' ? (stagesRes.value.count     ?? 0) : 0,
+      screenersRun:  screenersRes.status  === 'fulfilled' ? (screenersRes.value.count  ?? 0) : 0,
+      interactions:  interactionsRes.status === 'fulfilled' ? (interactionsRes.value.count ?? 0) : 0,
+    })
+    setLoading(false)
   }
-  return <div className="stat-card">{content}</div>
+
+  const lines = []
+  if (digest) {
+    if (digest.newCandidates > 0) lines.push(`${digest.newCandidates} new candidate${digest.newCandidates !== 1 ? 's' : ''} added`)
+    if (digest.stageAdvances > 0) lines.push(`${digest.stageAdvances} pipeline advance${digest.stageAdvances !== 1 ? 's' : ''}`)
+    if (digest.screenersRun  > 0) lines.push(`${digest.screenersRun} screener${digest.screenersRun !== 1 ? 's' : ''} run`)
+    if (digest.interactions  > 0) lines.push(`${digest.interactions} interaction${digest.interactions !== 1 ? 's' : ''} logged`)
+  }
+
+  return (
+    <section className="digest-card">
+      <p className="digest-eyebrow">Since yesterday</p>
+      {loading ? (
+        <div className="digest-loading"><div className="spinner spinner--sm" /></div>
+      ) : lines.length === 0 ? (
+        <p className="digest-empty">No activity since yesterday.</p>
+      ) : (
+        <ul className="digest-list">
+          {lines.map((line, i) => <li key={i} className="digest-item">{line}</li>)}
+        </ul>
+      )}
+    </section>
+  )
 }
 
-// ── Today's Actions ───────────────────────────────────────
+// ── Needs Attention ───────────────────────────────────────
 
 function ActionRow({ candidateId, name, stage, roleTitle, variant, label }) {
   return (
@@ -62,8 +111,8 @@ function ActionRow({ candidateId, name, stage, roleTitle, variant, label }) {
   )
 }
 
-function TodayActions({ recruiter }) {
-  const [items, setItems]   = useState(null)
+function NeedsAttention({ recruiter }) {
+  const [items, setItems]     = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -73,13 +122,13 @@ function TodayActions({ recruiter }) {
 
   async function load() {
     setLoading(true)
-    const today = todayDateString()
+    const today     = new Date().toISOString().slice(0, 10)
     const staleDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    const [overdueRes, dueTodayRes, queueRes, unscheduledRes] = await Promise.allSettled([
+    const [overdueRes, dueTodayRes, queueRes, unscheduledRes, unscreenedRes] = await Promise.allSettled([
       supabase
         .from('pipeline')
-        .select('id, current_stage, next_action, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
+        .select('id, current_stage, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
         .eq('recruiter_id', recruiter.id)
         .eq('status', 'active')
         .lt('next_action_due_at', today)
@@ -89,7 +138,7 @@ function TodayActions({ recruiter }) {
 
       supabase
         .from('pipeline')
-        .select('id, current_stage, next_action, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
+        .select('id, current_stage, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
         .eq('recruiter_id', recruiter.id)
         .eq('status', 'active')
         .gte('next_action_due_at', today)
@@ -111,6 +160,15 @@ function TodayActions({ recruiter }) {
         .lt('created_at', staleDate)
         .order('created_at', { ascending: true })
         .limit(5),
+
+      supabase
+        .from('pipeline')
+        .select('id, current_stage, candidates(id, first_name, last_name), roles(title)')
+        .eq('recruiter_id', recruiter.id)
+        .eq('status', 'active')
+        .is('fit_score', null)
+        .neq('current_stage', 'placed')
+        .limit(5),
     ])
 
     setItems({
@@ -118,17 +176,27 @@ function TodayActions({ recruiter }) {
       dueToday:     dueTodayRes.status     === 'fulfilled' ? (dueTodayRes.value.data     ?? []) : [],
       draftedCount: queueRes.status        === 'fulfilled' ? (queueRes.value.count       ?? 0)  : 0,
       unscheduled:  unscheduledRes.status  === 'fulfilled' ? (unscheduledRes.value.data  ?? []) : [],
+      unscreened:   unscreenedRes.status   === 'fulfilled' ? (unscreenedRes.value.data   ?? []) : [],
     })
     setLoading(false)
   }
+
+  const overdueCount = items?.overdue.length ?? 0
+
+  // Deduplicate: unscreened rows that already appear in overdue/dueToday/unscheduled
+  const seenIds = new Set([
+    ...(items?.overdue.map(p => p.candidates.id) ?? []),
+    ...(items?.dueToday.map(p => p.candidates.id) ?? []),
+    ...(items?.unscheduled.map(p => p.candidates.id) ?? []),
+  ])
+  const uniqueUnscreened = (items?.unscreened ?? []).filter(p => !seenIds.has(p.candidates.id))
 
   const isEmpty = !loading && items &&
     items.overdue.length === 0 &&
     items.dueToday.length === 0 &&
     items.draftedCount === 0 &&
+    uniqueUnscreened.length === 0 &&
     items.unscheduled.length === 0
-
-  const overdueCount = items?.overdue.length ?? 0
 
   return (
     <section className="today-actions-card">
@@ -178,13 +246,24 @@ function TodayActions({ recruiter }) {
             <Link to="/queue" className="today-action-row today-action-row--queue">
               <span className="today-dot today-dot--queue" />
               <span className="today-action-name">
-                {items.draftedCount} submission {items.draftedCount !== 1 ? 'drafts' : 'draft'} waiting for approval
+                {items.draftedCount} submission {items.draftedCount !== 1 ? 'drafts' : 'draft'} waiting for review
               </span>
               <span className="today-action-meta" />
               <span className="today-action-label">queue</span>
               <span className="today-action-arrow">Review →</span>
             </Link>
           )}
+          {uniqueUnscreened.map(p => (
+            <ActionRow
+              key={p.id + '-unscreened'}
+              candidateId={p.candidates.id}
+              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
+              stage={p.current_stage}
+              roleTitle={p.roles?.title}
+              variant="unscreened"
+              label="no score"
+            />
+          ))}
           {items.unscheduled.map(p => (
             <ActionRow
               key={p.id}
@@ -202,99 +281,91 @@ function TodayActions({ recruiter }) {
   )
 }
 
+// ── Today's Pipeline ──────────────────────────────────────
+
+function TodayPipeline({ recruiter }) {
+  const [roles, setRoles]   = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!recruiter?.id) return
+    load()
+  }, [recruiter?.id])
+
+  async function load() {
+    const { data, error } = await supabase
+      .from('pipeline')
+      .select('role_id, current_stage, roles(id, title, clients(name))')
+      .eq('recruiter_id', recruiter.id)
+      .eq('status', 'active')
+      .neq('current_stage', 'placed')
+
+    if (error || !data) { setLoading(false); return }
+
+    const roleMap = {}
+    for (const entry of data) {
+      const rid = entry.role_id
+      if (!roleMap[rid]) {
+        roleMap[rid] = {
+          id:     rid,
+          title:  entry.roles?.title ?? 'Unknown role',
+          client: entry.roles?.clients?.name ?? null,
+          stages: {},
+          count:  0,
+        }
+      }
+      const stage = entry.current_stage ?? 'unknown'
+      roleMap[rid].stages[stage] = (roleMap[rid].stages[stage] ?? 0) + 1
+      roleMap[rid].count++
+    }
+
+    setRoles(Object.values(roleMap).sort((a, b) => b.count - a.count))
+    setLoading(false)
+  }
+
+  return (
+    <section className="today-pipeline-card">
+      <p className="today-pipeline-eyebrow">Active Roles</p>
+      {loading ? (
+        <div className="today-pipeline-loading"><div className="spinner spinner--sm" /></div>
+      ) : !roles?.length ? (
+        <p className="today-pipeline-empty">
+          No active pipeline.{' '}
+          <Link to="/roles/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
+            Add a role →
+          </Link>
+        </p>
+      ) : (
+        <div className="today-pipeline-list">
+          {roles.map(role => (
+            <Link key={role.id} to={`/roles/${role.id}`} className="today-pipeline-row">
+              <div className="today-pipeline-left">
+                <span className="today-pipeline-title">{role.title}</span>
+                {role.client && <span className="today-pipeline-client">{role.client}</span>}
+              </div>
+              <div className="today-pipeline-right">
+                <span className="today-pipeline-count">{role.count} active</span>
+                <span className="today-pipeline-stages">
+                  {Object.entries(role.stages)
+                    .map(([stage, count]) => `${count} ${stage}`)
+                    .join(', ')}
+                </span>
+              </div>
+              <span className="today-action-arrow">View →</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── Dashboard ─────────────────────────────────────────────
 
 export default function Dashboard() {
   const { recruiter, loading: recruiterLoading } = useRecruiter()
-  const { stats, loading: statsLoading } = useStats(recruiter?.id)
-
-  const [briefText, setBriefText]       = useState(null)
-  const [briefLoading, setBriefLoading] = useState(false)
-  const [briefError, setBriefError]     = useState(null)
 
   const firstName = recruiter?.full_name?.split(' ')[0] ?? ''
-
-  useEffect(() => {
-    if (!recruiter?.id || statsLoading) return
-    generateBrief(false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recruiter?.id, statsLoading])
-
-  async function generateBrief(force = false) {
-    if (briefLoading) return
-    setBriefLoading(true)
-    setBriefError(null)
-
-    const cacheKey = `wren_briefing_${recruiter.id}`
-
-    // Check localStorage cache (4h TTL) unless force-refreshing
-    if (!force) {
-      try {
-        const raw = localStorage.getItem(cacheKey)
-        if (raw) {
-          const { text, ts, v } = JSON.parse(raw)
-          if (v === 2 && Date.now() - ts < BRIEF_TTL) {
-            setBriefText(text)
-            setBriefLoading(false)
-            return
-          }
-        }
-      } catch {}
-    }
-
-    try {
-      const today = todayDateString()
-
-      const [overdueRes, dueTodayRes, queueRes] = await Promise.allSettled([
-        supabase
-          .from('pipeline')
-          .select('current_stage, next_action, next_action_due_at, candidates(first_name, last_name), roles(title)')
-          .eq('recruiter_id', recruiter.id)
-          .eq('status', 'active')
-          .lt('next_action_due_at', today)
-          .not('next_action_due_at', 'is', null),
-
-        supabase
-          .from('pipeline')
-          .select('current_stage, next_action, next_action_due_at, candidates(first_name, last_name), roles(title)')
-          .eq('recruiter_id', recruiter.id)
-          .eq('status', 'active')
-          .gte('next_action_due_at', today)
-          .lte('next_action_due_at', today + 'T23:59:59'),
-
-        supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('recruiter_id', recruiter.id)
-          .eq('status', 'drafted'),
-      ])
-
-      const overdue      = overdueRes.status  === 'fulfilled' ? (overdueRes.value.data   ?? []) : []
-      const dueToday     = dueTodayRes.status === 'fulfilled' ? (dueTodayRes.value.data  ?? []) : []
-      const draftedCount = queueRes.status    === 'fulfilled' ? (queueRes.value.count    ?? 0)  : 0
-
-      const messages = buildDailyBriefMessages({
-        overdue,
-        dueToday,
-        draftedCount,
-        stats: stats ?? { activeRoles: 0, candidatesInPipeline: 0 },
-      })
-
-      const text = await generateText({ messages, maxTokens: 128 })
-      const trimmed = text.trim()
-      setBriefText(trimmed)
-
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify({ text: trimmed, ts: Date.now(), v: 2 }))
-      } catch {}
-
-    } catch (err) {
-      console.error('Brief generation failed:', err)
-      setBriefError(true)
-    } finally {
-      setBriefLoading(false)
-    }
-  }
 
   return (
     <AppLayout>
@@ -305,60 +376,9 @@ export default function Dashboard() {
         <p className="brief-date">{getFormattedDate()}</p>
       </section>
 
-      <section className="brief-card">
-        <div className="brief-card-inner">
-          <div className="brief-card-header">
-            <p className="brief-card-eyebrow">Wren</p>
-            {briefText && !briefLoading && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => generateBrief(true)}
-                disabled={briefLoading}
-              >
-                Refresh
-              </button>
-            )}
-          </div>
-          {briefLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-              <div className="spinner spinner--sm" />
-              <span className="brief-card-body">Checking your pipeline…</span>
-            </div>
-          ) : briefError ? (
-            <p className="brief-card-body">
-              Couldn't generate a briefing.{' '}
-              <button
-                onClick={() => generateBrief(true)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3, fontSize: 'inherit', fontFamily: 'inherit', padding: 0 }}
-              >
-                Try again
-              </button>
-            </p>
-          ) : briefText ? (
-            <p className="brief-card-body">{briefText}</p>
-          ) : (
-            <p className="brief-card-body">
-              Nothing to report yet.{' '}
-              <Link to="/roles/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
-                Add a role
-              </Link>
-              {' '}or{' '}
-              <Link to="/candidates/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
-                add a candidate
-              </Link>
-              {' '}to get started.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="stats-row">
-        <StatCard label="Active Roles"            value={stats?.activeRoles}           loading={statsLoading} to="/roles" />
-        <StatCard label="Candidates in Pipeline"  value={stats?.candidatesInPipeline}  loading={statsLoading} to="/candidates" />
-        <StatCard label="Messages to Review"      value={stats?.messagesToReview}      loading={statsLoading} to="/queue" />
-      </section>
-
-      {recruiter && <TodayActions recruiter={recruiter} />}
+      {recruiter && <ActivityDigest recruiter={recruiter} />}
+      {recruiter && <NeedsAttention recruiter={recruiter} />}
+      {recruiter && <TodayPipeline recruiter={recruiter} />}
 
       <WrenCommand />
     </AppLayout>

@@ -1426,17 +1426,6 @@ export default function CandidateCard() {
             </div>
           </div>
           <div className="page-header-actions">
-            <Link className="btn-ghost" to={`/candidates/${id}/call`}>Call Mode</Link>
-            <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
-            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-            <button className="btn-ghost" onClick={openLinkedinModal}>
-              Draft LinkedIn
-            </button>
-            <button className="btn-ghost" onClick={openOutreachModal}>
-              Draft Outreach
-            </button>
             <button className="btn-ghost" onClick={openSubModal}>
               Draft Submission
             </button>
@@ -1445,7 +1434,18 @@ export default function CandidateCard() {
               onClick={handleGenerateNextAction}
               disabled={generating}
             >
-              {generating ? 'Generating…' : 'Generate Next Action'}
+              {generating ? 'Generating…' : 'Next Action'}
+            </button>
+            <button className="btn-ghost" onClick={openOutreachModal}>
+              Outreach
+            </button>
+            <button className="btn-ghost" onClick={openLinkedinModal}>
+              LinkedIn
+            </button>
+            <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
+            <Link className="btn-ghost" to={`/candidates/${id}/call`}>Call Mode</Link>
+            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
             </button>
           </div>
         </div>

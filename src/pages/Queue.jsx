@@ -246,7 +246,7 @@ export default function Queue() {
   const [messages, setMessages]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [fetchError, setFetchError] = useState(null)
-  const [activeTab, setActiveTab] = useState('all')
+  const [activeTab, setActiveTab] = useState('drafted')
 
   useEffect(() => {
     if (!recruiter?.id) return
