@@ -767,10 +767,45 @@ export default function WrenCommand() {
     }
   }
 
-  // ── Paste: auto-detect large blocks ──────────────────
+  // ── Fetch a URL server-side and chip the result ──────
+
+  async function fetchUrlAsChip(url) {
+    const id = Date.now()
+    const shortLabel = url.includes('docs.google.com') ? 'Google Doc' : new URL(url).hostname
+    setChips(prev => [...prev, { id, type: null, label: `Fetching ${shortLabel}…`, content: null, loading: true }])
+    setFreeform('')
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.text) {
+        setChips(prev => prev.filter(c => c.id !== id))
+        setError(data.error ?? 'Could not fetch that URL.')
+        return
+      }
+      setChips(prev => prev.map(c => c.id === id ? { ...c, content: data.text } : c))
+      await classifyAndUpdateChip(data.text, id)
+    } catch {
+      setChips(prev => prev.filter(c => c.id !== id))
+      setError('Could not fetch that URL. Check the address and try again.')
+    }
+  }
+
+  // ── Paste: auto-detect large blocks or URLs ───────────
 
   function handlePaste(e) {
-    const text = e.clipboardData.getData('text')
+    const text = e.clipboardData.getData('text').trim()
+
+    // If it looks like a URL, fetch it
+    if (/^https?:\/\/\S+$/.test(text)) {
+      e.preventDefault()
+      fetchUrlAsChip(text)
+      return
+    }
+
     if (text.length <= 300) return // let normal paste proceed
 
     e.preventDefault()
@@ -836,6 +871,14 @@ export default function WrenCommand() {
 
   async function handleSubmit() {
     if (!canSubmit) return
+
+    // If freeform is just a URL and no chips, fetch it first
+    const trimmed = freeform.trim()
+    if (chips.length === 0 && /^https?:\/\/\S+$/.test(trimmed)) {
+      fetchUrlAsChip(trimmed)
+      return
+    }
+
     setLoading(true)
     setResult(null)
     setMultiResult(null)

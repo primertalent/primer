@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+import { generateText } from '../lib/ai'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -166,6 +167,13 @@ export default function ClientDetail() {
   // Contact add
   const [addingContact, setAddingContact] = useState(false)
 
+  // Intelligence
+  const [intelligence, setIntelligence]           = useState('')
+  const [intelGenerating, setIntelGenerating]     = useState(false)
+  const [intelSaving, setIntelSaving]             = useState(false)
+  const [intelSaved, setIntelSaved]               = useState(false)
+  const [intelError, setIntelError]               = useState(null)
+
   // Delete
   const [deleting, setDeleting] = useState(false)
 
@@ -176,7 +184,7 @@ export default function ClientDetail() {
       const [clientRes, contactsRes, rolesRes] = await Promise.all([
         supabase
           .from('clients')
-          .select('id, name, website, industry, notes')
+          .select('id, name, website, industry, notes, intelligence')
           .eq('id', id)
           .eq('recruiter_id', recruiter.id)
           .single(),
@@ -201,6 +209,7 @@ export default function ClientDetail() {
       } else {
         setClient(clientRes.data)
         setNotes(clientRes.data.notes ?? '')
+        setIntelligence(clientRes.data.intelligence ?? '')
         setContacts(contactsRes.data ?? [])
         setRoles(rolesRes.data ?? [])
       }
@@ -209,6 +218,60 @@ export default function ClientDetail() {
 
     fetchAll()
   }, [id, recruiter?.id])
+
+  async function handleGenerateIntelligence() {
+    setIntelGenerating(true)
+    setIntelError(null)
+    setIntelSaved(false)
+    try {
+      const rolesList = roles.map(r => `- ${r.title} (${STATUS_LABELS[r.status] ?? r.status})`).join('\n') || 'No roles yet'
+      const contactsList = contacts.map(c => `- ${c.full_name}${c.title ? `, ${c.title}` : ''}`).join('\n') || 'No contacts yet'
+
+      const prompt = `You are a recruiting intelligence analyst. Based on the data below, write a concise intelligence brief on this client company from a recruiter's perspective.
+
+Cover:
+1. What they tend to hire — seniority, function, background patterns based on open roles
+2. Key contacts and decision-makers
+3. What a recruiter should know before submitting a candidate
+
+Rules:
+- Plain text, no markdown headers or bullets
+- 3-4 sentences
+- Write like a recruiter briefing a colleague. Specific, direct, useful.
+- No em dashes, no AI writing tells
+
+CLIENT: ${client.name}
+Industry: ${client.industry ?? 'Unknown'}
+Website: ${client.website ?? 'Unknown'}
+Notes: ${notes || 'None'}
+Roles:\n${rolesList}
+Contacts:\n${contactsList}`
+
+      const text = await generateText({
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 400,
+      })
+      setIntelligence(text.trim())
+    } catch (err) {
+      setIntelError('Generation failed. Try again.')
+    } finally {
+      setIntelGenerating(false)
+    }
+  }
+
+  async function handleSaveIntelligence() {
+    setIntelSaving(true)
+    setIntelSaved(false)
+    const { error } = await supabase
+      .from('clients')
+      .update({ intelligence })
+      .eq('id', id)
+      .eq('recruiter_id', recruiter.id)
+    if (error) console.warn('intelligence save failed:', error.message)
+    else setIntelSaved(true)
+    setIntelSaving(false)
+    setTimeout(() => setIntelSaved(false), 2500)
+  }
 
   async function handleDelete() {
     if (!window.confirm(`Delete "${client.name}"? This cannot be undone.`)) return
@@ -435,6 +498,52 @@ export default function ClientDetail() {
           </button>
           {notesSaved && <span className="notes-saved-label">Saved</span>}
         </div>
+      </section>
+
+      {/* Intelligence */}
+      <section className="candidate-section" style={{ marginTop: 24 }}>
+        <div className="section-heading-row">
+          <h2 className="section-heading">Client Intelligence</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {intelligence && (
+              <button
+                className="btn-ghost btn-sm"
+                onClick={handleSaveIntelligence}
+                disabled={intelSaving || intelSaved}
+              >
+                {intelSaving ? 'Saving…' : intelSaved ? 'Saved ✓' : 'Save'}
+              </button>
+            )}
+            <button
+              className="btn-ghost btn-sm"
+              onClick={handleGenerateIntelligence}
+              disabled={intelGenerating}
+            >
+              {intelGenerating ? 'Generating…' : intelligence ? 'Regenerate' : 'Generate'}
+            </button>
+          </div>
+        </div>
+
+        {intelGenerating && (
+          <div className="modal-generating" style={{ marginTop: 12 }}>
+            <div className="spinner spinner--sm" />
+            Generating intelligence brief…
+          </div>
+        )}
+
+        {intelError && (
+          <p className="error" style={{ marginTop: 8 }}>{intelError}</p>
+        )}
+
+        {!intelGenerating && (
+          <textarea
+            className="field-input field-textarea"
+            value={intelligence}
+            onChange={e => { setIntelligence(e.target.value); setIntelSaved(false) }}
+            rows={4}
+            placeholder="Generate an intelligence brief on this client, or write your own…"
+          />
+        )}
       </section>
 
     </AppLayout>
