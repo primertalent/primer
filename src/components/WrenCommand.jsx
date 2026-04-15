@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { generateText } from '../lib/ai'
 import { buildIntakeMessages, buildClassifyMessages } from '../lib/prompts/intake'
+import { buildMultiScreenMessages } from '../lib/prompts/multiScreen'
 import { buildCvPdfMessages } from '../lib/prompts/cvExtraction'
 
 // ── Helpers ───────────────────────────────────────────────
@@ -324,6 +325,266 @@ function IntakeResult({ result, recruiter, onClear }) {
   )
 }
 
+// ── MultiScreenResult ─────────────────────────────────────
+
+const REC_LABEL = { advance: 'Advance', hold: 'Hold', pass: 'Pass' }
+const REC_CLASS = { advance: 'screener-rec--advance', hold: 'screener-rec--hold', pass: 'screener-rec--pass' }
+
+function MultiScreenResult({ result, recruiter, onClear }) {
+  const [saving, setSaving]            = useState(false)
+  const [saved, setSaved]              = useState(false)
+  const [savedCandidateId, setSavedId] = useState(null)
+  const [saveError, setSaveError]      = useState(null)
+
+  const c        = result.candidate
+  const rankings = result.rankings ?? []
+
+  async function handleSaveAll() {
+    if (!recruiter?.id) return
+    setSaving(true)
+    setSaveError(null)
+
+    try {
+      // ── Candidate ──────────────────────────────────────
+      const { first_name, last_name } = parseName(c?.name)
+      let existing = null
+
+      if (c?.email) {
+        const { data } = await supabase
+          .from('candidates').select('id')
+          .eq('recruiter_id', recruiter.id).eq('email', c.email)
+          .maybeSingle()
+        existing = data
+      }
+      if (!existing && c?.name) {
+        const { data } = await supabase
+          .from('candidates').select('id')
+          .eq('recruiter_id', recruiter.id)
+          .eq('first_name', first_name).eq('last_name', last_name)
+          .maybeSingle()
+        existing = data
+      }
+
+      const candidatePayload = {
+        recruiter_id: recruiter.id,
+        first_name,
+        last_name,
+        ...(c?.email           && { email: c.email }),
+        ...(c?.current_title   && { current_title: c.current_title }),
+        ...(c?.current_company && { current_company: c.current_company }),
+        ...(c?.cv_text         && { cv_text: c.cv_text }),
+      }
+
+      let candidateId
+      if (existing) {
+        await supabase.from('candidates').update(candidatePayload).eq('id', existing.id)
+        candidateId = existing.id
+      } else {
+        const { data, error } = await supabase
+          .from('candidates').insert(candidatePayload).select('id').single()
+        if (error) throw error
+        candidateId = data.id
+      }
+
+      // ── Per-role: client → role → pipeline → screener_result ──
+      for (const ranking of rankings) {
+        if (!ranking.company || !ranking.role_title) continue
+
+        // Client
+        let clientId
+        const { data: existingClient } = await supabase
+          .from('clients').select('id')
+          .eq('recruiter_id', recruiter.id).ilike('name', ranking.company)
+          .maybeSingle()
+
+        if (existingClient) {
+          clientId = existingClient.id
+        } else {
+          const { data, error } = await supabase
+            .from('clients')
+            .insert({ recruiter_id: recruiter.id, name: ranking.company })
+            .select('id').single()
+          if (error) throw error
+          clientId = data.id
+        }
+
+        // Role
+        let roleId
+        const { data: existingRole } = await supabase
+          .from('roles').select('id')
+          .eq('recruiter_id', recruiter.id).eq('client_id', clientId).ilike('title', ranking.role_title)
+          .maybeSingle()
+
+        if (existingRole) {
+          roleId = existingRole.id
+        } else {
+          const { data, error } = await supabase
+            .from('roles')
+            .insert({
+              recruiter_id: recruiter.id,
+              client_id: clientId,
+              title: ranking.role_title,
+              status: 'open',
+              process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+            })
+            .select('id').single()
+          if (error) throw error
+          roleId = data.id
+        }
+
+        // Pipeline
+        const fitScore = ranking.match_score != null
+          ? Math.min(100, Math.round(ranking.match_score * 10))
+          : null
+
+        await supabase.from('pipeline').upsert(
+          {
+            recruiter_id: recruiter.id,
+            candidate_id: candidateId,
+            role_id: roleId,
+            current_stage: 'Sourced',
+            status: 'active',
+            ...(fitScore != null && { fit_score: fitScore }),
+          },
+          { onConflict: 'candidate_id,role_id' }
+        )
+
+        // Screener result
+        await supabase.from('screener_results').insert({
+          recruiter_id: recruiter.id,
+          candidate_id: candidateId,
+          role_id: roleId,
+          result: {
+            match_score: ranking.match_score,
+            recommendation: ranking.recommendation,
+            recommendation_reason: ranking.why,
+            top_strengths: ranking.strengths ?? [],
+            top_concerns: ranking.gaps ?? [],
+            skills_match: [],
+            red_flags: [],
+          },
+        })
+      }
+
+      setSaved(true)
+      setSavedId(candidateId)
+    } catch (err) {
+      console.error('MultiScreen Save All failed:', err)
+      setSaveError('Couldn\'t save. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="intake-result">
+
+      {/* Header */}
+      <div className="intake-header">
+        <div className="intake-header-left">
+          <div className="intake-candidate-name">
+            {c?.name || 'Unknown Candidate'}
+            {saved && savedCandidateId && (
+              <span className="intake-saved-links">
+                <Link to={`/candidates/${savedCandidateId}`} className="intake-saved-link">View</Link>
+                <Link to={`/candidates/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
+              </span>
+            )}
+          </div>
+          {(c?.current_title || c?.current_company) && (
+            <div className="intake-candidate-meta">
+              {[c.current_title, c.current_company].filter(Boolean).join(' · ')}
+            </div>
+          )}
+          <div className="intake-role-line">{rankings.length} roles compared</div>
+        </div>
+        <button className="btn-ghost btn-sm" onClick={onClear} title="Dismiss">✕ Clear</button>
+      </div>
+
+      {/* Overall next action */}
+      {result.overall_next_action && (
+        <div className="intake-section">
+          <p className="intake-eyebrow">Overall Next Action</p>
+          <p className="intake-pitch">{result.overall_next_action}</p>
+        </div>
+      )}
+
+      {/* Stack-ranked role cards */}
+      <div className="multiscreen-rankings">
+        {rankings.map((r, i) => {
+          const variant = r.match_score >= 8 ? 'green' : r.match_score >= 5 ? 'amber' : 'red'
+          const recClass = REC_CLASS[r.recommendation] ?? ''
+          const recLabel = REC_LABEL[r.recommendation] ?? r.recommendation
+          return (
+            <div key={i} className="multiscreen-rank-card">
+              <div className="multiscreen-rank-header">
+                <span className="multiscreen-rank-number">#{r.rank}</span>
+                <div className="multiscreen-rank-role">
+                  <span className="multiscreen-role-title">{r.role_title}</span>
+                  <span className="multiscreen-company">{r.company}</span>
+                </div>
+                <div className="multiscreen-rank-scores">
+                  <span className={`fit-badge fit-badge--${variant}`}>
+                    {r.match_score}<span className="fit-badge-denom">/10</span>
+                  </span>
+                  <span className={`screener-rec-badge ${recClass}`}>{recLabel}</span>
+                </div>
+              </div>
+
+              {r.score_label && (
+                <p className="multiscreen-score-label">{r.score_label}</p>
+              )}
+
+              {r.why && <p className="multiscreen-why">{r.why}</p>}
+
+              <div className="multiscreen-two-col">
+                {r.strengths?.length > 0 && (
+                  <div className="screener-block">
+                    <p className="screener-block-label">Strengths</p>
+                    <ul className="screener-list screener-list--strengths">
+                      {r.strengths.map((s, j) => <li key={j}>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {r.gaps?.length > 0 && (
+                  <div className="screener-block">
+                    <p className="screener-block-label">Gaps</p>
+                    <ul className="screener-list screener-list--concerns">
+                      {r.gaps.map((g, j) => <li key={j}>{g}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {r.next_action && (
+                <div className="multiscreen-next-action">
+                  <span className="screener-block-label">Next</span>
+                  <span>{r.next_action}</span>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Save */}
+      <div className="intake-actions">
+        <div className="intake-actions-right">
+          {saveError && <span className="intake-save-error">{saveError}</span>}
+          {saved ? (
+            <span className="saved-label">Saved ✓</span>
+          ) : (
+            <button className="btn-primary" onClick={handleSaveAll} disabled={saving}>
+              {saving ? 'Saving…' : `Save All (${rankings.length} roles)`}
+            </button>
+          )}
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
 // ── WrenCommand ───────────────────────────────────────────
 
 export default function WrenCommand() {
@@ -331,9 +592,10 @@ export default function WrenCommand() {
   const fileInputRef        = useRef(null)
   const [chips, setChips]   = useState([])
   const [freeform, setFreeform] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState(null)
-  const [error, setError]       = useState(null)
+  const [loading, setLoading]       = useState(false)
+  const [result, setResult]         = useState(null)
+  const [multiResult, setMultiResult] = useState(null)
+  const [error, setError]           = useState(null)
 
   // ── Classify a text block and resolve a loading chip ──
 
@@ -411,14 +673,20 @@ export default function WrenCommand() {
 
   // ── Submit ────────────────────────────────────────────
 
-  const anyLoading  = chips.some(c => c.loading)
-  const hasContent  = chips.length > 0 || freeform.trim().length > 0
-  const canSubmit   = hasContent && !anyLoading && !loading
+  const anyLoading   = chips.some(c => c.loading)
+  const hasContent   = chips.length > 0 || freeform.trim().length > 0
+  const canSubmit    = hasContent && !anyLoading && !loading
+
+  // Detect multi-screen mode: 1 resume chip + 2 or more JD chips
+  const resumeChips  = chips.filter(c => !c.loading && c.type === 'resume')
+  const jdChips      = chips.filter(c => !c.loading && c.type === 'jd')
+  const isMultiScreen = resumeChips.length === 1 && jdChips.length >= 2
 
   async function handleSubmit() {
     if (!canSubmit) return
     setLoading(true)
     setResult(null)
+    setMultiResult(null)
     setError(null)
 
     try {
@@ -428,11 +696,19 @@ export default function WrenCommand() {
 
       const fullInput = [docBlocks, freeform.trim()].filter(Boolean).join('\n\n')
 
-      const { system, messages, maxTokens } = buildIntakeMessages(fullInput)
-      const text = await generateText({ system, messages, maxTokens })
-      const parsed = parseJson(text)
-      if (!parsed) throw new Error('No valid JSON in response')
-      setResult(parsed)
+      if (isMultiScreen) {
+        const { system, messages, maxTokens } = buildMultiScreenMessages(fullInput)
+        const text = await generateText({ system, messages, maxTokens })
+        const parsed = parseJson(text)
+        if (!parsed) throw new Error('No valid JSON in response')
+        setMultiResult(parsed)
+      } else {
+        const { system, messages, maxTokens } = buildIntakeMessages(fullInput)
+        const text = await generateText({ system, messages, maxTokens })
+        const parsed = parseJson(text)
+        if (!parsed) throw new Error('No valid JSON in response')
+        setResult(parsed)
+      }
     } catch (err) {
       console.error('Intake failed:', err)
       setError('Something went wrong. Try again.')
@@ -508,6 +784,11 @@ export default function WrenCommand() {
             onChange={e => { handleFiles(e.target.files); e.target.value = '' }}
           />
           {anyLoading && <span className="wren-command-hint">Classifying…</span>}
+          {isMultiScreen && !anyLoading && (
+            <span className="wren-multiscreen-badge">
+              Multi-screen · {jdChips.length} roles
+            </span>
+          )}
         </div>
         <div className="wren-command-footer-right">
           <span className="wren-command-hint">⌘↵ to submit</span>
@@ -516,7 +797,12 @@ export default function WrenCommand() {
             onClick={handleSubmit}
             disabled={!canSubmit}
           >
-            {loading ? 'Wren is thinking…' : 'Let Wren fly →'}
+            {loading
+              ? 'Wren is thinking…'
+              : isMultiScreen
+                ? `Compare ${jdChips.length} roles →`
+                : 'Let Wren fly →'
+            }
           </button>
         </div>
       </div>
@@ -530,6 +816,7 @@ export default function WrenCommand() {
 
       {error && <p className="wren-command-error">{error}</p>}
       {result && <IntakeResult result={result} recruiter={recruiter} onClear={() => setResult(null)} />}
+      {multiResult && <MultiScreenResult result={multiResult} recruiter={recruiter} onClear={() => setMultiResult(null)} />}
     </section>
   )
 }

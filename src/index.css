@@ -3891,6 +3891,113 @@ select.field-input {
   background: var(--color-error-bg);
 }
 
+/* ── Multi-screen mode badge ─────────────────────────────── */
+
+.wren-multiscreen-badge {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b21a8;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* ── Multi-screen result ─────────────────────────────────── */
+
+.multiscreen-rankings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.multiscreen-rank-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.multiscreen-rank-card:first-child {
+  border-color: #e9d5ff;
+  background: #fdfbff;
+}
+
+.multiscreen-rank-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.multiscreen-rank-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-muted);
+  min-width: 32px;
+  line-height: 1.1;
+}
+
+.multiscreen-rank-card:first-child .multiscreen-rank-number {
+  color: #6b21a8;
+}
+
+.multiscreen-rank-role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.multiscreen-role-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.multiscreen-company {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.multiscreen-rank-scores {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.multiscreen-score-label {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.multiscreen-why {
+  font-size: 13px;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.multiscreen-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.multiscreen-next-action {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
 /* ── Recruiter judgment ──────────────────────────────────── */
 
 .recruiter-judgment {
