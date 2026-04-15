@@ -59,7 +59,7 @@ function SignalRow({ label, value }) {
   )
 }
 
-function IntakeResult({ result, recruiter }) {
+function IntakeResult({ result, recruiter, onClear }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
@@ -236,12 +236,15 @@ function IntakeResult({ result, recruiter }) {
             </div>
           )}
         </div>
-        {s?.score > 0 && (
-          <div className="intake-score">
-            <span className="intake-score-value">{s.score}<span className="intake-score-denom">/10</span></span>
-            {s.score_label && <span className="intake-score-label">{s.score_label}</span>}
-          </div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <button className="btn-ghost btn-sm" onClick={onClear} title="Dismiss result">✕ Clear</button>
+          {s?.score > 0 && (
+            <div className="intake-score">
+              <span className="intake-score-value">{s.score}<span className="intake-score-denom">/10</span></span>
+              {s.score_label && <span className="intake-score-label">{s.score_label}</span>}
+            </div>
+          )}
+        </div>
       </div>
 
       {hasSignals && (
@@ -526,7 +529,7 @@ export default function WrenCommand() {
       )}
 
       {error && <p className="wren-command-error">{error}</p>}
-      {result && <IntakeResult result={result} recruiter={recruiter} />}
+      {result && <IntakeResult result={result} recruiter={recruiter} onClear={() => setResult(null)} />}
     </section>
   )
 }

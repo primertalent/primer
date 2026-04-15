@@ -42,12 +42,14 @@ function bodyPreview(body) {
 
 // ── MessageCard ───────────────────────────────────────────
 
-function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
+function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit, onDelete }) {
   const [editing, setEditing]   = useState(false)
   const [editBody, setEditBody] = useState(message.body)
   const [saving, setSaving]     = useState(false)
   const [acting, setActing]     = useState(false)
   const [actionError, setActionError] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deletingMsg, setDeletingMsg] = useState(false)
 
   const candidateName = message.candidates
     ? `${message.candidates.first_name} ${message.candidates.last_name}`
@@ -85,6 +87,17 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
     const err = await onSend(message.id)
     if (err) setActionError('Couldn\'t mark as sent. Try again.')
     setActing(false)
+  }
+
+  async function handleDelete() {
+    setDeletingMsg(true)
+    setActionError(null)
+    const err = await onDelete(message.id)
+    if (err) {
+      setActionError('Couldn\'t delete. Try again.')
+      setDeletingMsg(false)
+      setConfirmDelete(false)
+    }
   }
 
   async function handleSave() {
@@ -186,7 +199,25 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit }) {
                 Hold
               </button>
             )}
+            {isDrafted && !confirmDelete && (
+              <button
+                className="btn-action btn-action--delete"
+                onClick={() => setConfirmDelete(true)}
+                disabled={acting || deletingMsg}
+              >
+                Delete
+              </button>
+            )}
           </div>
+          {confirmDelete && (
+            <div className="inline-confirm">
+              <span>Delete this draft?</span>
+              <button className="btn-confirm-yes" onClick={handleDelete} disabled={deletingMsg}>
+                {deletingMsg ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button className="btn-confirm-cancel" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </div>
+          )}
           {actionError && <p className="inline-error">{actionError}</p>}
         </div>
       )}
@@ -266,6 +297,12 @@ export default function Queue() {
     }
   }
 
+  async function handleDelete(id) {
+    const { error } = await supabase.from('messages').delete().eq('id', id)
+    if (!error) setMessages(prev => prev.filter(m => m.id !== id))
+    return error ?? null
+  }
+
   function tabCount(key) {
     if (key === 'all') return messages.length
     return messages.filter(m => m.status === key).length
@@ -336,6 +373,7 @@ export default function Queue() {
               onHold={handleHold}
               onSend={handleSend}
               onSaveEdit={handleSaveEdit}
+              onDelete={handleDelete}
             />
           ))
         )}

@@ -135,7 +135,7 @@ function SkillTags({ skills }) {
 
 const PIPELINE_STAGES = ['sourced', 'screening', 'shortlisted', 'interviewing', 'offer', 'placed']
 
-function PipelineEntry({ entry, onAdvance, advancing }) {
+function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
   const roleName = entry.roles?.title ?? 'Unknown role'
   const clientName = entry.roles?.clients?.name ?? 'Unknown client'
   const currentStage = entry.current_stage?.toLowerCase()
@@ -144,11 +144,27 @@ function PipelineEntry({ entry, onAdvance, advancing }) {
     ? PIPELINE_STAGES[currentIdx + 1]
     : null
 
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState(null)
+
+  async function handleConfirmRemove() {
+    setRemoving(true)
+    setRemoveError(null)
+    const err = await onRemove(entry.id)
+    if (err) {
+      setRemoveError('Couldn\'t remove. Try again.')
+      setRemoving(false)
+      setConfirmRemove(false)
+    }
+  }
+
   return (
     <div className="pipeline-entry">
       <div className="pipeline-role">
         <span className="pipeline-role-title">{roleName}</span>
         <span className="pipeline-client">{clientName}</span>
+        <button className="btn-row-remove" onClick={() => setConfirmRemove(true)} title="Remove from pipeline">×</button>
       </div>
       <div className="pipeline-meta">
         <span className="stage-badge">{entry.current_stage}</span>
@@ -178,11 +194,36 @@ function PipelineEntry({ entry, onAdvance, advancing }) {
           )}
         </div>
       )}
+      {confirmRemove && (
+        <div className="inline-confirm">
+          <span>Remove from {roleName}?</span>
+          <button className="btn-confirm-yes" onClick={handleConfirmRemove} disabled={removing}>
+            {removing ? 'Removing…' : 'Yes, remove'}
+          </button>
+          <button className="btn-confirm-cancel" onClick={() => setConfirmRemove(false)}>Cancel</button>
+        </div>
+      )}
+      {removeError && <p className="inline-error">{removeError}</p>}
     </div>
   )
 }
 
-function InteractionEntry({ interaction }) {
+function InteractionEntry({ interaction, onDelete }) {
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
+
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError(null)
+    const err = await onDelete(interaction.id)
+    if (err) {
+      setDeleteError('Couldn\'t delete. Try again.')
+      setDeleting(false)
+      setConfirm(false)
+    }
+  }
+
   return (
     <div className="interaction-entry">
       <div className="interaction-meta">
@@ -191,6 +232,7 @@ function InteractionEntry({ interaction }) {
           <span className="interaction-direction">{interaction.direction}</span>
         )}
         <span className="interaction-date">{formatDateShort(interaction.occurred_at)}</span>
+        <button className="btn-row-remove" onClick={() => setConfirm(true)} title="Delete">×</button>
       </div>
       {interaction.subject && (
         <p className="interaction-subject">{interaction.subject}</p>
@@ -198,6 +240,16 @@ function InteractionEntry({ interaction }) {
       {interaction.body && (
         <p className="interaction-body">{interaction.body}</p>
       )}
+      {confirm && (
+        <div className="inline-confirm">
+          <span>Delete this interaction?</span>
+          <button className="btn-confirm-yes" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Yes, delete'}
+          </button>
+          <button className="btn-confirm-cancel" onClick={() => setConfirm(false)}>Cancel</button>
+        </div>
+      )}
+      {deleteError && <p className="inline-error">{deleteError}</p>}
     </div>
   )
 }
@@ -221,6 +273,67 @@ function SignalBadges({ signals }) {
           </span>
         )
       })}
+    </div>
+  )
+}
+
+// ── Screener history row ──────────────────────────────
+
+function ScoreHistoryRow({ sr, inPipeline, onDelete }) {
+  const score = (sr.result?.match_score ?? 0) * 10
+  const tenth = score / 10
+  const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
+  let variant = 'none'
+  if (score >= 80) variant = 'green'
+  else if (score >= 50) variant = 'amber'
+  else variant = 'red'
+
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
+
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError(null)
+    const err = await onDelete(sr.id)
+    if (err) {
+      setDeleteError('Couldn\'t delete. Try again.')
+      setDeleting(false)
+      setConfirm(false)
+    }
+  }
+
+  return (
+    <div className="scores-history-row">
+      <div className="scores-history-role">
+        <span className="scores-history-title">{sr.roles?.title ?? 'Unknown role'}</span>
+        {sr.roles?.clients?.name && (
+          <span className="scores-history-client">{sr.roles.clients.name}</span>
+        )}
+        {!inPipeline && (
+          <span className="scores-history-badge scores-history-badge--pre-pipeline">Pre-pipeline</span>
+        )}
+      </div>
+      <div className="scores-history-right">
+        <span className={`fit-badge fit-badge--${variant}`}>
+          {display}<span className="fit-badge-denom">/10</span>
+        </span>
+        <span className="scores-history-date">{formatDateShort(sr.scored_at)}</span>
+        {sr.result?.recommendation_reason && (
+          <p className="scores-history-rationale">{sr.result.recommendation_reason}</p>
+        )}
+        <button className="btn-row-remove" onClick={() => setConfirm(true)} title="Delete result">×</button>
+      </div>
+      {confirm && (
+        <div className="inline-confirm">
+          <span>Delete this result?</span>
+          <button className="btn-confirm-yes" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Yes, delete'}
+          </button>
+          <button className="btn-confirm-cancel" onClick={() => setConfirm(false)}>Cancel</button>
+        </div>
+      )}
+      {deleteError && <p className="inline-error">{deleteError}</p>}
     </div>
   )
 }
@@ -509,6 +622,8 @@ export default function CandidateCard() {
   const [signals, setSignals] = useState(null)
   const [parsingCareer, setParsingCareer] = useState(false)
   const [careerError, setCareerError] = useState(null)
+  const [clearCareerConfirm, setClearCareerConfirm] = useState(false)
+  const [clearingCareer, setClearingCareer] = useState(false)
 
   // Submission draft modal
   const [subModal, setSubModal] = useState({
@@ -798,6 +913,41 @@ export default function CandidateCard() {
     }
   }
 
+  async function handleClearCareer() {
+    setClearingCareer(true)
+    const { error } = await supabase
+      .from('candidates')
+      .update({ career_timeline: null, career_signals: null })
+      .eq('id', id)
+    if (!error) {
+      setTimeline(null)
+      setSignals(null)
+    }
+    setClearCareerConfirm(false)
+    setClearingCareer(false)
+  }
+
+  async function handleRemovePipeline(entryId) {
+    const { error } = await supabase.from('pipeline').delete().eq('id', entryId)
+    if (error) return error
+    setPipelines(prev => prev.filter(p => p.id !== entryId))
+    return null
+  }
+
+  async function handleDeleteInteraction(interactionId) {
+    const { error } = await supabase.from('interactions').delete().eq('id', interactionId)
+    if (error) return error
+    setInteractions(prev => prev.filter(i => i.id !== interactionId))
+    return null
+  }
+
+  async function handleDeleteScreenerResult(resultId) {
+    const { error } = await supabase.from('screener_results').delete().eq('id', resultId)
+    if (error) return error
+    setScreenerHistory(prev => prev.filter(r => r.id !== resultId))
+    return null
+  }
+
   async function handleAddToRole(role) {
     if (addingRoleId) return
     setAddError(null)
@@ -1057,9 +1207,14 @@ export default function CandidateCard() {
         {/* AI suggestion */}
         {(generating || suggestion || genError) && (
           <div className={`ai-card ${genError ? 'ai-card--error' : ''}`}>
-            <p className="ai-card-eyebrow">
-              {genError ? 'Error' : 'Suggested Next Action'}
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p className="ai-card-eyebrow">
+                {genError ? 'Error' : 'Suggested Next Action'}
+              </p>
+              {!generating && (
+                <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
+              )}
+            </div>
             {generating
               ? <div className="modal-generating"><div className="spinner spinner--sm" />Thinking…</div>
               : <p className="ai-card-body">{genError ? 'Couldn\'t generate a suggestion. Try again.' : suggestion}</p>
@@ -1148,6 +1303,7 @@ export default function CandidateCard() {
                   entry={entry}
                   onAdvance={handleAdvanceStage}
                   advancing={advancingId === entry.id}
+                  onRemove={handleRemovePipeline}
                 />
               ))
             )}
@@ -1279,16 +1435,32 @@ export default function CandidateCard() {
         <section className="candidate-section" style={{ marginTop: 24 }}>
           <div className="section-heading-row">
             <h2 className="section-heading">Career Timeline</h2>
-            {candidate.cv_text && !timeline && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={handleParseCareer}
-                disabled={parsingCareer}
-              >
-                {parsingCareer ? 'Parsing…' : 'Parse from CV'}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {candidate.cv_text && (
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={handleParseCareer}
+                  disabled={parsingCareer}
+                >
+                  {parsingCareer ? 'Parsing…' : timeline ? 'Reparse' : 'Parse from CV'}
+                </button>
+              )}
+              {timeline && !clearCareerConfirm && (
+                <button className="btn-ghost btn-sm" onClick={() => setClearCareerConfirm(true)}>
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
+          {clearCareerConfirm && (
+            <div className="inline-confirm">
+              <span>Clear career data?</span>
+              <button className="btn-confirm-yes" onClick={handleClearCareer} disabled={clearingCareer}>
+                {clearingCareer ? 'Clearing…' : 'Yes, clear'}
+              </button>
+              <button className="btn-confirm-cancel" onClick={() => setClearCareerConfirm(false)}>Cancel</button>
+            </div>
+          )}
           {parsingCareer && (
             <div className="modal-generating" style={{ marginTop: 8 }}>
               <div className="spinner spinner--sm" />
@@ -1325,38 +1497,14 @@ export default function CandidateCard() {
             <p className="muted" style={{ marginTop: 4 }}>No screener results yet. Run the screener against a role to build history.</p>
           ) : (
             <div className="scores-history">
-              {screenerHistory.map(sr => {
-                const score = (sr.result?.match_score ?? 0) * 10
-                const tenth = score / 10
-                const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
-                let variant = 'none'
-                if (score >= 80) variant = 'green'
-                else if (score >= 50) variant = 'amber'
-                else variant = 'red'
-                const inPipeline = pipelines.some(p => p.role_id === sr.role_id)
-                return (
-                  <div key={sr.id} className="scores-history-row">
-                    <div className="scores-history-role">
-                      <span className="scores-history-title">{sr.roles?.title ?? 'Unknown role'}</span>
-                      {sr.roles?.clients?.name && (
-                        <span className="scores-history-client">{sr.roles.clients.name}</span>
-                      )}
-                      {!inPipeline && (
-                        <span className="scores-history-badge scores-history-badge--pre-pipeline">Pre-pipeline</span>
-                      )}
-                    </div>
-                    <div className="scores-history-right">
-                      <span className={`fit-badge fit-badge--${variant}`}>
-                        {display}<span className="fit-badge-denom">/10</span>
-                      </span>
-                      <span className="scores-history-date">{formatDateShort(sr.scored_at)}</span>
-                      {sr.result?.recommendation_reason && (
-                        <p className="scores-history-rationale">{sr.result.recommendation_reason}</p>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+              {screenerHistory.map(sr => (
+                <ScoreHistoryRow
+                  key={sr.id}
+                  sr={sr}
+                  inPipeline={pipelines.some(p => p.role_id === sr.role_id)}
+                  onDelete={handleDeleteScreenerResult}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -1421,7 +1569,7 @@ export default function CandidateCard() {
           ) : (
             <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
               {interactions.map(i => (
-                <InteractionEntry key={i.id} interaction={i} />
+                <InteractionEntry key={i.id} interaction={i} onDelete={handleDeleteInteraction} />
               ))}
             </div>
           )}

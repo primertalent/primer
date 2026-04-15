@@ -42,8 +42,24 @@ function formatComp(min, max, type) {
 
 // ── Sub-components ────────────────────────────────────────
 
-function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission }) {
+function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRemove }) {
   const uClass = urgencyClass(entry.next_action_due_at)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState(null)
+
+  async function handleConfirmRemove(e) {
+    e.preventDefault()
+    setRemoving(true)
+    setRemoveError(null)
+    const err = await onRemove(entry.id)
+    if (err) {
+      setRemoveError('Couldn\'t remove. Try again.')
+      setRemoving(false)
+      setConfirmRemove(false)
+    }
+  }
+
   return (
     <div className="pipeline-candidate-card">
       <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-info">
@@ -85,12 +101,32 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission }) {
             title="Advance to next stage"
           >→</button>
         )}
+        <button
+          className="btn-kanban-remove"
+          onClick={e => { e.preventDefault(); setConfirmRemove(true) }}
+          title="Remove from pipeline"
+        >×</button>
       </div>
+      {confirmRemove && (
+        <div className="inline-confirm">
+          <span>Remove?</span>
+          <button className="btn-confirm-yes" onClick={handleConfirmRemove} disabled={removing}>
+            {removing ? 'Removing…' : 'Yes'}
+          </button>
+          <button
+            className="btn-confirm-cancel"
+            onClick={e => { e.preventDefault(); setConfirmRemove(false) }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {removeError && <p className="inline-error">{removeError}</p>}
     </div>
   )
 }
 
-function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSubmission }) {
+function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSubmission, onRemove }) {
   const currentIndex = stages.indexOf(stage)
   const nextStage = stages[currentIndex + 1] ?? null
   const prevStage = stages[currentIndex - 1] ?? null
@@ -111,6 +147,7 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
               onAdvance={nextStage ? onAdvance : null}
               onGoBack={prevStage ? onGoBack : null}
               onDraftSubmission={onDraftSubmission}
+              onRemove={onRemove}
             />
           ))
         )}
@@ -142,6 +179,10 @@ export default function RoleDetail() {
   const [searchStrings, setSearchStrings] = useState(null)
   const [searchGenerating, setSearchGenerating] = useState(false)
   const [searchError, setSearchError] = useState(null)
+  const [clearSearchConfirm, setClearSearchConfirm] = useState(false)
+
+  // Interview questions clear confirm
+  const [clearInterviewConfirm, setClearInterviewConfirm] = useState(false)
 
   // Submission draft modal
   const [draftModal, setDraftModal] = useState({
@@ -385,6 +426,24 @@ export default function RoleDetail() {
     }
   }
 
+  async function handleRemoveFromPipeline(pipelineId) {
+    const { error } = await supabase.from('pipeline').delete().eq('id', pipelineId)
+    if (error) return error
+    setPipeline(prev => prev.filter(p => p.id !== pipelineId))
+    return null
+  }
+
+  async function handleClearSearchStrings() {
+    const { error } = await supabase.from('roles').update({ search_strings: null }).eq('id', id)
+    if (!error) setSearchStrings(null)
+    setClearSearchConfirm(false)
+  }
+
+  function handleClearInterviewQuestions() {
+    setInterviewQuestions(null)
+    setClearInterviewConfirm(false)
+  }
+
   return (
     <AppLayout>
 
@@ -427,6 +486,7 @@ export default function RoleDetail() {
               onAdvance={handleAdvanceStage}
               onGoBack={handleGoBackStage}
               onDraftSubmission={handleDraftSubmission}
+              onRemove={handleRemoveFromPipeline}
             />
           ))}
         </div>
@@ -436,14 +496,26 @@ export default function RoleDetail() {
       <section className="candidate-section" style={{ marginTop: 32 }}>
         <div className="section-heading-row">
           <h2 className="section-heading">Search Strings</h2>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={handleBuildSearchStrings}
-            disabled={searchGenerating}
-          >
-            {searchGenerating ? 'Building…' : searchStrings ? 'Rebuild' : 'Build Search Strings'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {searchStrings && !clearSearchConfirm && (
+              <button className="btn-ghost btn-sm" onClick={() => setClearSearchConfirm(true)}>Clear</button>
+            )}
+            <button
+              className="btn-ghost btn-sm"
+              onClick={handleBuildSearchStrings}
+              disabled={searchGenerating}
+            >
+              {searchGenerating ? 'Building…' : searchStrings ? 'Rebuild' : 'Build Search Strings'}
+            </button>
+          </div>
         </div>
+        {clearSearchConfirm && (
+          <div className="inline-confirm">
+            <span>Clear search strings?</span>
+            <button className="btn-confirm-yes" onClick={handleClearSearchStrings}>Yes, clear</button>
+            <button className="btn-confirm-cancel" onClick={() => setClearSearchConfirm(false)}>Cancel</button>
+          </div>
+        )}
 
         {searchGenerating && (
           <div className="modal-generating">
@@ -482,14 +554,26 @@ export default function RoleDetail() {
       <section className="candidate-section" style={{ marginTop: 32 }}>
         <div className="section-heading-row">
           <h2 className="section-heading">Interview Questions</h2>
-          <button
-            className="btn-ghost btn-sm"
-            onClick={handleGenerateInterviewQuestions}
-            disabled={interviewGenerating}
-          >
-            {interviewGenerating ? 'Generating…' : interviewQuestions ? 'Regenerate' : 'Generate'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {interviewQuestions && !clearInterviewConfirm && (
+              <button className="btn-ghost btn-sm" onClick={() => setClearInterviewConfirm(true)}>Clear</button>
+            )}
+            <button
+              className="btn-ghost btn-sm"
+              onClick={handleGenerateInterviewQuestions}
+              disabled={interviewGenerating}
+            >
+              {interviewGenerating ? 'Generating…' : interviewQuestions ? 'Regenerate' : 'Generate'}
+            </button>
+          </div>
         </div>
+        {clearInterviewConfirm && (
+          <div className="inline-confirm">
+            <span>Clear interview questions?</span>
+            <button className="btn-confirm-yes" onClick={handleClearInterviewQuestions}>Yes, clear</button>
+            <button className="btn-confirm-cancel" onClick={() => setClearInterviewConfirm(false)}>Cancel</button>
+          </div>
+        )}
 
         {interviewGenerating && (
           <div className="modal-generating">
