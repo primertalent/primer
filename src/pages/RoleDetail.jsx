@@ -130,6 +130,7 @@ export default function RoleDetail() {
   const [pipeline, setPipeline] = useState([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
   // Interview questions
@@ -164,7 +165,7 @@ export default function RoleDetail() {
       const [roleRes, pipelineRes] = await Promise.all([
         supabase
           .from('roles')
-          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, search_strings, clients(name)')
+          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, clients(name)')
           .eq('id', id)
           .eq('recruiter_id', recruiter.id)
           .single(),
@@ -176,14 +177,19 @@ export default function RoleDetail() {
           .eq('status', 'active'),
       ])
 
-      if (roleRes.error || !roleRes.data) {
+      if (roleRes.error) {
+        // PGRST116 = no rows returned (genuine 404). Anything else = query/RLS/network error.
+        console.error('[RoleDetail] fetch error:', roleRes.error.code, roleRes.error.message)
+        if (roleRes.error.code === 'PGRST116') {
+          setNotFound(true)
+        } else {
+          setFetchError(roleRes.error.message ?? 'Couldn\'t load this role.')
+        }
+      } else if (!roleRes.data) {
         setNotFound(true)
       } else {
         setRole(roleRes.data)
         setPipeline(pipelineRes.data ?? [])
-        if (roleRes.data.search_strings) {
-          setSearchStrings(roleRes.data.search_strings)
-        }
       }
 
       setLoading(false)
@@ -201,6 +207,18 @@ export default function RoleDetail() {
 
   if (loading) {
     return <AppLayout><div className="loading-state"><div className="spinner" /></div></AppLayout>
+  }
+
+  if (fetchError) {
+    return (
+      <AppLayout>
+        <div className="page-error">
+          <p className="page-error-title">Couldn't load this role.</p>
+          <p className="page-error-body">Check the browser console for details, then try refreshing.</p>
+          <button className="btn-ghost" onClick={() => navigate('/roles')}>Back to Roles</button>
+        </div>
+      </AppLayout>
+    )
   }
 
   if (notFound) {

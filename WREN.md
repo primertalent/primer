@@ -155,9 +155,14 @@ Wren should surface what matters without being asked. Signal badges on a candida
 5. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record. (Note: the Command Bar already handles this via paste — call mode is the dedicated flow.)
 6. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
 
+_Completed session 6:_ Full product polish pass — spinner system, empty/error/loading states, nav active treatment, WrenCommand UX hardening. No new features.
+
 ---
 
 ## Decisions Log
+
+- **Polish before features.** Session 6 was a full product polish pass — no new features. Established that the product needs to feel intentional before adding surface area. Patterns established: `.loading-state` + `.spinner`, `.empty-state-title/.body`, `.page-error`, `.modal-generating`. All future pages and features should use these from the start.
+- **Save All confirmation pattern.** After a successful save in WrenCommand (and all future save-and-done flows), the action button is replaced by a static "Saved ✓" label. Buttons do not toggle back to their original state after save — the save is permanent, the confirmation is final.
 
 - **AI calls are server-side only.** All Anthropic API calls go through api/ai.js. Key never touches the client. Non-negotiable.
 - **JSONB for flexible data.** Career timeline, career signals, and process steps use JSONB columns so structure can evolve without migrations.
