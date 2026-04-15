@@ -165,7 +165,7 @@ export default function RoleDetail() {
       const [roleRes, pipelineRes] = await Promise.all([
         supabase
           .from('roles')
-          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, clients(name)')
+          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, search_strings, clients(name)')
           .eq('id', id)
           .eq('recruiter_id', recruiter.id)
           .single(),
@@ -190,6 +190,9 @@ export default function RoleDetail() {
       } else {
         setRole(roleRes.data)
         setPipeline(pipelineRes.data ?? [])
+        if (roleRes.data.search_strings) {
+          setSearchStrings(roleRes.data.search_strings)
+        }
       }
 
       setLoading(false)
