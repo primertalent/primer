@@ -1,5 +1,5 @@
 // Returns plain text — LinkedIn connection request message, under 300 characters
-export function buildLinkedInMessageMessages(candidate, role) {
+export function buildLinkedInMessageMessages(candidate, role, recruiter = null) {
   const skills = candidate.skills?.slice(0, 2).join(' and ') || 'your background'
   const signals = candidate.career_signals ?? []
 
@@ -54,6 +54,7 @@ Current: ${candidate.current_title ?? 'Unknown'} at ${candidate.current_company 
 Skills: ${skills}
 Signals: ${signals.length ? signals.join(', ') : 'None'}
 ${roleContext ? `\n${roleContext}` : ''}
+${recruiter?.full_name ? `\nRECRUITER\nName: ${recruiter.full_name}` : ''}
 
 Return only the message text. Plain text, no labels, no quotes around it. 300 characters or fewer.`
 

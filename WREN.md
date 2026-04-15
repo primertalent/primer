@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 8).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 9).
 
 ---
 
@@ -62,6 +62,15 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - **Wren Command Bar** — persistent input surface on the Dashboard/Brief page. Accepts paste, file attachment (PDF + DOCX), or any combination. Auto-classifies inputs into labeled chips (Resume, JD, Transcript, Notes) via a fast classify call. Assembles all inputs as labeled `<document>` blocks for the intake prompt. Full intake runs in one pass: candidate + company + role created or matched, screener scored, call signals extracted, interaction logged, pipeline entry created. Save All writes all 7 records to Supabase in sequence. View/Edit links appear inline after save. ✕ Clear button dismisses the result card and resets to input.
 - **Recruiter judgment layer** — every pipeline entry on the CandidateCard has an "Add your take" inline form: recruiter score (1–10) + freeform note. Both persist to `pipeline.recruiter_score` and `pipeline.recruiter_note`. Never touched by AI reruns. Recruiter score displays alongside the AI fit score with a distinct purple badge. Same badge visible on kanban cards in RoleDetail. Screener history rows (Scores History) also accept a per-run recruiter note, persisted to `screener_results.recruiter_note`. The delta between AI score and recruiter score is preserved — both visible simultaneously.
 - **Edit/Delete everything** — every AI-generated or user-logged record is now deletable inline. Pattern: × button on row hover → "Delete? Yes / Cancel" inline confirm → optimistic delete with rollback on error. Surfaces: screener result rows (Scores History), interaction rows, pipeline entries (CandidateCard), kanban cards (RoleDetail), drafted queue messages. Career timeline: Clear button in section heading → wipes `career_timeline` + `career_signals` from DB. Reparse button replaces "Parse from CV" when timeline exists. Search strings + interview questions: Clear button in section heading. Next action AI card: Regenerate button in card header. WrenCommand IntakeResult: ✕ Clear button in top-right of card.
+- **Multi-screen mode** — WrenCommand auto-detects 1 resume chip + 2+ JD chips and routes to a comparative AI call. Rankings returned as stack-ranked cards (rank, score, recommendation, strengths, gaps, next action per role). Save All loops all rankings → client → role → pipeline → screener_result. "Multi-screen · N roles" badge in footer. Button label changes to "Compare N roles →".
+- **Inline submission draft from multi-screen** — after comparison, a Draft Submission section appears scoped to the rank #1 role. Email/Bullets toggle, Draft button generates inline using cv_text and matched JD chip. Copy or Save to Queue (available after Save All). No navigation required.
+- **JD text saved from chips** — when a role is created via WrenCommand (single intake or multi-screen), the JD chip's raw text is now saved to `roles.notes`. The Job Description section and Format button appear on RoleDetail for all chip-created roles.
+- **Interview guide persistence** — "Save Guide" button in RoleDetail saves generated interview questions to `roles.interview_guide` JSONB column. Guide reloads on every visit. Clear also wipes from DB. Requires: `ALTER TABLE roles ADD COLUMN interview_guide JSONB;`
+- **JD format button** — "Format" button in RoleDetail's Job Description section. Runs a cleanup AI pass on raw scraped text (strips HTML artifacts, fixes whitespace), saves back to `role.notes` in place.
+- **Unscreened badge** — candidates in the pipeline with no fit score now show a yellow "Unscreened" badge in the Fit column of the Candidates table instead of "—".
+- **LinkedIn draft uses recruiter name** — `recruiter.full_name` is now passed to the LinkedIn message prompt. Drafts are personalized to the recruiter, not generic.
+- **Promise.allSettled in CandidateCard** — initial data fetch uses `Promise.allSettled`. If screener history, interactions, or roles queries fail, the candidate still loads. Partial data degrades gracefully instead of blocking the whole page.
+- **Human writing rules** — applied consistently across all 8 prompt files. No em dashes, en dashes, or dashes as punctuation. No AI cliché vocabulary (leveraged, spearheaded, passionate, etc.). Every prompt now instructs the model to write like a recruiter talking to a colleague.
 
 ---
 
@@ -159,12 +168,14 @@ Wren should surface what matters without being asked. Signal badges on a candida
 
 ## Current Priority Queue
 
-1. **Wren Command Bar: Google Doc URL input** — paste a URL, Wren fetches and chips it. Same classify flow as paste and file.
-2. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
-3. **JD formatting polish** — AI cleans the display version of a scraped JD. Currently raw.
-4. **Call mode screen** — A focused view for during/after a candidate or client call.
-5. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record. (Note: the Command Bar already handles this via paste — call mode is the dedicated flow.)
-6. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
+1. **Mobile responsive CSS** — Recruiter uses Wren between calls, before interviews. Currently desktop only.
+2. **Call mode screen** — A focused view for during/after a candidate or client call.
+3. **Wren Command Bar: Google Doc URL input** — paste a URL, Wren fetches and chips it. Same classify flow as paste and file.
+4. **candidatePitchBuilder save** — pitch is generated but not persisted. Add a save path to `candidates.enrichment_data` or a dedicated column.
+5. **Duplicate pipeline entry friendly error** — detect constraint violation on `candidate_id,role_id` unique key, show a human-readable message instead of silent failure.
+6. **Rapid stage advance desync** — brief disable on advance/go-back buttons while DB write confirms to prevent double-clicks from desyncing stage state.
+
+_Completed session 9:_ Multi-screen mode, inline submission draft from multi-screen, JD text saved from chips, interview guide persistence, JD format button, unscreened badge, LinkedIn recruiter name, Promise.allSettled in CandidateCard, human writing rules across all prompts.
 
 _Completed session 8:_ Recruiter judgment layer — pipeline score + note, screener result note. AI score and recruiter score coexist, neither overwrites the other.
 

@@ -179,6 +179,8 @@ export default function RoleDetail() {
   const [interviewQuestions, setInterviewQuestions] = useState(null)
   const [interviewGenerating, setInterviewGenerating] = useState(false)
   const [interviewError, setInterviewError] = useState(null)
+  const [interviewGuideSaving, setInterviewGuideSaving] = useState(false)
+  const [interviewGuideSaved, setInterviewGuideSaved] = useState(false)
 
   // Boolean search strings
   const [searchStrings, setSearchStrings] = useState(null)
@@ -188,6 +190,10 @@ export default function RoleDetail() {
 
   // Interview questions clear confirm
   const [clearInterviewConfirm, setClearInterviewConfirm] = useState(false)
+
+  // JD formatting
+  const [jdFormatting, setJdFormatting] = useState(false)
+  const [jdFormatError, setJdFormatError] = useState(null)
 
   // Submission draft modal
   const [draftModal, setDraftModal] = useState({
@@ -211,7 +217,7 @@ export default function RoleDetail() {
       const [roleRes, pipelineRes] = await Promise.all([
         supabase
           .from('roles')
-          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, search_strings, clients(name)')
+          .select('id, title, status, comp_min, comp_max, comp_type, comp_currency, process_steps, notes, search_strings, interview_guide, clients(name)')
           .eq('id', id)
           .eq('recruiter_id', recruiter.id)
           .single(),
@@ -238,6 +244,9 @@ export default function RoleDetail() {
         setPipeline(pipelineRes.data ?? [])
         if (roleRes.data.search_strings) {
           setSearchStrings(roleRes.data.search_strings)
+        }
+        if (roleRes.data.interview_guide) {
+          setInterviewQuestions(roleRes.data.interview_guide)
         }
       }
 
@@ -379,6 +388,7 @@ export default function RoleDetail() {
   async function handleGenerateInterviewQuestions() {
     setInterviewQuestions(null)
     setInterviewError(null)
+    setInterviewGuideSaved(false)
     setInterviewGenerating(true)
     try {
       const messages = buildInterviewQuestionMessages(role, [])
@@ -444,9 +454,47 @@ export default function RoleDetail() {
     setClearSearchConfirm(false)
   }
 
-  function handleClearInterviewQuestions() {
+  async function handleClearInterviewQuestions() {
     setInterviewQuestions(null)
+    setInterviewGuideSaved(false)
     setClearInterviewConfirm(false)
+    await supabase.from('roles').update({ interview_guide: null }).eq('id', id)
+  }
+
+  async function handleFormatJd() {
+    if (!role?.notes) return
+    setJdFormatting(true)
+    setJdFormatError(null)
+    try {
+      const formatted = await generateText({
+        system: 'You are a recruiting assistant. Clean up the job description text below. Remove HTML tags, excessive whitespace, broken line breaks, and formatting artifacts. Preserve all meaningful content: responsibilities, requirements, compensation, company info. Return plain text only. No markdown, no explanation.',
+        messages: [{ role: 'user', content: role.notes }],
+        maxTokens: 2048,
+      })
+      const { error } = await supabase
+        .from('roles')
+        .update({ notes: formatted.trim() })
+        .eq('id', id)
+      if (error) throw new Error(error.message)
+      setRole(prev => ({ ...prev, notes: formatted.trim() }))
+    } catch (err) {
+      setJdFormatError(err.message ?? 'Format failed. Try again.')
+    } finally {
+      setJdFormatting(false)
+    }
+  }
+
+  async function handleSaveInterviewGuide() {
+    if (!interviewQuestions) return
+    setInterviewGuideSaving(true)
+    setInterviewGuideSaved(false)
+    const { error } = await supabase
+      .from('roles')
+      .update({ interview_guide: interviewQuestions })
+      .eq('id', id)
+    if (error) console.warn('interview_guide save failed (column may not exist yet):', error.message)
+    setInterviewGuideSaving(false)
+    if (!error) setInterviewGuideSaved(true)
   }
 
   return (
@@ -559,9 +607,18 @@ export default function RoleDetail() {
       <section className="candidate-section" style={{ marginTop: 32 }}>
         <div className="section-heading-row">
           <h2 className="section-heading">Interview Questions</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {interviewQuestions && !clearInterviewConfirm && (
-              <button className="btn-ghost btn-sm" onClick={() => setClearInterviewConfirm(true)}>Clear</button>
+              <>
+                <button className="btn-ghost btn-sm" onClick={() => setClearInterviewConfirm(true)}>Clear</button>
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={handleSaveInterviewGuide}
+                  disabled={interviewGuideSaving || interviewGuideSaved}
+                >
+                  {interviewGuideSaving ? 'Saving…' : interviewGuideSaved ? 'Saved' : 'Save Guide'}
+                </button>
+              </>
             )}
             <button
               className="btn-ghost btn-sm"
@@ -622,7 +679,19 @@ export default function RoleDetail() {
       {/* Job description */}
       {role.notes && (
         <section className="role-jd-section">
-          <h2 className="section-heading">Job Description</h2>
+          <div className="section-heading-row">
+            <h2 className="section-heading">Job Description</h2>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={handleFormatJd}
+              disabled={jdFormatting}
+            >
+              {jdFormatting ? 'Formatting…' : 'Format'}
+            </button>
+          </div>
+          {jdFormatError && (
+            <p className="error" style={{ marginTop: 4, marginBottom: 8 }}>{jdFormatError}</p>
+          )}
           <p className="role-jd-body">{role.notes}</p>
         </section>
       )}

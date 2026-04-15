@@ -6,6 +6,7 @@ import { useRecruiter } from '../hooks/useRecruiter'
 import { generateText } from '../lib/ai'
 import { buildIntakeMessages, buildClassifyMessages } from '../lib/prompts/intake'
 import { buildMultiScreenMessages } from '../lib/prompts/multiScreen'
+import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
 import { buildCvPdfMessages } from '../lib/prompts/cvExtraction'
 
 // ── Helpers ───────────────────────────────────────────────
@@ -60,7 +61,7 @@ function SignalRow({ label, value }) {
   )
 }
 
-function IntakeResult({ result, recruiter, onClear }) {
+function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
@@ -158,6 +159,7 @@ function IntakeResult({ result, recruiter, onClear }) {
         if (existingRole) {
           roleId = existingRole.id
         } else {
+          const jdText = jdChips[0]?.content ?? null
           const { data, error } = await supabase
             .from('roles')
             .insert({
@@ -166,6 +168,7 @@ function IntakeResult({ result, recruiter, onClear }) {
               title: r.title,
               status: 'open',
               process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+              ...(jdText && { notes: jdText }),
             })
             .select('id').single()
           if (error) throw error
@@ -330,14 +333,23 @@ function IntakeResult({ result, recruiter, onClear }) {
 const REC_LABEL = { advance: 'Advance', hold: 'Hold', pass: 'Pass' }
 const REC_CLASS = { advance: 'screener-rec--advance', hold: 'screener-rec--hold', pass: 'screener-rec--pass' }
 
-function MultiScreenResult({ result, recruiter, onClear }) {
+function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
   const [saveError, setSaveError]      = useState(null)
 
+  // Inline submission draft for rank #1
+  const [draftFormat, setDraftFormat]   = useState('email')
+  const [draftPhase, setDraftPhase]     = useState(null) // null | 'generating' | 'done' | 'error'
+  const [draftText, setDraftText]       = useState('')
+  const [draftCopied, setDraftCopied]   = useState(false)
+  const [draftSaving, setDraftSaving]   = useState(false)
+  const [draftSaved, setDraftSaved]     = useState(false)
+
   const c        = result.candidate
   const rankings = result.rankings ?? []
+  const topRanking = rankings[0] ?? null
 
   async function handleSaveAll() {
     if (!recruiter?.id) return
@@ -418,6 +430,13 @@ function MultiScreenResult({ result, recruiter, onClear }) {
         if (existingRole) {
           roleId = existingRole.id
         } else {
+          // Match the JD chip by looking for one whose content mentions this role title
+          const titleLower = ranking.role_title.toLowerCase()
+          const matchedChip = jdChips.find(chip =>
+            chip.content?.toLowerCase().includes(titleLower)
+          ) ?? jdChips.find(chip =>
+            chip.content?.toLowerCase().includes(ranking.company.toLowerCase())
+          ) ?? null
           const { data, error } = await supabase
             .from('roles')
             .insert({
@@ -426,6 +445,7 @@ function MultiScreenResult({ result, recruiter, onClear }) {
               title: ranking.role_title,
               status: 'open',
               process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+              ...(matchedChip?.content && { notes: matchedChip.content }),
             })
             .select('id').single()
           if (error) throw error
@@ -474,6 +494,71 @@ function MultiScreenResult({ result, recruiter, onClear }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleDraftSubmission() {
+    if (!topRanking) return
+    setDraftPhase('generating')
+    setDraftText('')
+    setDraftCopied(false)
+    setDraftSaved(false)
+
+    try {
+      const { first_name, last_name } = parseName(c?.name)
+      const pseudoCandidate = {
+        first_name,
+        last_name,
+        current_title: c?.current_title ?? null,
+        current_company: c?.current_company ?? null,
+        cv_text: c?.cv_text ?? null,
+        skills: [],
+        career_timeline: null,
+        location: null,
+      }
+
+      const titleLower = topRanking.role_title.toLowerCase()
+      const matchedChip = jdChips.find(chip =>
+        chip.content?.toLowerCase().includes(titleLower)
+      ) ?? jdChips.find(chip =>
+        chip.content?.toLowerCase().includes(topRanking.company.toLowerCase())
+      ) ?? null
+
+      const pseudoRole = {
+        title: topRanking.role_title,
+        clients: { name: topRanking.company },
+        notes: matchedChip?.content ?? null,
+        comp_min: null,
+        comp_max: null,
+        comp_type: null,
+      }
+
+      const fitScore = topRanking.match_score != null
+        ? Math.min(100, Math.round(topRanking.match_score * 10))
+        : null
+
+      const messages = buildSubmissionMessages(pseudoCandidate, pseudoRole, fitScore, draftFormat)
+      const text = await generateText({ messages, maxTokens: 1024 })
+      setDraftText(text.trim())
+      setDraftPhase('done')
+    } catch (err) {
+      setDraftPhase('error')
+    }
+  }
+
+  async function handleDraftSaveToQueue() {
+    if (!draftText || !savedCandidateId || draftSaving) return
+    setDraftSaving(true)
+    const subject = `${c?.name ?? 'Candidate'} — ${topRanking?.role_title ?? 'Submission'}`
+    const { error } = await supabase.from('messages').insert({
+      recruiter_id: recruiter.id,
+      candidate_id: savedCandidateId,
+      channel:      'email',
+      subject,
+      body:         draftText,
+      status:       'drafted',
+    })
+    if (!error) setDraftSaved(true)
+    setDraftSaving(false)
   }
 
   return (
@@ -580,6 +665,73 @@ function MultiScreenResult({ result, recruiter, onClear }) {
           )}
         </div>
       </div>
+
+      {/* Inline submission draft for rank #1 */}
+      {topRanking && (
+        <div className="multiscreen-draft-section">
+          <div className="multiscreen-draft-header">
+            <span className="intake-eyebrow">
+              Draft Submission — {topRanking.role_title} @ {topRanking.company}
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className={`format-toggle-btn${draftFormat === 'email' ? ' format-toggle-btn--active' : ''}`}
+                onClick={() => { setDraftFormat('email'); setDraftPhase(null) }}
+              >Email</button>
+              <button
+                className={`format-toggle-btn${draftFormat === 'bullet' ? ' format-toggle-btn--active' : ''}`}
+                onClick={() => { setDraftFormat('bullet'); setDraftPhase(null) }}
+              >Bullets</button>
+              <button
+                className="btn-ghost btn-sm"
+                onClick={handleDraftSubmission}
+                disabled={draftPhase === 'generating'}
+              >
+                {draftPhase === 'generating' ? 'Drafting…' : draftPhase === 'done' ? 'Regenerate' : 'Draft'}
+              </button>
+            </div>
+          </div>
+
+          {draftPhase === 'generating' && (
+            <div className="modal-generating" style={{ marginTop: 8 }}>
+              <div className="spinner spinner--sm" />
+              Drafting submission…
+            </div>
+          )}
+
+          {draftPhase === 'error' && (
+            <p className="error" style={{ marginTop: 8 }}>Draft failed. Try again.</p>
+          )}
+
+          {draftPhase === 'done' && draftText && (
+            <>
+              <textarea
+                className="sub-draft-textarea"
+                value={draftText}
+                onChange={e => setDraftText(e.target.value)}
+                rows={8}
+              />
+              <div className="intake-actions" style={{ marginTop: 8 }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => { navigator.clipboard.writeText(draftText); setDraftCopied(true); setTimeout(() => setDraftCopied(false), 2000) }}
+                >
+                  {draftCopied ? 'Copied ✓' : 'Copy'}
+                </button>
+                {savedCandidateId && (
+                  <button
+                    className="btn-ghost"
+                    onClick={handleDraftSaveToQueue}
+                    disabled={draftSaving || draftSaved}
+                  >
+                    {draftSaving ? 'Saving…' : draftSaved ? 'Saved to Queue ✓' : 'Save to Queue'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
     </div>
   )
@@ -815,8 +967,8 @@ export default function WrenCommand() {
       )}
 
       {error && <p className="wren-command-error">{error}</p>}
-      {result && <IntakeResult result={result} recruiter={recruiter} onClear={() => setResult(null)} />}
-      {multiResult && <MultiScreenResult result={multiResult} recruiter={recruiter} onClear={() => setMultiResult(null)} />}
+      {result && <IntakeResult result={result} recruiter={recruiter} jdChips={jdChips} onClear={() => setResult(null)} />}
+      {multiResult && <MultiScreenResult result={multiResult} recruiter={recruiter} jdChips={jdChips} onClear={() => setMultiResult(null)} />}
     </section>
   )
 }

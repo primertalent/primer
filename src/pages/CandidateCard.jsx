@@ -797,7 +797,7 @@ export default function CandidateCard() {
       console.debug('[CandidateCard] recruiter row:', recruiter)
       console.debug('[CandidateCard] fetching candidate id:', id)
 
-      const [candidateRes, pipelineRes, interactionRes, rolesRes, screenerHistoryRes] = await Promise.all([
+      const settled = await Promise.allSettled([
         supabase
           .from('candidates')
           .select('*')
@@ -834,6 +834,9 @@ export default function CandidateCard() {
           .eq('candidate_id', id)
           .order('scored_at', { ascending: false }),
       ])
+      const [candidateRes, pipelineRes, interactionRes, rolesRes, screenerHistoryRes] = settled.map(r =>
+        r.status === 'fulfilled' ? r.value : { data: null, error: { message: 'Request failed' } }
+      )
 
       console.debug('[CandidateCard] candidate result:', {
         data: candidateRes.data,
@@ -1224,7 +1227,7 @@ export default function CandidateCard() {
     setLinkedinModal(prev => ({ ...prev, phase: 'generating', text: null, error: null }))
 
     try {
-      const messages = buildLinkedInMessageMessages(candidate, role)
+      const messages = buildLinkedInMessageMessages(candidate, role, recruiter)
       const text = await generateText({ messages, maxTokens: 256 })
       setLinkedinModal(prev => ({ ...prev, phase: 'done', text: text.trim() }))
     } catch (err) {

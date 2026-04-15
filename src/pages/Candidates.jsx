@@ -43,8 +43,11 @@ function formatLastTouch(iso) {
 
 // ── Sub-components ────────────────────────────────────
 
-function FitBadge({ score }) {
-  if (score < 0) return <span className="fit-badge fit-badge--none">—</span>
+function FitBadge({ score, inPipeline }) {
+  if (score < 0) {
+    if (inPipeline) return <span className="fit-badge fit-badge--unscreened">Unscreened</span>
+    return <span className="fit-badge fit-badge--none">—</span>
+  }
   const tenth = score / 10
   const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
   let variant = 'none'
@@ -306,7 +309,7 @@ export default function Candidates() {
                       <SkillTags skills={c.skills} />
                     </td>
                     <td className="candidates-td">
-                      <FitBadge score={fit} />
+                      <FitBadge score={fit} inPipeline={active > 0} />
                     </td>
                     <td className="candidates-td">
                       {active > 0 ? (
