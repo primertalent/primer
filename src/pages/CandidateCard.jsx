@@ -1200,6 +1200,39 @@ export default function CandidateCard() {
     } else {
       setPipelines(prev => [...prev, entry])
       setPickerOpen(false)
+
+      // Auto-screen in background — no await, never blocks UI
+      if (candidate?.cv_text && role.notes) {
+        ;(async () => {
+          try {
+            const messages = buildScreenerMessages(candidate, role)
+            const raw = await generateText({ messages, maxTokens: 2048 })
+            const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+            const result = JSON.parse(cleaned)
+
+            const { data: savedResult, error: srErr } = await supabase
+              .from('screener_results')
+              .insert({ recruiter_id: recruiter.id, candidate_id: id, role_id: role.id, result })
+              .select()
+              .single()
+            if (!srErr) setScreenerHistory(prev => [savedResult, ...prev])
+
+            if (result.match_score != null) {
+              const fitScore = Math.min(100, Math.round(result.match_score * 10))
+              const rationale = result.recommendation_reason ?? null
+              await supabase
+                .from('pipeline')
+                .update({ fit_score: fitScore, fit_score_rationale: rationale })
+                .eq('id', entry.id)
+              setPipelines(prev => prev.map(p =>
+                p.id === entry.id ? { ...p, fit_score: fitScore, fit_score_rationale: rationale } : p
+              ))
+            }
+          } catch {
+            // Silent — screener failed, candidate is still in pipeline unscored
+          }
+        })()
+      }
     }
     setAddingRoleId(null)
   }
