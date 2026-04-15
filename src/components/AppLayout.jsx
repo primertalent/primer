@@ -13,7 +13,7 @@ export default function AppLayout({ children }) {
             to="/dashboard"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
-            Brief
+            Home
           </NavLink>
           <NavLink
             to="/clients"

@@ -35,7 +35,7 @@ export function buildDailyBriefMessages({ overdue, dueToday, draftedCount, stats
 
 Rules:
 - Lead with what makes them money: queue items, overdue actions, pipeline movement needed.
-- Be specific — use names and role titles from the data. Don't generalize.
+- Be specific. Use names and role titles from the data. Don't generalize.
 - Sound like a sharp chief of staff, not a status report. Direct, human, no filler.
 - No em dashes, no "Additionally", no AI-writing tells. Short sentences.
 - If nothing urgent, say so in one sentence and name the highest-value next move.
