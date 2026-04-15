@@ -1064,6 +1064,27 @@ export default function CandidateCard() {
       console.error('stage advance failed:', updateRes.error)
       // Roll back
       setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p))
+    } else {
+      // Auto-regenerate next action in background — no await, never blocks UI
+      ;(async () => {
+        try {
+          const updatedPipelines = pipelines.map(p =>
+            p.id === entry.id ? { ...p, current_stage: nextStage } : p
+          )
+          const messages = buildNextActionMessages(candidate, updatedPipelines, interactions)
+          const text = await generateText({ messages, maxTokens: 512 })
+          const trimmed = text.trim()
+          if (!trimmed) return
+
+          await supabase
+            .from('candidates')
+            .update({ enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: trimmed } })
+            .eq('id', id)
+          setSavedNextAction(trimmed)
+        } catch {
+          // Silent — next action stays as-is if generation fails
+        }
+      })()
     }
     if (historyRes.error) console.error('stage history insert failed:', historyRes.error)
 
