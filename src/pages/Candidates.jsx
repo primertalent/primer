@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -96,11 +96,13 @@ export default function Candidates() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
 
-  const [search, setSearch]           = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
-  const [skillFilter, setSkillFilter] = useState('')
-  const [sortCol, setSortCol]         = useState('name')
-  const [sortDir, setSortDir]         = useState('asc')
+  const [search, setSearch]               = useState('')
+  const [searchResults, setSearchResults] = useState(null) // null = not in search mode
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [sourceFilter, setSourceFilter]   = useState('')
+  const [skillFilter, setSkillFilter]     = useState('')
+  const [sortCol, setSortCol]             = useState('name')
+  const [sortDir, setSortDir]             = useState('asc')
 
   useEffect(() => {
     if (!recruiter?.id) return
@@ -139,6 +141,32 @@ export default function Candidates() {
     fetchAll()
   }, [recruiter?.id])
 
+  // Debounced DB search
+  useEffect(() => {
+    const q = search.trim()
+    if (!q || !recruiter?.id) {
+      setSearchResults(null)
+      setSearchLoading(false)
+      return
+    }
+    setSearchLoading(true)
+    const timer = setTimeout(async () => {
+      const terms = q.split(/\s+/).slice(0, 3) // cap at 3 terms
+      const orClause = terms
+        .map(t => `first_name.ilike.%${t}%,last_name.ilike.%${t}%,current_title.ilike.%${t}%,current_company.ilike.%${t}%`)
+        .join(',')
+      const { data } = await supabase
+        .from('candidates')
+        .select('id, first_name, last_name, current_title, current_company, location, source, skills, pipeline ( id, status, fit_score, next_action_due_at )')
+        .eq('recruiter_id', recruiter.id)
+        .or(orClause)
+        .order('created_at', { ascending: false })
+      setSearchResults(data ?? [])
+      setSearchLoading(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search, recruiter?.id])
+
   // Unique skills across all candidates for the filter dropdown
   const allSkills = useMemo(() => {
     const set = new Set()
@@ -157,15 +185,12 @@ export default function Candidates() {
   }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    let list = candidates.filter(c => {
+    // Use DB search results when a search is active, otherwise the full loaded list
+    const base = searchResults ?? candidates
+    let list = base.filter(c => {
       if (sourceFilter && c.source !== sourceFilter) return false
       if (skillFilter && !(c.skills ?? []).includes(skillFilter)) return false
-      if (!q) return true
-      const name = `${c.first_name} ${c.last_name}`.toLowerCase()
-      const title = (c.current_title ?? '').toLowerCase()
-      const company = (c.current_company ?? '').toLowerCase()
-      return name.includes(q) || title.includes(q) || company.includes(q)
+      return true
     })
 
     list = [...list].sort((a, b) => {
@@ -183,7 +208,7 @@ export default function Candidates() {
     })
 
     return list
-  }, [candidates, search, sourceFilter, skillFilter, sortCol, sortDir, lastTouchMap])
+  }, [candidates, searchResults, sourceFilter, skillFilter, sortCol, sortDir, lastTouchMap])
 
   return (
     <AppLayout>
@@ -193,6 +218,10 @@ export default function Candidates() {
           <p className="brief-date">
             {loading
               ? 'Loading…'
+              : searchLoading
+              ? 'Searching…'
+              : searchResults !== null
+              ? `${filtered.length} ${filtered.length === 1 ? 'result' : 'results'}`
               : `${filtered.length} of ${candidates.length} ${candidates.length === 1 ? 'candidate' : 'candidates'}`}
           </p>
         </div>

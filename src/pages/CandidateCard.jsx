@@ -159,6 +159,34 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
     }
   }
 
+  // Next action editing
+  const [nextEditing, setNextEditing] = useState(false)
+  const [nextText, setNextText]       = useState(entry.next_action ?? '')
+  const [nextDue, setNextDue]         = useState(entry.next_action_due_at ? entry.next_action_due_at.slice(0, 10) : '')
+  const [nextSaving, setNextSaving]   = useState(false)
+  const [nextError, setNextError]     = useState(null)
+  const [displayNext, setDisplayNext] = useState(entry.next_action ?? null)
+  const [displayDue, setDisplayDue]   = useState(entry.next_action_due_at ?? null)
+
+  async function handleSaveNextAction() {
+    setNextSaving(true)
+    setNextError(null)
+    const text = nextText.trim() || null
+    const due  = nextDue ? new Date(nextDue).toISOString() : null
+    const { error } = await supabase
+      .from('pipeline')
+      .update({ next_action: text, next_action_due_at: due })
+      .eq('id', entry.id)
+    if (error) {
+      setNextError('Couldn\'t save. Try again.')
+    } else {
+      setDisplayNext(text)
+      setDisplayDue(due)
+      setNextEditing(false)
+    }
+    setNextSaving(false)
+  }
+
   // Recruiter judgment
   const [recruiterEditing, setRecruiterEditing] = useState(false)
   const [recruiterScore, setRecruiterScore] = useState(entry.recruiter_score ?? '')
@@ -211,18 +239,57 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
           {advancing ? '…' : nextStage ? `→ ${nextStage}` : 'Placed'}
         </button>
       </div>
-      {entry.next_action && (
+      {!nextEditing ? (
         <div className="pipeline-next-action">
-          <span className="detail-label">Next action</span>
-          <span className="detail-value">{entry.next_action}</span>
-          {entry.next_action_due_at && (
-            <span className="due-date">
-              {urgencyClass(entry.next_action_due_at) && (
-                <span className={`urgency-dot ${urgencyClass(entry.next_action_due_at)}`} />
+          {displayNext ? (
+            <>
+              <span className="detail-label">Next action</span>
+              <span className="detail-value">{displayNext}</span>
+              {displayDue && (
+                <span className="due-date">
+                  {urgencyClass(displayDue) && (
+                    <span className={`urgency-dot ${urgencyClass(displayDue)}`} />
+                  )}
+                  Due {formatDateShort(displayDue)}
+                </span>
               )}
-              Due {formatDateShort(entry.next_action_due_at)}
-            </span>
-          )}
+            </>
+          ) : null}
+          <button
+            className="btn-ghost btn-sm"
+            style={{ marginLeft: 'auto', flexShrink: 0 }}
+            onClick={() => setNextEditing(true)}
+          >
+            {displayNext ? 'Edit action' : 'Set next action'}
+          </button>
+        </div>
+      ) : (
+        <div className="next-action-edit">
+          <input
+            className="next-action-input"
+            type="text"
+            placeholder="What needs to happen next?"
+            value={nextText}
+            onChange={e => setNextText(e.target.value)}
+          />
+          <input
+            className="next-action-date"
+            type="date"
+            value={nextDue}
+            onChange={e => setNextDue(e.target.value)}
+          />
+          <div className="recruiter-edit-actions">
+            <button className="btn-primary btn-sm" onClick={handleSaveNextAction} disabled={nextSaving}>
+              {nextSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button className="btn-ghost btn-sm" onClick={() => {
+              setNextText(displayNext ?? '')
+              setNextDue(displayDue ? displayDue.slice(0, 10) : '')
+              setNextEditing(false)
+              setNextError(null)
+            }}>Cancel</button>
+          </div>
+          {nextError && <p className="inline-error">{nextError}</p>}
         </div>
       )}
 
@@ -710,9 +777,13 @@ export default function CandidateCard() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  const [suggestion, setSuggestion] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState(null)
+  const [suggestion, setSuggestion]         = useState(null)
+  const [generating, setGenerating]         = useState(false)
+  const [genError, setGenError]             = useState(null)
+  const [savedNextAction, setSavedNextAction] = useState(null) // from enrichment_data
+  const [nextActionEditing, setNextActionEditing] = useState(false)
+  const [nextActionDraft, setNextActionDraft]     = useState('')
+  const [nextActionSaving, setNextActionSaving]   = useState(false)
 
   // Add-to-role picker
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -867,6 +938,7 @@ export default function CandidateCard() {
       } else {
         const c = candidateRes.data
         setCandidate(c)
+        setSavedNextAction(c.enrichment_data?.next_action ?? null)
         setPipelines(pipelineRes.data ?? [])
         setInteractions(interactionRes.data ?? [])
         setOpenRoles(rolesRes.data ?? [])
@@ -1381,15 +1453,98 @@ export default function CandidateCard() {
         {/* Signal badges */}
         {signals?.length > 0 && <SignalBadges signals={signals} />}
 
+        {/* Saved next action (recruiter-owned) */}
+        {savedNextAction && !nextActionEditing && (
+          <div className="ai-card" style={{ borderColor: 'var(--color-primary)', borderWidth: 2 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p className="ai-card-eyebrow">Next Action</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-ghost btn-sm" onClick={() => { setNextActionDraft(savedNextAction); setNextActionEditing(true) }}>Edit</button>
+                <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction} disabled={generating}>
+                  {generating ? 'Thinking…' : 'Regenerate'}
+                </button>
+              </div>
+            </div>
+            <p className="ai-card-body">{savedNextAction}</p>
+          </div>
+        )}
+
+        {/* Next action edit form */}
+        {nextActionEditing && (
+          <div className="ai-card">
+            <p className="ai-card-eyebrow">Next Action</p>
+            <textarea
+              className="sub-draft-textarea"
+              rows={2}
+              style={{ marginTop: 8 }}
+              value={nextActionDraft}
+              onChange={e => setNextActionDraft(e.target.value)}
+              placeholder="What needs to happen next with this candidate?"
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                className="btn-primary btn-sm"
+                disabled={nextActionSaving}
+                onClick={async () => {
+                  setNextActionSaving(true)
+                  const text = nextActionDraft.trim() || null
+                  const { error } = await supabase.from('candidates').update({
+                    enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: text },
+                  }).eq('id', candidate.id)
+                  if (!error) {
+                    setSavedNextAction(text)
+                    setNextActionEditing(false)
+                  }
+                  setNextActionSaving(false)
+                }}
+              >
+                {nextActionSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-ghost btn-sm" onClick={() => setNextActionEditing(false)}>Cancel</button>
+              {savedNextAction && (
+                <button
+                  className="btn-ghost btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={async () => {
+                    await supabase.from('candidates').update({
+                      enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: null },
+                    }).eq('id', candidate.id)
+                    setSavedNextAction(null)
+                    setNextActionEditing(false)
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* AI suggestion */}
-        {(generating || suggestion || genError) && (
+        {(generating || suggestion || genError) && !savedNextAction && (
           <div className={`ai-card ${genError ? 'ai-card--error' : ''}`}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <p className="ai-card-eyebrow">
                 {genError ? 'Error' : 'Suggested Next Action'}
               </p>
-              {!generating && (
-                <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
+              {!generating && !genError && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn-ghost btn-sm"
+                    onClick={async () => {
+                      setNextActionDraft(suggestion)
+                      setNextActionSaving(true)
+                      const { error } = await supabase.from('candidates').update({
+                        enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: suggestion },
+                      }).eq('id', candidate.id)
+                      if (!error) setSavedNextAction(suggestion)
+                      setNextActionSaving(false)
+                    }}
+                  >
+                    Set as my action
+                  </button>
+                  <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
+                </div>
               )}
             </div>
             {generating

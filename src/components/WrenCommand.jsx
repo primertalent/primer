@@ -330,8 +330,8 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
 
 // ── MultiScreenResult ─────────────────────────────────────
 
-const REC_LABEL = { advance: 'Advance', hold: 'Hold', pass: 'Pass' }
-const REC_CLASS = { advance: 'screener-rec--advance', hold: 'screener-rec--hold', pass: 'screener-rec--pass' }
+const REC_LABEL = { advance: 'Advance', 'hold/advance': 'Hold → Advance', hold: 'Hold', 'hold/pass': 'Hold → Pass', pass: 'Pass' }
+const REC_CLASS = { advance: 'screener-rec--advance', 'hold/advance': 'screener-rec--hold', hold: 'screener-rec--hold', 'hold/pass': 'screener-rec--hold', pass: 'screener-rec--pass' }
 
 function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
   const [saving, setSaving]            = useState(false)
@@ -339,17 +339,11 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
   const [savedCandidateId, setSavedId] = useState(null)
   const [saveError, setSaveError]      = useState(null)
 
-  // Inline submission draft for rank #1
-  const [draftFormat, setDraftFormat]   = useState('email')
-  const [draftPhase, setDraftPhase]     = useState(null) // null | 'generating' | 'done' | 'error'
-  const [draftText, setDraftText]       = useState('')
-  const [draftCopied, setDraftCopied]   = useState(false)
-  const [draftSaving, setDraftSaving]   = useState(false)
-  const [draftSaved, setDraftSaved]     = useState(false)
+  // Per-role pitch state: { [rank]: { phase, email, bullets, emailCopied, bulletsCopied, emailSaved, bulletsSaved } }
+  const [pitches, setPitches] = useState({})
 
   const c        = result.candidate
   const rankings = result.rankings ?? []
-  const topRanking = rankings[0] ?? null
 
   async function handleSaveAll() {
     if (!recruiter?.id) return
@@ -496,69 +490,77 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
     }
   }
 
-  async function handleDraftSubmission() {
-    if (!topRanking) return
-    setDraftPhase('generating')
-    setDraftText('')
-    setDraftCopied(false)
-    setDraftSaved(false)
+  async function handleGeneratePitch(ranking) {
+    const key = ranking.rank
+    setPitches(prev => ({ ...prev, [key]: { phase: 'generating', email: '', bullets: '', emailCopied: false, bulletsCopied: false, emailSaved: false, bulletsSaved: false } }))
 
     try {
       const { first_name, last_name } = parseName(c?.name)
       const pseudoCandidate = {
-        first_name,
-        last_name,
-        current_title: c?.current_title ?? null,
+        first_name, last_name,
+        current_title:   c?.current_title   ?? null,
         current_company: c?.current_company ?? null,
-        cv_text: c?.cv_text ?? null,
-        skills: [],
-        career_timeline: null,
-        location: null,
+        cv_text:         c?.cv_text         ?? null,
+        skills: [], career_timeline: null, location: null,
       }
 
-      const titleLower = topRanking.role_title.toLowerCase()
+      const titleLower = ranking.role_title.toLowerCase()
       const matchedChip = jdChips.find(chip =>
         chip.content?.toLowerCase().includes(titleLower)
       ) ?? jdChips.find(chip =>
-        chip.content?.toLowerCase().includes(topRanking.company.toLowerCase())
+        chip.content?.toLowerCase().includes(ranking.company?.toLowerCase())
       ) ?? null
 
       const pseudoRole = {
-        title: topRanking.role_title,
-        clients: { name: topRanking.company },
+        title: ranking.role_title,
+        clients: { name: ranking.company },
         notes: matchedChip?.content ?? null,
-        comp_min: null,
-        comp_max: null,
-        comp_type: null,
+        comp_min: null, comp_max: null, comp_type: null,
       }
 
-      const fitScore = topRanking.match_score != null
-        ? Math.min(100, Math.round(topRanking.match_score * 10))
+      const fitScore = ranking.match_score != null
+        ? Math.min(100, Math.round(ranking.match_score * 10))
         : null
 
-      const messages = buildSubmissionMessages(pseudoCandidate, pseudoRole, fitScore, draftFormat)
-      const text = await generateText({ messages, maxTokens: 1024 })
-      setDraftText(text.trim())
-      setDraftPhase('done')
-    } catch (err) {
-      setDraftPhase('error')
+      const [emailText, bulletsText] = await Promise.all([
+        generateText({ messages: buildSubmissionMessages(pseudoCandidate, pseudoRole, fitScore, 'email'), maxTokens: 1024 }),
+        generateText({ messages: buildSubmissionMessages(pseudoCandidate, pseudoRole, fitScore, 'bullet'), maxTokens: 512 }),
+      ])
+
+      setPitches(prev => ({ ...prev, [key]: { phase: 'done', email: emailText.trim(), bullets: bulletsText.trim(), emailCopied: false, bulletsCopied: false, emailSaved: false, bulletsSaved: false } }))
+    } catch {
+      setPitches(prev => ({ ...prev, [key]: { phase: 'error', email: '', bullets: '', emailCopied: false, bulletsCopied: false, emailSaved: false, bulletsSaved: false } }))
     }
   }
 
-  async function handleDraftSaveToQueue() {
-    if (!draftText || !savedCandidateId || draftSaving) return
-    setDraftSaving(true)
-    const subject = `${c?.name ?? 'Candidate'} — ${topRanking?.role_title ?? 'Submission'}`
-    const { error } = await supabase.from('messages').insert({
+  async function handleSavePitchToQueue(ranking, text) {
+    if (!text || !savedCandidateId) return
+    const subject = `${c?.name ?? 'Candidate'} — ${ranking.role_title ?? 'Submission'}`
+    await supabase.from('messages').insert({
       recruiter_id: recruiter.id,
       candidate_id: savedCandidateId,
       channel:      'email',
       subject,
-      body:         draftText,
+      body:         text,
       status:       'drafted',
     })
-    if (!error) setDraftSaved(true)
-    setDraftSaving(false)
+  }
+
+  async function handleSavePitchToCandidate(ranking, key) {
+    if (!savedCandidateId) return
+    const roleKey = (ranking.role_title ?? 'role').replace(/\W+/g, '_').toLowerCase()
+    const { data: existing } = await supabase
+      .from('candidates')
+      .select('enrichment_data')
+      .eq('id', savedCandidateId)
+      .single()
+    const merged = {
+      ...(existing?.enrichment_data ?? {}),
+      [`pitch_${roleKey}_email`]:   pitches[key].email,
+      [`pitch_${roleKey}_bullets`]: pitches[key].bullets,
+    }
+    await supabase.from('candidates').update({ enrichment_data: merged }).eq('id', savedCandidateId)
+    setPitches(prev => ({ ...prev, [key]: { ...prev[key], candidateSaved: true } }))
   }
 
   return (
@@ -616,8 +618,11 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
                 </div>
               </div>
 
-              {r.score_label && (
-                <p className="multiscreen-score-label">{r.score_label}</p>
+              {(r.score_label || r.salary_range) && (
+                <div className="multiscreen-meta-row">
+                  {r.score_label && <p className="multiscreen-score-label">{r.score_label}</p>}
+                  {r.salary_range && <span className="multiscreen-salary">{r.salary_range}</span>}
+                </div>
               )}
 
               {r.why && <p className="multiscreen-why">{r.why}</p>}
@@ -647,6 +652,91 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
                   <span>{r.next_action}</span>
                 </div>
               )}
+
+              {/* Per-card pitch */}
+              {pitches[r.rank]?.phase === 'done' ? (
+                <div className="multiscreen-pitch-section">
+                  <div className="multiscreen-pitch-block">
+                    <div className="multiscreen-pitch-block-header">
+                      <p className="intake-eyebrow">Email Pitch</p>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(pitches[r.rank].email)
+                            setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], emailCopied: true } }))
+                            setTimeout(() => setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], emailCopied: false } })), 2000)
+                          }}
+                        >
+                          {pitches[r.rank].emailCopied ? 'Copied ✓' : 'Copy'}
+                        </button>
+                        {saved && savedCandidateId && !pitches[r.rank].emailSaved && (
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={async () => {
+                              await handleSavePitchToQueue(r, pitches[r.rank].email)
+                              setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], emailSaved: true } }))
+                            }}
+                          >
+                            Save to Queue
+                          </button>
+                        )}
+                        {pitches[r.rank].emailSaved && <span className="saved-label">Saved ✓</span>}
+                        {saved && savedCandidateId && !pitches[r.rank].candidateSaved && (
+                          <button
+                            className="btn-ghost btn-sm"
+                            onClick={() => handleSavePitchToCandidate(r, r.rank)}
+                          >
+                            Save to Candidate
+                          </button>
+                        )}
+                        {pitches[r.rank].candidateSaved && <span className="saved-label">Saved to Candidate ✓</span>}
+                      </div>
+                    </div>
+                    <textarea
+                      className="sub-draft-textarea"
+                      rows={5}
+                      value={pitches[r.rank].email}
+                      onChange={e => setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], email: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="multiscreen-pitch-block">
+                    <div className="multiscreen-pitch-block-header">
+                      <p className="intake-eyebrow">Bullets</p>
+                      <button
+                        className="btn-ghost btn-sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(pitches[r.rank].bullets)
+                          setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], bulletsCopied: true } }))
+                          setTimeout(() => setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], bulletsCopied: false } })), 2000)
+                        }}
+                      >
+                        {pitches[r.rank].bulletsCopied ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+                    <textarea
+                      className="sub-draft-textarea"
+                      rows={4}
+                      value={pitches[r.rank].bullets}
+                      onChange={e => setPitches(prev => ({ ...prev, [r.rank]: { ...prev[r.rank], bullets: e.target.value } }))}
+                    />
+                  </div>
+                  <button className="btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={() => handleGeneratePitch(r)}>
+                    Regenerate
+                  </button>
+                </div>
+              ) : pitches[r.rank]?.phase === 'generating' ? (
+                <div className="modal-generating" style={{ marginTop: 10 }}>
+                  <div className="spinner spinner--sm" /> Drafting pitches…
+                </div>
+              ) : (
+                <div style={{ marginTop: 10 }}>
+                  <button className="btn-ghost btn-sm" onClick={() => handleGeneratePitch(r)}>
+                    {pitches[r.rank]?.phase === 'error' ? 'Retry Pitch' : 'Generate Pitch'}
+                  </button>
+                </div>
+              )}
+
             </div>
           )
         })}
@@ -665,73 +755,6 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
           )}
         </div>
       </div>
-
-      {/* Inline submission draft for rank #1 */}
-      {topRanking && (
-        <div className="multiscreen-draft-section">
-          <div className="multiscreen-draft-header">
-            <span className="intake-eyebrow">
-              Draft Submission — {topRanking.role_title} @ {topRanking.company}
-            </span>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button
-                className={`format-toggle-btn${draftFormat === 'email' ? ' format-toggle-btn--active' : ''}`}
-                onClick={() => { setDraftFormat('email'); setDraftPhase(null) }}
-              >Email</button>
-              <button
-                className={`format-toggle-btn${draftFormat === 'bullet' ? ' format-toggle-btn--active' : ''}`}
-                onClick={() => { setDraftFormat('bullet'); setDraftPhase(null) }}
-              >Bullets</button>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={handleDraftSubmission}
-                disabled={draftPhase === 'generating'}
-              >
-                {draftPhase === 'generating' ? 'Drafting…' : draftPhase === 'done' ? 'Regenerate' : 'Draft'}
-              </button>
-            </div>
-          </div>
-
-          {draftPhase === 'generating' && (
-            <div className="modal-generating" style={{ marginTop: 8 }}>
-              <div className="spinner spinner--sm" />
-              Drafting submission…
-            </div>
-          )}
-
-          {draftPhase === 'error' && (
-            <p className="error" style={{ marginTop: 8 }}>Draft failed. Try again.</p>
-          )}
-
-          {draftPhase === 'done' && draftText && (
-            <>
-              <textarea
-                className="sub-draft-textarea"
-                value={draftText}
-                onChange={e => setDraftText(e.target.value)}
-                rows={8}
-              />
-              <div className="intake-actions" style={{ marginTop: 8 }}>
-                <button
-                  className="btn-ghost"
-                  onClick={() => { navigator.clipboard.writeText(draftText); setDraftCopied(true); setTimeout(() => setDraftCopied(false), 2000) }}
-                >
-                  {draftCopied ? 'Copied ✓' : 'Copy'}
-                </button>
-                {savedCandidateId && (
-                  <button
-                    className="btn-ghost"
-                    onClick={handleDraftSaveToQueue}
-                    disabled={draftSaving || draftSaved}
-                  >
-                    {draftSaving ? 'Saving…' : draftSaved ? 'Saved to Queue ✓' : 'Save to Queue'}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
     </div>
   )

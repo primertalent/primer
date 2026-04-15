@@ -1,42 +1,48 @@
-export function buildDailyBriefMessages({ overdue, dueToday, pipeline, stats }) {
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+export function buildDailyBriefMessages({ overdue, dueToday, draftedCount, stats }) {
+  const parts = []
 
-  const overdueSection = overdue.length
-    ? overdue.map(p =>
-        `- ${p.candidates.first_name} ${p.candidates.last_name} — ${p.roles?.title ?? 'Unknown role'} (${p.current_stage}) — overdue: ${p.next_action || 'no action set'}`
-      ).join('\n')
-    : null
+  if (draftedCount > 0) {
+    parts.push(`${draftedCount} submission draft${draftedCount !== 1 ? 's' : ''} in queue waiting for approval.`)
+  }
 
-  const dueTodaySection = dueToday.length
-    ? dueToday.map(p =>
-        `- ${p.candidates.first_name} ${p.candidates.last_name} — ${p.roles?.title ?? 'Unknown role'} (${p.current_stage}) — due today: ${p.next_action || 'no action set'}`
-      ).join('\n')
-    : null
+  if (overdue.length > 0) {
+    const names = overdue.slice(0, 3).map(p =>
+      `${p.candidates.first_name} ${p.candidates.last_name} (${p.roles?.title ?? 'unknown role'}, ${p.current_stage})`
+    ).join('; ')
+    parts.push(`${overdue.length} overdue action${overdue.length !== 1 ? 's' : ''}: ${names}${overdue.length > 3 ? ' and more' : ''}.`)
+  }
 
-  const pipelineSummary = pipeline.length
-    ? `${pipeline.length} active candidates across ${stats.activeRoles} open roles`
-    : 'No active pipeline yet'
+  if (dueToday.length > 0) {
+    const names = dueToday.slice(0, 3).map(p =>
+      `${p.candidates.first_name} ${p.candidates.last_name} (${p.roles?.title ?? 'unknown role'})`
+    ).join('; ')
+    parts.push(`${dueToday.length} action${dueToday.length !== 1 ? 's' : ''} due today: ${names}.`)
+  }
 
-  const sections = [
-    `Today is ${today}.`,
-    `Pipeline: ${pipelineSummary}. ${stats.messagesToReview} draft${stats.messagesToReview !== 1 ? 's' : ''} pending in queue.`,
-    overdueSection ? `Overdue actions:\n${overdueSection}` : null,
-    dueTodaySection ? `Due today:\n${dueTodaySection}` : null,
-  ].filter(Boolean).join('\n\n')
+  const pipelineCount = stats.candidatesInPipeline ?? 0
+  const roleCount     = stats.activeRoles ?? 0
+  if (pipelineCount > 0) {
+    parts.push(`${pipelineCount} candidate${pipelineCount !== 1 ? 's' : ''} across ${roleCount} open role${roleCount !== 1 ? 's' : ''}.`)
+  }
 
-  const prompt = `You are Wren, a recruiting OS for a solo independent recruiter. Write a brief morning brief based on the data below.
+  if (parts.length === 0) {
+    parts.push('Pipeline is clear. No overdue actions, no pending queue.')
+  }
+
+  const context = parts.join(' ')
+
+  const prompt = `You are Wren, a recruiting OS. A recruiter just opened their dashboard. Give them a 2-sentence status they can act on immediately.
 
 Rules:
-- 2-3 sentences max. Plain text, no markdown.
-- Lead with what needs attention right now — overdue actions first, then today's priorities.
-- If nothing is urgent, say so clearly and point to the highest-value next move.
-- Sound like a sharp colleague giving a 30-second morning rundown. Not a bot, not a report.
-- No em dashes, no AI writing tells, no filler.
+- Lead with what makes them money: queue items, overdue actions, pipeline movement needed.
+- Be specific — use names and role titles from the data. Don't generalize.
+- Sound like a sharp chief of staff, not a status report. Direct, human, no filler.
+- No em dashes, no "Additionally", no AI-writing tells. Short sentences.
+- If nothing urgent, say so in one sentence and name the highest-value next move.
 
-DATA:
-${sections}
+DATA: ${context}
 
-Write the brief now. 2-3 sentences.`
+Write 2 sentences max.`
 
   return [{ role: 'user', content: prompt }]
 }

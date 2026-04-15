@@ -176,8 +176,11 @@ export default function RoleDetail() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [fetchError, setFetchError] = useState(null)
-  const [deleting, setDeleting] = useState(false)
-  const [advancingId, setAdvancingId] = useState(null)
+  const [deleting, setDeleting]         = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [closing, setClosing]           = useState(false)
+  const [closeError, setCloseError]     = useState(null)
+  const [advancingId, setAdvancingId]   = useState(null)
 
   // Interview questions
   const [interviewQuestions, setInterviewQuestions] = useState(null)
@@ -259,6 +262,23 @@ export default function RoleDetail() {
 
     fetchRole()
   }, [id, recruiter?.id])
+
+  async function handleCloseRole() {
+    setClosing(true)
+    setCloseError(null)
+    const newStatus = role.status === 'filled' ? 'open' : 'filled'
+    const { error } = await supabase
+      .from('roles')
+      .update({ status: newStatus })
+      .eq('id', id)
+    if (error) {
+      setCloseError('Couldn\'t update status. Try again.')
+    } else {
+      setRole(prev => ({ ...prev, status: newStatus }))
+      setConfirmClose(false)
+    }
+    setClosing(false)
+  }
 
   async function handleDelete() {
     if (!window.confirm(`Delete "${role.title}"? This cannot be undone.`)) return
@@ -527,11 +547,31 @@ export default function RoleDetail() {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Link to={`/roles/${id}/edit`} className="btn-ghost">Edit</Link>
-          <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Deleting…' : 'Delete'}
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link to={`/roles/${id}/edit`} className="btn-ghost">Edit</Link>
+            {role.status === 'filled' ? (
+              <button className="btn-ghost" onClick={handleCloseRole} disabled={closing}>
+                {closing ? 'Reopening…' : 'Reopen'}
+              </button>
+            ) : confirmClose ? (
+              <div className="inline-confirm">
+                <span>Mark as filled?</span>
+                <button className="btn-confirm-yes" onClick={handleCloseRole} disabled={closing}>
+                  {closing ? 'Saving…' : 'Yes'}
+                </button>
+                <button className="btn-confirm-cancel" onClick={() => setConfirmClose(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button className="btn-ghost" onClick={() => setConfirmClose(true)}>
+                Close Role
+              </button>
+            )}
+            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+          {closeError && <p className="inline-error" style={{ margin: 0 }}>{closeError}</p>}
         </div>
       </div>
 

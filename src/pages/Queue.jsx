@@ -48,6 +48,7 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit, onDelete 
   const [saving, setSaving]     = useState(false)
   const [acting, setActing]     = useState(false)
   const [actionError, setActionError] = useState(null)
+  const [copied, setCopied]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deletingMsg, setDeletingMsg] = useState(false)
 
@@ -84,6 +85,7 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit, onDelete 
   async function handleSend() {
     setActing(true)
     setActionError(null)
+    try { await navigator.clipboard.writeText(message.body ?? '') } catch {}
     const err = await onSend(message.id)
     if (err) setActionError('Couldn\'t mark as sent. Try again.')
     setActing(false)
@@ -176,13 +178,25 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit, onDelete 
                 Approve
               </button>
             )}
+            {!isSent && (
+              <button
+                className="btn-action"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(message.body ?? '') } catch {}
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+              >
+                {copied ? 'Copied ✓' : 'Copy'}
+              </button>
+            )}
             {isApproved && (
               <button
                 className="btn-action btn-action--send"
                 onClick={handleSend}
                 disabled={acting}
               >
-                Send
+                Copy & Send
               </button>
             )}
             {!editing && (

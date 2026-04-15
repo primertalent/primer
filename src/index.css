@@ -310,6 +310,131 @@ body {
   color: var(--color-muted);
 }
 
+/* ── Today's Actions ────────────────────────────────── */
+
+.today-actions-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.today-actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+}
+
+.today-actions-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.today-badge-overdue {
+  font-size: 11px;
+  font-weight: 600;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.today-actions-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.today-actions-empty {
+  font-size: 14px;
+  color: var(--color-muted);
+  padding: 12px 20px 16px;
+  margin: 0;
+}
+
+.today-actions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.today-action-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  border-top: 1px solid var(--color-border);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background 0.1s;
+}
+
+.today-action-row:hover {
+  background: var(--color-bg);
+}
+
+.today-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.today-dot--overdue     { background: #dc2626; }
+.today-dot--today       { background: #f59e0b; }
+.today-dot--queue       { background: var(--color-primary); }
+.today-dot--unscheduled { background: var(--color-border); }
+
+.today-action-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-action-meta {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.today-action-label {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.today-action-row--overdue     .today-action-label { color: #dc2626; }
+.today-action-row--today       .today-action-label { color: #d97706; }
+.today-action-row--queue       .today-action-label { color: var(--color-primary); }
+.today-action-row--unscheduled .today-action-label { color: var(--color-muted); }
+
+.today-action-arrow {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .today-action-row {
+    grid-template-columns: 16px 1fr auto;
+    gap: 8px;
+  }
+  .today-action-meta,
+  .today-action-label {
+    display: none;
+  }
+}
+
 /* ── Candidate card — page header ───────────────────── */
 
 .page-header {
@@ -563,8 +688,49 @@ body {
 
 .pipeline-next-action {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.next-action-edit {
+  display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.next-action-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.next-action-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.next-action-date {
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  width: 160px;
+}
+
+.next-action-date:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .due-date {
@@ -4021,6 +4187,48 @@ select.field-input {
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 4px;
+}
+
+.multiscreen-pitch-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.multiscreen-pitch-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.multiscreen-pitch-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.multiscreen-pitch-block-header .intake-eyebrow {
+  margin-bottom: 0;
+}
+
+.multiscreen-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.multiscreen-salary {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 7px;
 }
 
 .sub-draft-textarea {

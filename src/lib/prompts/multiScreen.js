@@ -21,6 +21,7 @@ Return this exact JSON structure. No explanation, no markdown, no code fences.
       "rank": 1,
       "role_title": "",
       "company": "",
+      "salary_range": "",
       "match_score": 0,
       "score_label": "",
       "recommendation": "advance",
@@ -36,10 +37,11 @@ Return this exact JSON structure. No explanation, no markdown, no code fences.
 Rules:
 - match_score is 1–10. Use the full range. If rank 1 is clearly the best fit, it should score higher than rank 2.
 - score_label is one of: Strong Match, Good Match, Possible, Weak, No Match
-- recommendation is one of: advance, hold, pass
-- why is 1–2 sentences on the overall fit for this specific role
-- strengths: 2–3 bullets of what the candidate specifically brings to this role
-- gaps: 1–2 bullets of what is missing or risky for this specific role
+- recommendation is one of: advance, hold/advance, hold, hold/pass, pass. Use hold/advance when the fit is borderline but worth a closer look. Use hold/pass when there are real gaps but a soft no.
+- why: 2–3 sentences. Name specific things from the resume (job titles, companies, metrics, technologies) and map them to named requirements in this JD. Don't be generic. "Led data platform at Stripe" is better than "has relevant experience."
+- strengths: 2–3 bullets naming specific resume items that directly match this role's requirements. Be concrete.
+- gaps: 1–2 bullets of what is actually missing or risky for this specific role. If no real gaps, say so.
+- salary_range: extract from the JD if present. Format as "$X–$Y" or "$X+" or "Up to $X". Leave null if not stated.
 - next_action: the single most important next step for THIS role specifically
 - overall_next_action: which role to prioritize and the exact first move to make
 - rank 1 is the strongest fit. All roles must be ranked; no ties.
