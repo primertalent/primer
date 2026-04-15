@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 7).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 8).
 
 ---
 
@@ -60,6 +60,7 @@ Not a co-pilot. Not a chatbot. An operating system that handles the work between
 - **Interaction logging UI** — "Log" button in the Interactions section heading on the candidate card. Inline form with Type (Call / Email / Note), Direction (Inbound / Outbound, hidden for notes), Date (defaults to now), and Notes textarea. Saves to `interactions` table. New entry prepends to the list instantly. Interactions list is now most-recent-first.
 - **Stage advance from candidate card** — each pipeline entry row has a "→ [next stage]" button. One click advances the candidate, updates `pipeline.current_stage`, inserts a row into `pipeline_stage_history`, and updates the UI optimistically with rollback on failure. Disables at "placed".
 - **Wren Command Bar** — persistent input surface on the Dashboard/Brief page. Accepts paste, file attachment (PDF + DOCX), or any combination. Auto-classifies inputs into labeled chips (Resume, JD, Transcript, Notes) via a fast classify call. Assembles all inputs as labeled `<document>` blocks for the intake prompt. Full intake runs in one pass: candidate + company + role created or matched, screener scored, call signals extracted, interaction logged, pipeline entry created. Save All writes all 7 records to Supabase in sequence. View/Edit links appear inline after save. ✕ Clear button dismisses the result card and resets to input.
+- **Recruiter judgment layer** — every pipeline entry on the CandidateCard has an "Add your take" inline form: recruiter score (1–10) + freeform note. Both persist to `pipeline.recruiter_score` and `pipeline.recruiter_note`. Never touched by AI reruns. Recruiter score displays alongside the AI fit score with a distinct purple badge. Same badge visible on kanban cards in RoleDetail. Screener history rows (Scores History) also accept a per-run recruiter note, persisted to `screener_results.recruiter_note`. The delta between AI score and recruiter score is preserved — both visible simultaneously.
 - **Edit/Delete everything** — every AI-generated or user-logged record is now deletable inline. Pattern: × button on row hover → "Delete? Yes / Cancel" inline confirm → optimistic delete with rollback on error. Surfaces: screener result rows (Scores History), interaction rows, pipeline entries (CandidateCard), kanban cards (RoleDetail), drafted queue messages. Career timeline: Clear button in section heading → wipes `career_timeline` + `career_signals` from DB. Reparse button replaces "Parse from CV" when timeline exists. Search strings + interview questions: Clear button in section heading. Next action AI card: Regenerate button in card header. WrenCommand IntakeResult: ✕ Clear button in top-right of card.
 
 ---
@@ -165,6 +166,8 @@ Wren should surface what matters without being asked. Signal badges on a candida
 5. **Call notes ingestion** — Drop in raw call notes, Wren structures and saves to the candidate record. (Note: the Command Bar already handles this via paste — call mode is the dedicated flow.)
 6. **LinkedIn outreach drafting** — Generate a personalized connection request or InMail from the candidate card. Copy and send from LinkedIn.
 
+_Completed session 8:_ Recruiter judgment layer — pipeline score + note, screener result note. AI score and recruiter score coexist, neither overwrites the other.
+
 _Completed session 7:_ Edit/delete everything — inline confirm pattern across all generated content. Screener results, interactions, pipeline entries, kanban cards, drafted messages, career timeline, search strings, interview questions, next action regenerate, WrenCommand clear.
 
 _Completed session 6:_ Full product polish pass — spinner system, empty/error/loading states, nav active treatment, WrenCommand UX hardening. No new features.
@@ -173,6 +176,7 @@ _Completed session 6:_ Full product polish pass — spinner system, empty/error/
 
 ## Decisions Log
 
+- **Recruiter score and AI score are separate, permanent tracks.** `pipeline.recruiter_score` and `pipeline.recruiter_note` are never touched by AI reruns. The AI generates its read; the recruiter layers theirs on top. Both visible. The delta between them is meaningful data — if a recruiter consistently rates higher than the AI, that's a calibration signal worth surfacing eventually.
 - **Inline confirm is the delete pattern.** No modals for destructive actions. One click surfaces "Delete? Yes / Cancel" inline in the row/card. Yes triggers the delete, Cancel dismisses. Error shown inline if delete fails. This is the standard for all future delete actions.
 - **× button appears on hover.** Row remove buttons (`.btn-row-remove`, `.btn-kanban-remove`) are opacity 0 by default, opacity 1 on parent hover. This keeps the UI clean without sacrificing discoverability.
 - **Regenerate vs. Clear distinction.** Regenerate = overwrite in place, no confirmation. Clear = wipe from DB, requires confirm. Both available when AI-generated data exists.

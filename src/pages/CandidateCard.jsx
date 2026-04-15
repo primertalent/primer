@@ -159,6 +159,34 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
     }
   }
 
+  // Recruiter judgment
+  const [recruiterEditing, setRecruiterEditing] = useState(false)
+  const [recruiterScore, setRecruiterScore] = useState(entry.recruiter_score ?? '')
+  const [recruiterNote, setRecruiterNote] = useState(entry.recruiter_note ?? '')
+  const [recruiterSaving, setRecruiterSaving] = useState(false)
+  const [recruiterError, setRecruiterError] = useState(null)
+  const [displayScore, setDisplayScore] = useState(entry.recruiter_score ?? null)
+  const [displayNote, setDisplayNote] = useState(entry.recruiter_note ?? null)
+
+  async function handleSaveRecruiter() {
+    setRecruiterSaving(true)
+    setRecruiterError(null)
+    const score = recruiterScore !== '' ? Math.min(10, Math.max(1, parseInt(recruiterScore, 10))) : null
+    const note = recruiterNote.trim() || null
+    const { error } = await supabase
+      .from('pipeline')
+      .update({ recruiter_score: score, recruiter_note: note })
+      .eq('id', entry.id)
+    if (error) {
+      setRecruiterError('Couldn\'t save. Try again.')
+    } else {
+      setDisplayScore(score)
+      setDisplayNote(note)
+      setRecruiterEditing(false)
+    }
+    setRecruiterSaving(false)
+  }
+
   return (
     <div className="pipeline-entry">
       <div className="pipeline-role">
@@ -170,6 +198,9 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
         <span className="stage-badge">{entry.current_stage}</span>
         {entry.fit_score != null && (
           <span className="fit-score">{Math.round(entry.fit_score)}<span className="fit-denom">/100</span></span>
+        )}
+        {displayScore != null && (
+          <span className="recruiter-score-badge" title="Your score">{displayScore}/10 you</span>
         )}
         <button
           className="btn-ghost btn-sm pipeline-advance-btn"
@@ -194,6 +225,64 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
           )}
         </div>
       )}
+
+      {/* Recruiter judgment */}
+      <div className="recruiter-judgment">
+        {!recruiterEditing ? (
+          <>
+            {(displayScore != null || displayNote) && (
+              <div className="recruiter-judgment-display">
+                {displayScore != null && (
+                  <span className="recruiter-score-badge">{displayScore}/10</span>
+                )}
+                {displayNote && (
+                  <p className="recruiter-note">{displayNote}</p>
+                )}
+              </div>
+            )}
+            <button className="btn-ghost btn-sm" onClick={() => setRecruiterEditing(true)}>
+              {displayScore != null || displayNote ? 'Edit your take' : 'Add your take'}
+            </button>
+          </>
+        ) : (
+          <div className="recruiter-edit-form">
+            <div className="recruiter-edit-row">
+              <span className="recruiter-edit-label">Your score</span>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                className="recruiter-score-input"
+                placeholder="1–10"
+                value={recruiterScore}
+                onChange={e => setRecruiterScore(e.target.value)}
+              />
+            </div>
+            <textarea
+              className="recruiter-note-input"
+              placeholder="What do you know that the screener doesn't?"
+              rows={2}
+              value={recruiterNote}
+              onChange={e => setRecruiterNote(e.target.value)}
+            />
+            {recruiterError && <p className="inline-error">{recruiterError}</p>}
+            <div className="recruiter-edit-actions">
+              <button className="btn-primary btn-sm" onClick={handleSaveRecruiter} disabled={recruiterSaving}>
+                {recruiterSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-ghost btn-sm" onClick={() => {
+                setRecruiterScore(displayScore ?? '')
+                setRecruiterNote(displayNote ?? '')
+                setRecruiterEditing(false)
+                setRecruiterError(null)
+              }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {confirmRemove && (
         <div className="inline-confirm">
           <span>Remove from {roleName}?</span>
@@ -292,6 +381,12 @@ function ScoreHistoryRow({ sr, inPipeline, onDelete }) {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
 
+  const [noteEditing, setNoteEditing] = useState(false)
+  const [noteDraft, setNoteDraft] = useState(sr.recruiter_note ?? '')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [noteError, setNoteError] = useState(null)
+  const [displayNote, setDisplayNote] = useState(sr.recruiter_note ?? null)
+
   async function handleDelete() {
     setDeleting(true)
     setDeleteError(null)
@@ -301,6 +396,23 @@ function ScoreHistoryRow({ sr, inPipeline, onDelete }) {
       setDeleting(false)
       setConfirm(false)
     }
+  }
+
+  async function handleSaveNote() {
+    setNoteSaving(true)
+    setNoteError(null)
+    const note = noteDraft.trim() || null
+    const { error } = await supabase
+      .from('screener_results')
+      .update({ recruiter_note: note })
+      .eq('id', sr.id)
+    if (error) {
+      setNoteError('Couldn\'t save. Try again.')
+    } else {
+      setDisplayNote(note)
+      setNoteEditing(false)
+    }
+    setNoteSaving(false)
   }
 
   return (
@@ -324,6 +436,42 @@ function ScoreHistoryRow({ sr, inPipeline, onDelete }) {
         )}
         <button className="btn-row-remove" onClick={() => setConfirm(true)} title="Delete result">×</button>
       </div>
+
+      {/* Recruiter note on this screening run */}
+      <div className="recruiter-note-row">
+        {!noteEditing ? (
+          <>
+            {displayNote && <p className="recruiter-note" style={{ marginBottom: 4 }}>{displayNote}</p>}
+            <button className="btn-ghost btn-sm" onClick={() => setNoteEditing(true)}>
+              {displayNote ? 'Edit note' : 'Add note'}
+            </button>
+          </>
+        ) : (
+          <div className="recruiter-edit-form">
+            <textarea
+              className="recruiter-note-input"
+              placeholder="Your read on this screening…"
+              rows={2}
+              value={noteDraft}
+              onChange={e => setNoteDraft(e.target.value)}
+            />
+            {noteError && <p className="inline-error">{noteError}</p>}
+            <div className="recruiter-edit-actions">
+              <button className="btn-primary btn-sm" onClick={handleSaveNote} disabled={noteSaving}>
+                {noteSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn-ghost btn-sm" onClick={() => {
+                setNoteDraft(displayNote ?? '')
+                setNoteEditing(false)
+                setNoteError(null)
+              }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {confirm && (
         <div className="inline-confirm">
           <span>Delete this result?</span>

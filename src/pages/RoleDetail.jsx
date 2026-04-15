@@ -74,6 +74,11 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
             {Math.round(entry.fit_score)}<span className="fit-denom">/100</span>
           </span>
         )}
+        {entry.recruiter_score != null && (
+          <span className="recruiter-score-badge recruiter-score-badge--sm" title="Your score">
+            {entry.recruiter_score}/10
+          </span>
+        )}
         {entry.next_action_due_at && (
           <span className="due-date">
             {uClass && <span className={`urgency-dot ${uClass}`} />}
@@ -213,7 +218,7 @@ export default function RoleDetail() {
 
         supabase
           .from('pipeline')
-          .select('id, current_stage, fit_score, next_action_due_at, candidate_id, candidates(id, first_name, last_name, current_title)')
+          .select('id, current_stage, fit_score, next_action_due_at, candidate_id, recruiter_score, recruiter_note, candidates(id, first_name, last_name, current_title)')
           .eq('role_id', id)
           .eq('status', 'active'),
       ])

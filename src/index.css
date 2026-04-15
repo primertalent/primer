@@ -3890,3 +3890,106 @@ select.field-input {
 .btn-action--delete:hover {
   background: var(--color-error-bg);
 }
+
+/* ── Recruiter judgment ──────────────────────────────────── */
+
+.recruiter-judgment {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.recruiter-judgment-display {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.recruiter-score-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b21a8;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  border-radius: 4px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.recruiter-score-badge--sm {
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.recruiter-note {
+  font-size: 13px;
+  color: var(--color-muted);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.recruiter-note-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.recruiter-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.recruiter-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recruiter-edit-label {
+  font-size: 12px;
+  color: var(--color-muted);
+  min-width: 64px;
+}
+
+.recruiter-score-input {
+  width: 64px;
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.recruiter-score-input:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.recruiter-note-input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: var(--font);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.recruiter-note-input:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.recruiter-edit-actions {
+  display: flex;
+  gap: 8px;
+}
