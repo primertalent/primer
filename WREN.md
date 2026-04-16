@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 14).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 15).
 
 ---
 
@@ -144,6 +144,13 @@ Wren is channel-agnostic. It drafts. The recruiter delivers.
 - **Auto-regenerate next action on stage advance** — when a stage advance succeeds in CandidateCard, next action prompt fires in the background with updated pipeline context. Saves to `candidates.enrichment_data.next_action`, updates card state live. Silent skip on any failure. Brief reflects updated action by next load.
 - **Auto-generate search strings on role create** — fires in background after role save in CreateRole, before redirect. Silent skip if no JD text. Strings ready in RoleDetail when recruiter arrives.
 - **Semantic role matching in WrenCommand intake** — before intake fires, all open roles are fetched and injected into the system prompt. Model matches by meaning: "GTM lead" resolves to "Go-to-market lead", abbreviations and alternate titles all resolve correctly. Returns `role_id` in the intake result. Save All uses it directly, skips DB lookup and insert. Falls back to ilike match then create only if `role_id` is null. Confirmed in real use.
+- **UI pass (session 15)** — full reshape across all surfaces. No new features, everything reshaped against the "what do I do next" principle:
+  - Needs Attention cards: two-button layout (filled primary action + ghost View), name bold at top, signal colored by variant. Action labels map to intent: Draft Follow-Up, Run Screener, Set Action, Review Queue.
+  - Kanban cards: fit_score_rationale shown as signal, next_action always visible at card bottom. Pipeline query expanded to include both fields.
+  - Queue: inbox-clear feel. Candidate name + role prominent, first sentence preview only. Drafted items: Edit / Approve & Copy / Hold. Empty state: "You're clear. Nothing waiting." Skeleton loading.
+  - WrenCommand output: decision-ready packet. Hero name + fit score large, Strengths (3 max from pitch bullets), Concerns (2 max from red flags), Next Action bold with sage accent. Save All + View Candidate after save.
+  - Candidate card: replaced 3-column grid with sticky context bar + single column. Sticky bar shows name, scores, next action at all times. Single column order: Details, Signals, Career Timeline, Resume Screener, Scores History, Pipeline, Interactions.
+  - Visual system: shimmer skeleton on all Dashboard and Queue loading states. Fade-in on intake results. Warm background and sage accent applied consistently.
 
 ---
 
@@ -304,6 +311,8 @@ Already built. Audit against the behavioral spec. Should answer: who is at risk,
 The Queue should feel like a clean close. Review, approve, copy, done. Audit it against the 4:30pm workflow step.
 
 ---
+
+_Completed session 15:_ Full UI pass — sticky candidate card, attention cards, queue inbox, intake packet, skeleton loading, visual system consistency.
 
 _Completed session 14:_ Semantic role matching in WrenCommand intake — roles fetched before intake fires, model matches by meaning not string, confirmed in real use. Bug: "GTM lead" was creating a new role instead of matching "Go-to-market lead at Inworld".
 
