@@ -193,10 +193,9 @@ If any answer is wrong, redesign or defer.
 - Auto-generate search strings on role create
 
 **What's next:**
-- Friction fixes from the real-use audit (see `AUDIT.md` when active)
-- Time-elapsed triggers via Supabase Edge Functions on a schedule
-- Auto-set `next_action_due_at` when next action fires
-- Wire "Draft Follow-Up" on Needs Attention to actually draft
+- Real-use audit in progress (2026-04-16 through 2026-04-23). Friction logged in `friction.md`.
+- Phase 3 items after audit: split CandidateCard, split WrenCommand, auto-set `next_action_due_at`, wire "Draft Follow-Up"
+- Time-elapsed triggers via Supabase Edge Functions (after audit)
 
 **Do not build yet:**
 - Team features, shared pipelines, assignments

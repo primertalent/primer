@@ -6,6 +6,16 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 16 — 2026-04-16
+**Audit phases 1 and 2. No new features. Debt cleared before real-use testing.**
+
+- Phase 1 (bugs): Removed Anthropic SDK from browser — `claude.js` now always routes through `/api/ai`, `VITE_ANTHROPIC_API_KEY` gone from client, `.env` and `.env.local` gitignored. Added Vite dev proxy (`/api` → localhost:3000). Fixed broken RLS on `screener_results` (new migration — `auth_user_id` → `current_recruiter_id()`). Deleted dead `INTAKE_SYSTEM_PROMPT`, `action: 'classify'`, and `action: 'intake'` branches from `api/ai.js` (29 lines, passthrough only).
+- Phase 2 (prompt cleanup): Replaced "recruiting OS" with agent framing in `intake.js`, `dailyBrief.js`, `multiScreen.js`, `nextAction.js`. Removed Paraform reference in `submissionDraft.js`. Added missing migrations for `career_timeline` and `career_signals` columns.
+- Dev ergonomics: `npm run dev` now runs `vercel dev` + `vite` together via `concurrently`.
+- `AUDIT.md` deleted. `friction.md` created — real-use audit runs 2026-04-16 through 2026-04-23.
+
+---
+
 ## Session 15 — 2026-04-15
 **Full UI pass. No new features. Every surface reshaped against "what do I do next."**
 
