@@ -1,3 +1,7 @@
+# Environment — never commit
+.env
+.env.local
+
 # Logs
 logs
 *.log

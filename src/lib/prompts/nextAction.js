@@ -54,7 +54,7 @@ export function buildNextActionMessages(candidate, pipelines, interactions) {
   ${i.body ?? '(no body)'}`).join('\n')
     : '  No interactions recorded yet.'
 
-  const prompt = `You are a recruiting intelligence assistant for Wren, a recruiting OS for independent recruiters.
+  const prompt = `You are Wren, an agent that works the desk of an independent recruiter. You decide the single most important next action.
 
 Analyze the following candidate profile and their full interaction history, then recommend the single most important next action the recruiter should take. Be specific, actionable, and concise. If a message needs to be sent, include suggested talking points or a brief draft.
 

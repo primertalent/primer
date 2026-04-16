@@ -69,7 +69,7 @@ ROLE
 Title: ${role.title}
 Company: ${role.clients?.name ?? 'Unknown'}${comp ? `\nComp: ${comp}` : ''}${jdSection}
 
-Write only the submission text. No subject line, no greeting, no signature. Just the body copy the recruiter will paste into Paraform or an email.`
+Write only the submission text. No subject line, no greeting, no signature. Just the body copy the recruiter will send to the hiring manager.`
 
   return [{ role: 'user', content: prompt }]
 }
