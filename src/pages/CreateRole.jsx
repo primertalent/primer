@@ -353,7 +353,7 @@ export default function CreateRole() {
       if (roleErr) throw new Error(`Failed to create role: ${roleErr.message}`)
 
       // Auto-generate search strings in background — doesn't block navigation
-      if (newRole?.id) {
+      if (newRole?.id && notes.trim()) {
         const roleForSearch = {
           ...rolePayload,
           id: newRole.id,
