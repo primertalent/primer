@@ -1465,6 +1465,13 @@ export default function CandidateCard() {
 
   const fullName = `${candidate.first_name} ${candidate.last_name}`
 
+  const topPipelineEntry = pipelines.length > 0
+    ? pipelines.reduce((best, p) => {
+        if (!best) return p
+        return (p.fit_score ?? -1) > (best.fit_score ?? -1) ? p : best
+      }, null)
+    : null
+
   return (
     <AppLayout>
 
@@ -1504,471 +1511,374 @@ export default function CandidateCard() {
           </div>
         </div>
 
-        {/* Signal badges */}
-        {signals?.length > 0 && <SignalBadges signals={signals} />}
+        {/* 3-column layout */}
+        <div className="cc-layout">
 
-        {/* Saved next action (recruiter-owned) */}
-        {savedNextAction && !nextActionEditing && (
-          <div className="ai-card" style={{ borderColor: 'var(--color-primary)', borderWidth: 2 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p className="ai-card-eyebrow">Next Action</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn-ghost btn-sm" onClick={() => { setNextActionDraft(savedNextAction); setNextActionEditing(true) }}>Edit</button>
-                <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction} disabled={generating}>
-                  {generating ? 'Thinking…' : 'Regenerate'}
-                </button>
+          {/* Left: Identity */}
+          <aside className="cc-left">
+            <div className="cc-identity">
+              <DetailRow label="Email" value={candidate.email} />
+              <DetailRow label="Phone" value={candidate.phone} />
+              <DetailRow label="Location" value={candidate.location} />
+              {candidate.linkedin_url && (
+                <DetailRow
+                  label="LinkedIn"
+                  value={<a href={candidate.linkedin_url} target="_blank" rel="noreferrer">Profile ↗</a>}
+                />
+              )}
+              <DetailRow label="Source" value={SOURCE_LABELS[candidate.source] ?? candidate.source} />
+              <div className="detail-row">
+                <span className="detail-label">Skills</span>
+                <SkillTags skills={candidate.skills} />
               </div>
-            </div>
-            <p className="ai-card-body">{savedNextAction}</p>
-          </div>
-        )}
-
-        {/* Next action edit form */}
-        {nextActionEditing && (
-          <div className="ai-card">
-            <p className="ai-card-eyebrow">Next Action</p>
-            <textarea
-              className="sub-draft-textarea"
-              rows={2}
-              style={{ marginTop: 8 }}
-              value={nextActionDraft}
-              onChange={e => setNextActionDraft(e.target.value)}
-              placeholder="What needs to happen next with this candidate?"
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button
-                className="btn-primary btn-sm"
-                disabled={nextActionSaving}
-                onClick={async () => {
-                  setNextActionSaving(true)
-                  const text = nextActionDraft.trim() || null
-                  const { error } = await supabase.from('candidates').update({
-                    enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: text },
-                  }).eq('id', candidate.id)
-                  if (!error) {
-                    setSavedNextAction(text)
-                    setNextActionEditing(false)
-                  }
-                  setNextActionSaving(false)
-                }}
-              >
-                {nextActionSaving ? 'Saving…' : 'Save'}
-              </button>
-              <button className="btn-ghost btn-sm" onClick={() => setNextActionEditing(false)}>Cancel</button>
-              {savedNextAction && (
-                <button
-                  className="btn-ghost btn-sm"
-                  style={{ marginLeft: 'auto' }}
-                  onClick={async () => {
-                    await supabase.from('candidates').update({
-                      enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: null },
-                    }).eq('id', candidate.id)
-                    setSavedNextAction(null)
-                    setNextActionEditing(false)
-                  }}
-                >
-                  Clear
-                </button>
+              {candidate.notes && (
+                <div className="detail-row detail-row--block">
+                  <span className="detail-label">Notes</span>
+                  <p className="detail-notes">{candidate.notes}</p>
+                </div>
+              )}
+              {topPipelineEntry && (topPipelineEntry.fit_score != null || topPipelineEntry.recruiter_score != null) && (
+                <div className="cc-identity-scores">
+                  {topPipelineEntry.fit_score != null && (
+                    <div className="cc-score-block">
+                      <span className={`cc-score-value ${topPipelineEntry.fit_score >= 70 ? 'cc-score--green' : topPipelineEntry.fit_score >= 40 ? 'cc-score--amber' : 'cc-score--red'}`}>
+                        {Math.round(topPipelineEntry.fit_score)}
+                      </span>
+                      <span className="cc-score-label">AI Score</span>
+                    </div>
+                  )}
+                  {topPipelineEntry.recruiter_score != null && (
+                    <div className="cc-score-block">
+                      <span className="cc-score-value">{topPipelineEntry.recruiter_score}</span>
+                      <span className="cc-score-label">Your Score</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </div>
-        )}
+            {signals?.length > 0 && <SignalBadges signals={signals} />}
+          </aside>
 
-        {/* AI suggestion */}
-        {(generating || suggestion || genError) && !savedNextAction && (
-          <div className={`ai-card ${genError ? 'ai-card--error' : ''}`}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p className="ai-card-eyebrow">
-                {genError ? 'Error' : 'Suggested Next Action'}
-              </p>
-              {!generating && !genError && (
-                <div style={{ display: 'flex', gap: 8 }}>
+          {/* Middle: Brain output */}
+          <main className="cc-middle">
+
+            {/* Next Action — big and obvious */}
+            {savedNextAction && !nextActionEditing && (
+              <div className="cc-next-action">
+                <p className="cc-next-action-label">Next Action</p>
+                <p className="cc-next-action-text">{savedNextAction}</p>
+                <div className="cc-next-action-controls">
+                  <button className="btn-ghost btn-sm" onClick={() => { setNextActionDraft(savedNextAction); setNextActionEditing(true) }}>Edit</button>
+                  <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction} disabled={generating}>
+                    {generating ? 'Thinking…' : 'Regenerate'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Next action edit form */}
+            {nextActionEditing && (
+              <div className="ai-card">
+                <p className="ai-card-eyebrow">Next Action</p>
+                <textarea
+                  className="sub-draft-textarea"
+                  rows={2}
+                  style={{ marginTop: 8 }}
+                  value={nextActionDraft}
+                  onChange={e => setNextActionDraft(e.target.value)}
+                  placeholder="What needs to happen next with this candidate?"
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
-                    className="btn-ghost btn-sm"
+                    className="btn-primary btn-sm"
+                    disabled={nextActionSaving}
                     onClick={async () => {
-                      setNextActionDraft(suggestion)
                       setNextActionSaving(true)
+                      const text = nextActionDraft.trim() || null
                       const { error } = await supabase.from('candidates').update({
-                        enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: suggestion },
+                        enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: text },
                       }).eq('id', candidate.id)
-                      if (!error) setSavedNextAction(suggestion)
+                      if (!error) {
+                        setSavedNextAction(text)
+                        setNextActionEditing(false)
+                      }
                       setNextActionSaving(false)
                     }}
                   >
-                    Set as my action
+                    {nextActionSaving ? 'Saving…' : 'Save'}
                   </button>
-                  <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
+                  <button className="btn-ghost btn-sm" onClick={() => setNextActionEditing(false)}>Cancel</button>
+                  {savedNextAction && (
+                    <button
+                      className="btn-ghost btn-sm"
+                      style={{ marginLeft: 'auto' }}
+                      onClick={async () => {
+                        await supabase.from('candidates').update({
+                          enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: null },
+                        }).eq('id', candidate.id)
+                        setSavedNextAction(null)
+                        setNextActionEditing(false)
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* AI suggestion */}
+            {(generating || suggestion || genError) && !savedNextAction && (
+              <div className={`ai-card ${genError ? 'ai-card--error' : ''}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p className="ai-card-eyebrow">
+                    {genError ? 'Error' : 'Suggested Next Action'}
+                  </p>
+                  {!generating && !genError && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn-ghost btn-sm"
+                        onClick={async () => {
+                          setNextActionDraft(suggestion)
+                          setNextActionSaving(true)
+                          const { error } = await supabase.from('candidates').update({
+                            enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: suggestion },
+                          }).eq('id', candidate.id)
+                          if (!error) setSavedNextAction(suggestion)
+                          setNextActionSaving(false)
+                        }}
+                      >
+                        Set as my action
+                      </button>
+                      <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
+                    </div>
+                  )}
+                </div>
+                {generating
+                  ? <div className="modal-generating"><div className="spinner spinner--sm" />Thinking…</div>
+                  : <p className="ai-card-body">{genError ? 'Couldn\'t generate a suggestion. Try again.' : suggestion}</p>
+                }
+              </div>
+            )}
+
+            {/* Career Timeline */}
+            <section className="candidate-section">
+              <div className="section-heading-row">
+                <h2 className="section-heading">Career Timeline</h2>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {candidate.cv_text && (
+                    <button className="btn-ghost btn-sm" onClick={handleParseCareer} disabled={parsingCareer}>
+                      {parsingCareer ? 'Parsing…' : timeline ? 'Reparse' : 'Parse from CV'}
+                    </button>
+                  )}
+                  {timeline && !clearCareerConfirm && (
+                    <button className="btn-ghost btn-sm" onClick={() => setClearCareerConfirm(true)}>Clear</button>
+                  )}
+                </div>
+              </div>
+              {clearCareerConfirm && (
+                <div className="inline-confirm">
+                  <span>Clear career data?</span>
+                  <button className="btn-confirm-yes" onClick={handleClearCareer} disabled={clearingCareer}>
+                    {clearingCareer ? 'Clearing…' : 'Yes, clear'}
+                  </button>
+                  <button className="btn-confirm-cancel" onClick={() => setClearCareerConfirm(false)}>Cancel</button>
                 </div>
               )}
-            </div>
-            {generating
-              ? <div className="modal-generating"><div className="spinner spinner--sm" />Thinking…</div>
-              : <p className="ai-card-body">{genError ? 'Couldn\'t generate a suggestion. Try again.' : suggestion}</p>
-            }
-          </div>
-        )}
+              {parsingCareer && (
+                <div className="modal-generating" style={{ marginTop: 8 }}>
+                  <div className="spinner spinner--sm" />Parsing career history…
+                </div>
+              )}
+              {careerError && (
+                <div className="ai-card ai-card--error" style={{ marginTop: 8 }}>
+                  <p className="ai-card-eyebrow">Error</p>
+                  <p className="ai-card-body">Couldn't parse career history. Try again.</p>
+                </div>
+              )}
+              {!candidate.cv_text && <p className="muted" style={{ marginTop: 8 }}>No CV on file. Upload a resume to enable career parsing.</p>}
+              {timeline !== null && (
+                <>
+                  {(() => { const s = computeTenureSummary(timeline); return s ? <TenureSummary summary={s} /> : null })()}
+                  {timeline.length === 0
+                    ? <p className="muted">No career history could be extracted.</p>
+                    : timeline.map((entry, i) => <CareerEntry key={i} entry={entry} />)
+                  }
+                </>
+              )}
+            </section>
 
-        {/* Two-column layout */}
-        <div className="candidate-columns">
-
-          {/* Left: Candidate details */}
-          <section className="candidate-section">
-            <h2 className="section-heading">Candidate Details</h2>
-            <DetailRow label="Email" value={candidate.email} />
-            <DetailRow label="Phone" value={candidate.phone} />
-            <DetailRow
-              label="LinkedIn"
-              value={candidate.linkedin_url
-                ? <a href={candidate.linkedin_url} target="_blank" rel="noreferrer">{candidate.linkedin_url}</a>
-                : null}
-            />
-            <DetailRow label="Location" value={candidate.location} />
-            <DetailRow label="Source" value={SOURCE_LABELS[candidate.source] ?? candidate.source} />
-            <div className="detail-row">
-              <span className="detail-label">Skills</span>
-              <SkillTags skills={candidate.skills} />
-            </div>
-            {candidate.notes && (
-              <div className="detail-row detail-row--block">
-                <span className="detail-label">Notes</span>
-                <p className="detail-notes">{candidate.notes}</p>
-              </div>
-            )}
-          </section>
-
-          {/* Right: Pipeline status */}
-          <section className="candidate-section">
-            <div className="section-heading-row">
-              <h2 className="section-heading">Pipeline</h2>
-              <button className="btn-ghost btn-sm" onClick={handleOpenPicker}>
-                {pickerOpen ? 'Cancel' : '+ Add to Role'}
-              </button>
-            </div>
-
-            {/* Role picker */}
-            {pickerOpen && (
-              <div className="role-picker">
-                {rolesLoading ? (
-                  <p className="muted" style={{ padding: '10px 0' }}>Loading roles…</p>
-                ) : openRoles?.length === 0 ? (
-                  <p className="muted" style={{ padding: '10px 0' }}>No open roles.</p>
-                ) : (
-                  <ul className="role-picker-list">
-                    {openRoles.map(role => {
-                      const alreadyAdded = pipelines.some(p => p.role_id === role.id)
-                      const isAdding = addingRoleId === role.id
-                      return (
-                        <li key={role.id}>
-                          <button
-                            className={`role-picker-option${alreadyAdded ? ' role-picker-option--added' : ''}`}
-                            onClick={() => !alreadyAdded && handleAddToRole(role)}
-                            disabled={alreadyAdded || !!addingRoleId}
-                          >
-                            <span className="role-picker-title">{role.title}</span>
-                            {role.clients?.name && (
-                              <span className="role-picker-client">{role.clients.name}</span>
-                            )}
-                            {alreadyAdded && <span className="role-picker-check">✓</span>}
-                            {isAdding && <span className="role-picker-check">…</span>}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
+            {/* Resume Screener */}
+            <section className="candidate-section screener-section">
+              <h2 className="section-heading">Resume Screener</h2>
+              <div className="screener-controls">
+                <select
+                  className="field-input screener-role-select"
+                  value={screenerRoleId}
+                  onChange={e => {
+                    setScreenerRoleId(e.target.value)
+                    setScreenResult(null); setScreenError(null)
+                    setPitchText(null); setPitchError(null)
+                    setScorecard(null); setScorecardError(null)
+                  }}
+                  disabled={!openRoles}
+                >
+                  <option value="">{openRoles === null ? 'Loading roles…' : 'Select a role to screen against…'}</option>
+                  {openRoles?.map(r => (
+                    <option key={r.id} value={r.id}>{r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}</option>
+                  ))}
+                </select>
+                <button className="btn-primary" onClick={handleScreen} disabled={!screenerRoleId || screening}>
+                  {screening ? 'Screening…' : 'Screen Against Role'}
+                </button>
+                {pipelines.length > 0 && (
+                  <button className="btn-ghost" onClick={handleGeneratePitch} disabled={!screenerRoleId || pitchGenerating}>
+                    {pitchGenerating ? 'Generating…' : 'Generate Pitch'}
+                  </button>
                 )}
-                {addError && <p className="error" style={{ marginTop: 8 }}>{addError}</p>}
               </div>
-            )}
+              {screening && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Screening against role…</div>}
+              {screenError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't screen this candidate. Try again.</p></div>}
+              {screenResult && <ScreenerResult result={screenResult} />}
+              {candidate.cv_text && screenerRoleId && pipelines.some(p => p.role_id === screenerRoleId) && (
+                <div style={{ marginTop: 16 }}>
+                  <button className="btn-ghost" onClick={handleGenerateScorecard} disabled={scorecardGenerating}>
+                    {scorecardGenerating ? 'Generating…' : scorecard ? 'Regenerate Scorecard' : 'Full Scorecard'}
+                  </button>
+                </div>
+              )}
+              {scorecardGenerating && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Building scorecard…</div>}
+              {scorecardError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't generate scorecard. Try again.</p></div>}
+              {scorecard && <ScorecardResult result={scorecard} />}
+              {pitchGenerating && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Generating pitch…</div>}
+              {pitchError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't generate pitch. Try again.</p></div>}
+              {pitchText && (
+                <div className="pitch-result" style={{ marginTop: 16 }}>
+                  <div className="pitch-result-header">
+                    <p className="screener-block-label">Candidate Pitch</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(pitchText)}>Copy</button>
+                      <button className="btn-ghost btn-sm" onClick={handleSavePitch} disabled={pitchSaving || pitchSaved}>
+                        {pitchSaving ? 'Saving…' : pitchSaved ? 'Saved ✓' : 'Save Pitch'}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="pitch-body">{pitchText}</p>
+                </div>
+              )}
+            </section>
 
-            {pipelines.length === 0 && !pickerOpen ? (
-              <p className="muted" style={{ marginTop: 8 }}>Not in any pipeline yet. Use + Add to Role to place this candidate.</p>
-            ) : (
-              pipelines.map(entry => (
-                <PipelineEntry
-                  key={entry.id}
-                  entry={entry}
-                  onAdvance={handleAdvanceStage}
-                  advancing={advancingId === entry.id}
-                  onRemove={handleRemovePipeline}
-                />
-              ))
-            )}
-          </section>
+            {/* Scores History */}
+            <section className="candidate-section">
+              <h2 className="section-heading">Scores History</h2>
+              {screenerHistory.length === 0 ? (
+                <p className="muted" style={{ marginTop: 4 }}>No screener results yet. Run the screener against a role to build history.</p>
+              ) : (
+                <div className="scores-history">
+                  {screenerHistory.map(sr => (
+                    <ScoreHistoryRow key={sr.id} sr={sr} inPipeline={pipelines.some(p => p.role_id === sr.role_id)} onDelete={handleDeleteScreenerResult} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+          </main>
+
+          {/* Right: Pipeline + Interactions */}
+          <aside className="cc-right">
+
+            {/* Pipeline */}
+            <section className="candidate-section">
+              <div className="section-heading-row">
+                <h2 className="section-heading">Pipeline</h2>
+                <button className="btn-ghost btn-sm" onClick={handleOpenPicker}>
+                  {pickerOpen ? 'Cancel' : '+ Add to Role'}
+                </button>
+              </div>
+              {pickerOpen && (
+                <div className="role-picker">
+                  {rolesLoading ? (
+                    <p className="muted" style={{ padding: '10px 0' }}>Loading roles…</p>
+                  ) : openRoles?.length === 0 ? (
+                    <p className="muted" style={{ padding: '10px 0' }}>No open roles.</p>
+                  ) : (
+                    <ul className="role-picker-list">
+                      {openRoles.map(role => {
+                        const alreadyAdded = pipelines.some(p => p.role_id === role.id)
+                        const isAdding = addingRoleId === role.id
+                        return (
+                          <li key={role.id}>
+                            <button
+                              className={`role-picker-option${alreadyAdded ? ' role-picker-option--added' : ''}`}
+                              onClick={() => !alreadyAdded && handleAddToRole(role)}
+                              disabled={alreadyAdded || !!addingRoleId}
+                            >
+                              <span className="role-picker-title">{role.title}</span>
+                              {role.clients?.name && <span className="role-picker-client">{role.clients.name}</span>}
+                              {alreadyAdded && <span className="role-picker-check">✓</span>}
+                              {isAdding && <span className="role-picker-check">…</span>}
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                  {addError && <p className="error" style={{ marginTop: 8 }}>{addError}</p>}
+                </div>
+              )}
+              {pipelines.length === 0 && !pickerOpen ? (
+                <p className="muted" style={{ marginTop: 8 }}>Not in any pipeline yet. Use + Add to Role to place this candidate.</p>
+              ) : (
+                pipelines.map(entry => (
+                  <PipelineEntry key={entry.id} entry={entry} onAdvance={handleAdvanceStage} advancing={advancingId === entry.id} onRemove={handleRemovePipeline} />
+                ))
+              )}
+            </section>
+
+            {/* Interactions */}
+            <section className="candidate-section">
+              <div className="section-heading-row">
+                <h2 className="section-heading">Interactions</h2>
+                {!logOpen && <button className="btn-ghost btn-sm" onClick={handleLogOpen}>+ Log</button>}
+              </div>
+              {logOpen && (
+                <div className="log-form">
+                  <div className="log-form-row">
+                    <select className="log-select" value={logForm.type} onChange={e => setLogForm(f => ({ ...f, type: e.target.value }))}>
+                      <option value="call">Call</option>
+                      <option value="email">Email</option>
+                      <option value="note">Note</option>
+                    </select>
+                    {logForm.type !== 'note' && (
+                      <select className="log-select" value={logForm.direction} onChange={e => setLogForm(f => ({ ...f, direction: e.target.value }))}>
+                        <option value="outbound">Outbound</option>
+                        <option value="inbound">Inbound</option>
+                      </select>
+                    )}
+                    <input type="datetime-local" className="log-date" value={logForm.occurred_at} onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))} />
+                  </div>
+                  <textarea className="log-textarea" placeholder="Notes…" rows={3} value={logForm.body} onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))} />
+                  {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
+                  <div className="log-form-actions">
+                    <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>{logSaving ? 'Saving…' : 'Save'}</button>
+                    <button className="btn-ghost btn-sm" onClick={() => setLogOpen(false)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {interactions.length === 0 ? (
+                <p className="muted" style={{ marginTop: logOpen ? 16 : 4 }}>No interactions logged yet. Use + Log to record a call, email, or note.</p>
+              ) : (
+                <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
+                  {interactions.map(i => (
+                    <InteractionEntry key={i.id} interaction={i} onDelete={handleDeleteInteraction} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+          </aside>
 
         </div>
-
-        {/* Resume Screener */}
-        <section className="candidate-section screener-section" style={{ marginTop: 24 }}>
-          <h2 className="section-heading">Resume Screener</h2>
-          <div className="screener-controls">
-            <select
-              className="field-input screener-role-select"
-              value={screenerRoleId}
-              onChange={e => {
-                setScreenerRoleId(e.target.value)
-                setScreenResult(null)
-                setScreenError(null)
-                setPitchText(null)
-                setPitchError(null)
-                setScorecard(null)
-                setScorecardError(null)
-              }}
-              disabled={!openRoles}
-            >
-              <option value="">
-                {openRoles === null ? 'Loading roles…' : 'Select a role to screen against…'}
-              </option>
-              {openRoles?.map(r => (
-                <option key={r.id} value={r.id}>
-                  {r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn-primary"
-              onClick={handleScreen}
-              disabled={!screenerRoleId || screening}
-            >
-              {screening ? 'Screening…' : 'Screen Against Role'}
-            </button>
-            {pipelines.length > 0 && (
-              <button
-                className="btn-ghost"
-                onClick={handleGeneratePitch}
-                disabled={!screenerRoleId || pitchGenerating}
-              >
-                {pitchGenerating ? 'Generating…' : 'Generate Pitch'}
-              </button>
-            )}
-          </div>
-
-          {screening && (
-            <div className="modal-generating" style={{ marginTop: 12 }}>
-              <div className="spinner spinner--sm" />
-              Screening against role…
-            </div>
-          )}
-
-          {screenError && (
-            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
-              <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">Couldn't screen this candidate. Try again.</p>
-            </div>
-          )}
-
-          {screenResult && <ScreenerResult result={screenResult} />}
-
-          {/* Full Scorecard — only when cv_text exists and candidate is in pipeline for selected role */}
-          {candidate.cv_text && screenerRoleId && pipelines.some(p => p.role_id === screenerRoleId) && (
-            <div style={{ marginTop: 16 }}>
-              <button
-                className="btn-ghost"
-                onClick={handleGenerateScorecard}
-                disabled={scorecardGenerating}
-              >
-                {scorecardGenerating ? 'Generating…' : scorecard ? 'Regenerate Scorecard' : 'Full Scorecard'}
-              </button>
-            </div>
-          )}
-
-          {scorecardGenerating && (
-            <div className="modal-generating" style={{ marginTop: 12 }}>
-              <div className="spinner spinner--sm" />
-              Building scorecard…
-            </div>
-          )}
-
-          {scorecardError && (
-            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
-              <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">Couldn't generate scorecard. Try again.</p>
-            </div>
-          )}
-
-          {scorecard && <ScorecardResult result={scorecard} />}
-
-          {pitchGenerating && (
-            <div className="modal-generating" style={{ marginTop: 12 }}>
-              <div className="spinner spinner--sm" />
-              Generating pitch…
-            </div>
-          )}
-
-          {pitchError && (
-            <div className="ai-card ai-card--error" style={{ marginTop: 16 }}>
-              <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">Couldn't generate pitch. Try again.</p>
-            </div>
-          )}
-
-          {pitchText && (
-            <div className="pitch-result" style={{ marginTop: 16 }}>
-              <div className="pitch-result-header">
-                <p className="screener-block-label">Candidate Pitch</p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn-ghost btn-sm"
-                    onClick={() => navigator.clipboard.writeText(pitchText)}
-                  >
-                    Copy
-                  </button>
-                  <button
-                    className="btn-ghost btn-sm"
-                    onClick={handleSavePitch}
-                    disabled={pitchSaving || pitchSaved}
-                  >
-                    {pitchSaving ? 'Saving…' : pitchSaved ? 'Saved ✓' : 'Save Pitch'}
-                  </button>
-                </div>
-              </div>
-              <p className="pitch-body">{pitchText}</p>
-            </div>
-          )}
-        </section>
-
-        {/* Career Timeline */}
-        <section className="candidate-section" style={{ marginTop: 24 }}>
-          <div className="section-heading-row">
-            <h2 className="section-heading">Career Timeline</h2>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {candidate.cv_text && (
-                <button
-                  className="btn-ghost btn-sm"
-                  onClick={handleParseCareer}
-                  disabled={parsingCareer}
-                >
-                  {parsingCareer ? 'Parsing…' : timeline ? 'Reparse' : 'Parse from CV'}
-                </button>
-              )}
-              {timeline && !clearCareerConfirm && (
-                <button className="btn-ghost btn-sm" onClick={() => setClearCareerConfirm(true)}>
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-          {clearCareerConfirm && (
-            <div className="inline-confirm">
-              <span>Clear career data?</span>
-              <button className="btn-confirm-yes" onClick={handleClearCareer} disabled={clearingCareer}>
-                {clearingCareer ? 'Clearing…' : 'Yes, clear'}
-              </button>
-              <button className="btn-confirm-cancel" onClick={() => setClearCareerConfirm(false)}>Cancel</button>
-            </div>
-          )}
-          {parsingCareer && (
-            <div className="modal-generating" style={{ marginTop: 8 }}>
-              <div className="spinner spinner--sm" />
-              Parsing career history…
-            </div>
-          )}
-
-          {careerError && (
-            <div className="ai-card ai-card--error" style={{ marginTop: 8 }}>
-              <p className="ai-card-eyebrow">Error</p>
-              <p className="ai-card-body">Couldn't parse career history. Try again.</p>
-            </div>
-          )}
-
-          {!candidate.cv_text && <p className="muted" style={{ marginTop: 8 }}>No CV on file. Upload a resume to enable career parsing.</p>}
-          {timeline !== null && (
-            <>
-              {(() => {
-                const summary = computeTenureSummary(timeline)
-                return summary ? <TenureSummary summary={summary} /> : null
-              })()}
-              {timeline.length === 0
-                ? <p className="muted">No career history could be extracted.</p>
-                : timeline.map((entry, i) => <CareerEntry key={i} entry={entry} />)
-              }
-            </>
-          )}
-        </section>
-
-        {/* Scores History — sourced from screener_results, not pipeline */}
-        <section className="candidate-section" style={{ marginTop: 24 }}>
-          <h2 className="section-heading">Scores History</h2>
-          {screenerHistory.length === 0 ? (
-            <p className="muted" style={{ marginTop: 4 }}>No screener results yet. Run the screener against a role to build history.</p>
-          ) : (
-            <div className="scores-history">
-              {screenerHistory.map(sr => (
-                <ScoreHistoryRow
-                  key={sr.id}
-                  sr={sr}
-                  inPipeline={pipelines.some(p => p.role_id === sr.role_id)}
-                  onDelete={handleDeleteScreenerResult}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Interaction history */}
-        <section className="candidate-section" style={{ marginTop: 24 }}>
-          <div className="section-heading-row">
-            <h2 className="section-heading">Interactions</h2>
-            {!logOpen && (
-              <button className="btn-ghost btn-sm" onClick={handleLogOpen}>+ Log</button>
-            )}
-          </div>
-
-          {logOpen && (
-            <div className="log-form">
-              <div className="log-form-row">
-                <select
-                  className="log-select"
-                  value={logForm.type}
-                  onChange={e => setLogForm(f => ({ ...f, type: e.target.value }))}
-                >
-                  <option value="call">Call</option>
-                  <option value="email">Email</option>
-                  <option value="note">Note</option>
-                </select>
-                {logForm.type !== 'note' && (
-                  <select
-                    className="log-select"
-                    value={logForm.direction}
-                    onChange={e => setLogForm(f => ({ ...f, direction: e.target.value }))}
-                  >
-                    <option value="outbound">Outbound</option>
-                    <option value="inbound">Inbound</option>
-                  </select>
-                )}
-                <input
-                  type="datetime-local"
-                  className="log-date"
-                  value={logForm.occurred_at}
-                  onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))}
-                />
-              </div>
-              <textarea
-                className="log-textarea"
-                placeholder="Notes…"
-                rows={3}
-                value={logForm.body}
-                onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))}
-              />
-              {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
-              <div className="log-form-actions">
-                <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>
-                  {logSaving ? 'Saving…' : 'Save'}
-                </button>
-                <button className="btn-ghost btn-sm" onClick={() => setLogOpen(false)}>Cancel</button>
-              </div>
-            </div>
-          )}
-
-          {interactions.length === 0 ? (
-            <p className="muted" style={{ marginTop: logOpen ? 16 : 4 }}>No interactions logged yet. Use + Log to record a call, email, or note.</p>
-          ) : (
-            <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
-              {interactions.map(i => (
-                <InteractionEntry key={i.id} interaction={i} onDelete={handleDeleteInteraction} />
-              ))}
-            </div>
-          )}
-        </section>
 
       {/* LinkedIn message modal */}
       {linkedinModal.open && (

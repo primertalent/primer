@@ -4942,3 +4942,118 @@ select.field-input {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+
+/* ── Candidate Card 3-column layout ─────────────────────── */
+
+.cc-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  gap: 24px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.cc-left,
+.cc-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cc-middle {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Identity card */
+.cc-identity {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Score block inside identity card */
+.cc-identity-scores {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.cc-score-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cc-score-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.cc-score-value.cc-score--green { color: var(--color-signal-green); }
+.cc-score-value.cc-score--amber { color: var(--color-signal-amber); }
+.cc-score-value.cc-score--red   { color: var(--color-signal-red); }
+
+.cc-score-label {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Next Action block — dominant surface in middle column */
+.cc-next-action {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-sage);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+
+.cc-next-action-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-sage);
+  margin-bottom: 6px;
+}
+
+.cc-next-action-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  margin-bottom: 10px;
+}
+
+.cc-next-action-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* Responsive: stack to single column on narrow screens */
+@media (max-width: 900px) {
+  .cc-layout {
+    grid-template-columns: 1fr;
+  }
+  .cc-left {
+    order: 2;
+  }
+  .cc-middle {
+    order: 1;
+  }
+  .cc-right {
+    order: 3;
+  }
+}
