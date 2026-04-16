@@ -304,11 +304,11 @@ These apply to every future build decision.
 
 ### Next build priorities
 
-**Priority 1 — Brief Needs Attention quality.**
-Already built. Audit against the behavioral spec. Should answer: who is at risk, who is hot, what is stalled, what is unscreened, drafts waiting. Every item a direct link. No scrolling.
+**Priority 1 — Real-use audit.**
+Session 15 shipped a full UI pass. Put it through a real work day. What still feels slow? What's missing? What's in the way? The next session should start with Ryan's friction notes from actual use, not theory.
 
-**Priority 2 — Queue as end-of-day close.**
-The Queue should feel like a clean close. Review, approve, copy, done. Audit it against the 4:30pm workflow step.
+**Priority 2 — Time-elapsed triggers.**
+The event-based triggers (pipeline add, stage advance, role create) are proven. The next agent layer is time-elapsed: 5 days no contact → Brief surfaces it. Submission sitting 48 hours → queue flags it. Requires a scheduled job layer (Supabase Edge Functions or a cron). Don't build until real-use audit confirms the event triggers are solid.
 
 ---
 
@@ -353,6 +353,7 @@ _Completed session 6:_ Full product polish pass.
 - **Document block pattern for multi-input AI calls.** Multiple inputs wrapped as labeled `<document>` blocks with type and name attributes. Standard for all future multi-input features.
 - **Classify call is intentionally minimal.** 100 token max, 2000 char input slice. Speed over completeness. Never block the UI waiting on classification.
 - **Role matching is semantic, not string.** The intake prompt receives all existing open roles before firing. The model matches by meaning. "GTM" = "Go-to-market", "VP Sales" = "Head of Sales". A `role_id` in the intake result means a match was found — use it directly, skip all lookups and inserts. Only create a new role when `role_id` is null.
+- **Single column beats multi-column for dense content.** The candidate card tried a 3-column grid. It broke on real content — text overflowed, columns fought each other. Replaced with sticky context bar (name, scores, next action always visible) + single column scroll. Rule: if content length is unpredictable, don't put it in a fixed-width column.
 - **Time-elapsed triggers are a separate architecture pattern.** Event-based triggers (pipeline add, stage advance, role create) fire synchronously off user actions and require no infra beyond what's already in place. Time-elapsed triggers (5 days no contact, submission sitting 48 hours) require scheduled jobs — a cron layer, a background worker, or Supabase Edge Functions on a timer. Do not build time-elapsed triggers until the event-based triggers are proven in real use.
 
 ---
