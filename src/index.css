@@ -5083,6 +5083,97 @@ select.field-input {
   }
 }
 
+/* ── Candidate card — sticky bar + single column ────────── */
+
+.cc-sticky-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 10;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding: 10px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.cc-sticky-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.cc-sticky-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-sticky-meta {
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-sticky-scores {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cc-sticky-score {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.cc-sticky-score--green    { color: var(--color-signal-green); }
+.cc-sticky-score--amber    { color: var(--color-signal-amber); }
+.cc-sticky-score--red      { color: var(--color-signal-red); }
+.cc-sticky-score--recruiter { color: var(--color-text); }
+
+.cc-sticky-next-action {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+
+.cc-sticky-next-action-text {
+  font-size: 12px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.cc-sticky-next-action-empty {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.cc-body {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Kanban card — signal + next action ─────────────────── */
 
 .kcard-next-action {
