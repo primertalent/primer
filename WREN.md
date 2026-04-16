@@ -1,5 +1,5 @@
 # WREN — Master Context Document
-> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 13).
+> Read this at the start of every Claude Code session. Keep it current. Last updated: 2026-04-15 (session 14).
 
 ---
 
@@ -143,6 +143,7 @@ Wren is channel-agnostic. It drafts. The recruiter delivers.
 - **Auto-screen on pipeline add** — when a candidate is added to a role from CandidateCard, screener fires automatically in the background. Saves to `screener_results`, writes `fit_score` and `fit_score_rationale` to the pipeline entry. Silent skip if candidate has no `cv_text` or role has no JD. No UI block.
 - **Auto-regenerate next action on stage advance** — when a stage advance succeeds in CandidateCard, next action prompt fires in the background with updated pipeline context. Saves to `candidates.enrichment_data.next_action`, updates card state live. Silent skip on any failure. Brief reflects updated action by next load.
 - **Auto-generate search strings on role create** — fires in background after role save in CreateRole, before redirect. Silent skip if no JD text. Strings ready in RoleDetail when recruiter arrives.
+- **Semantic role matching in WrenCommand intake** — before intake fires, all open roles are fetched and injected into the system prompt. Model matches by meaning: "GTM lead" resolves to "Go-to-market lead", abbreviations and alternate titles all resolve correctly. Returns `role_id` in the intake result. Save All uses it directly, skips DB lookup and insert. Falls back to ilike match then create only if `role_id` is null. Confirmed in real use.
 
 ---
 
@@ -304,6 +305,8 @@ The Queue should feel like a clean close. Review, approve, copy, done. Audit it 
 
 ---
 
+_Completed session 14:_ Semantic role matching in WrenCommand intake — roles fetched before intake fires, model matches by meaning not string, confirmed in real use. Bug: "GTM lead" was creating a new role instead of matching "Go-to-market lead at Inworld".
+
 _Completed session 13:_ Three event-based triggers: auto-screen on pipeline add, auto-regenerate next action on stage advance, silent skip guard on auto search string generation.
 
 _Completed session 12:_ Product reframe — Wren is an agent with a platform, not an OS. Agent/platform framing, skill layer documentation, channel philosophy, brain/button distinction. Paraform renamed to client submission everywhere.
@@ -340,6 +343,7 @@ _Completed session 6:_ Full product polish pass.
 - **No LinkedIn API.** Too locked down. Draft in Wren, copy to send. Chrome extension is the v2 play.
 - **Document block pattern for multi-input AI calls.** Multiple inputs wrapped as labeled `<document>` blocks with type and name attributes. Standard for all future multi-input features.
 - **Classify call is intentionally minimal.** 100 token max, 2000 char input slice. Speed over completeness. Never block the UI waiting on classification.
+- **Role matching is semantic, not string.** The intake prompt receives all existing open roles before firing. The model matches by meaning. "GTM" = "Go-to-market", "VP Sales" = "Head of Sales". A `role_id` in the intake result means a match was found — use it directly, skip all lookups and inserts. Only create a new role when `role_id` is null.
 - **Time-elapsed triggers are a separate architecture pattern.** Event-based triggers (pipeline add, stage advance, role create) fire synchronously off user actions and require no infra beyond what's already in place. Time-elapsed triggers (5 days no contact, submission sitting 48 hours) require scheduled jobs — a cron layer, a background worker, or Supabase Edge Functions on a timer. Do not build time-elapsed triggers until the event-based triggers are proven in real use.
 
 ---
