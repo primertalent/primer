@@ -5,7 +5,7 @@
 }
 
 :root {
-  --color-bg: #fafafa;
+  --color-bg: #f7f5f0;
   --color-surface: #ffffff;
   --color-border: #e4e4e7;
   --color-text: #18181b;
@@ -15,6 +15,11 @@
   --color-primary: #18181b;
   --color-error: #dc2626;
   --color-error-bg: #fef2f2;
+  --color-sage: #5c7a5c;
+
+  --color-signal-green: #16a34a;
+  --color-signal-amber: #d97706;
+  --color-signal-red:   #dc2626;
 
   --radius: 8px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -365,73 +370,95 @@ body {
   flex-direction: column;
 }
 
-.today-action-row {
-  display: grid;
-  grid-template-columns: 16px 1fr auto auto auto;
+/* ── Attention cards ─────────────────────────────────────── */
+
+.attention-card {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 20px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 20px 11px 17px;
   border-top: 1px solid var(--color-border);
-  text-decoration: none;
-  color: var(--color-text);
+  border-left: 3px solid transparent;
   transition: background 0.1s;
 }
 
-.today-action-row:hover {
-  background: var(--color-bg);
+.attention-card:hover {
+  background: rgba(0,0,0,0.02);
 }
 
-.today-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+.attention-card--overdue    { border-left-color: var(--color-signal-red); }
+.attention-card--today      { border-left-color: var(--color-signal-amber); }
+.attention-card--queue      { border-left-color: var(--color-sage); }
+.attention-card--unscreened { border-left-color: #a1a1aa; }
+.attention-card--unscheduled{ border-left-color: #d4d4d8; }
+
+.attention-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.attention-card-icon {
+  font-size: 13px;
   flex-shrink: 0;
+  margin-top: 1px;
+  line-height: 1;
 }
 
-.today-dot--overdue     { background: #dc2626; }
-.today-dot--today       { background: #f59e0b; }
-.today-dot--queue       { background: var(--color-primary); }
-.today-dot--unscheduled { background: var(--color-border); }
+.attention-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 
-.today-action-name {
-  font-size: 14px;
+.attention-insight {
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.attention-card--overdue  .attention-insight { color: var(--color-signal-red); }
+.attention-card--today    .attention-insight { color: var(--color-signal-amber); }
+
+.attention-who {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.today-action-meta {
-  font-size: 12px;
-  color: var(--color-muted);
-  white-space: nowrap;
-}
-
-.today-action-label {
+.attention-action {
+  flex-shrink: 0;
   font-size: 12px;
   font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
   white-space: nowrap;
+  background: var(--color-surface);
+  transition: border-color 0.1s, background 0.1s;
 }
 
-.today-action-row--overdue     .today-action-label { color: #dc2626; }
-.today-action-row--today       .today-action-label { color: #d97706; }
-.today-action-row--queue       .today-action-label { color: var(--color-primary); }
-.today-action-row--unscheduled .today-action-label { color: var(--color-muted); }
-
-.today-action-arrow {
-  font-size: 12px;
-  color: var(--color-muted);
-  white-space: nowrap;
+.attention-action:hover {
+  border-color: #a1a1aa;
+  background: var(--color-bg);
 }
 
 @media (max-width: 600px) {
-  .today-action-row {
-    grid-template-columns: 16px 1fr auto;
+  .attention-card {
     gap: 8px;
   }
-  .today-action-meta,
-  .today-action-label {
+  .attention-who {
     display: none;
   }
 }
@@ -2420,6 +2447,16 @@ select.field-input {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pipeline-candidate-card:hover .pipeline-candidate-actions {
+  opacity: 1;
+}
+
+@media (max-width: 600px) {
+  .pipeline-candidate-actions { opacity: 1; }
 }
 
 .btn-advance-stage,
@@ -4861,7 +4898,47 @@ select.field-input {
   white-space: nowrap;
 }
 
-/* ── Unscreened variant for Needs Attention ─────────────── */
+/* ── Kanban card score row ───────────────────────────────── */
 
-.today-dot--unscreened { background: #a1a1aa; }
-.today-action-row--unscreened .today-action-label { color: var(--color-muted); }
+.kcard-scores {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.kcard-score {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.kcard-score-label {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.kcard-score-divider {
+  font-size: 11px;
+  color: var(--color-border);
+}
+
+.kcard-score--green { color: var(--color-signal-green); }
+.kcard-score--amber { color: var(--color-signal-amber); }
+.kcard-score--red   { color: var(--color-signal-red); }
+.kcard-score--recruiter { color: var(--color-text); }
+
+.kcard-signal {
+  display: block;
+  font-size: 11px;
+  color: var(--color-muted);
+  font-style: italic;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

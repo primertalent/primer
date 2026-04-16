@@ -99,15 +99,28 @@ function ActivityDigest({ recruiter }) {
 
 // ── Needs Attention ───────────────────────────────────────
 
-function ActionRow({ candidateId, name, stage, roleTitle, variant, label }) {
+const ATTENTION_ICONS = {
+  overdue:     '⚠️',
+  today:       '⏰',
+  unscreened:  '🟡',
+  unscheduled: '💤',
+  queue:       '📋',
+}
+
+function AttentionCard({ variant, insight, name, role, href, actionLabel }) {
   return (
-    <Link to={`/candidates/${candidateId}`} className={`today-action-row today-action-row--${variant}`}>
-      <span className={`today-dot today-dot--${variant}`} />
-      <span className="today-action-name">{name}</span>
-      <span className="today-action-meta">{stage}{roleTitle ? ` · ${roleTitle}` : ''}</span>
-      <span className="today-action-label">{label}</span>
-      <span className="today-action-arrow">View →</span>
-    </Link>
+    <div className={`attention-card attention-card--${variant}`}>
+      <div className="attention-card-body">
+        <span className="attention-card-icon">{ATTENTION_ICONS[variant]}</span>
+        <div className="attention-card-content">
+          <p className="attention-insight">{insight}</p>
+          {(name || role) && (
+            <p className="attention-who">{[name, role].filter(Boolean).join(' · ')}</p>
+          )}
+        </div>
+      </div>
+      <Link to={href} className="attention-action">{actionLabel}</Link>
+    </div>
   )
 }
 
@@ -220,61 +233,64 @@ function NeedsAttention({ recruiter }) {
         </p>
       ) : (
         <div className="today-actions-list">
-          {items.overdue.map(p => (
-            <ActionRow
-              key={p.id}
-              candidateId={p.candidates.id}
-              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              stage={p.current_stage}
-              roleTitle={p.roles?.title}
-              variant="overdue"
-              label={`${daysSince(p.next_action_due_at)}d overdue`}
-            />
-          ))}
+          {items.overdue.map(p => {
+            const n = daysSince(p.next_action_due_at)
+            return (
+              <AttentionCard
+                key={p.id}
+                variant="overdue"
+                insight={`Action overdue ${n} day${n !== 1 ? 's' : ''}`}
+                name={`${p.candidates.first_name} ${p.candidates.last_name}`}
+                role={p.roles?.title}
+                href={`/candidates/${p.candidates.id}`}
+                actionLabel="View"
+              />
+            )
+          })}
           {items.dueToday.map(p => (
-            <ActionRow
+            <AttentionCard
               key={p.id}
-              candidateId={p.candidates.id}
-              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              stage={p.current_stage}
-              roleTitle={p.roles?.title}
               variant="today"
-              label="due today"
+              insight="Follow up due today"
+              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
+              role={p.roles?.title}
+              href={`/candidates/${p.candidates.id}`}
+              actionLabel="View"
             />
           ))}
           {items.draftedCount > 0 && (
-            <Link to="/queue" className="today-action-row today-action-row--queue">
-              <span className="today-dot today-dot--queue" />
-              <span className="today-action-name">
-                {items.draftedCount} submission {items.draftedCount !== 1 ? 'drafts' : 'draft'} waiting for review
-              </span>
-              <span className="today-action-meta" />
-              <span className="today-action-label">queue</span>
-              <span className="today-action-arrow">Review →</span>
-            </Link>
+            <AttentionCard
+              variant="queue"
+              insight={`${items.draftedCount} submission ${items.draftedCount !== 1 ? 'drafts' : 'draft'} ready to review`}
+              href="/queue"
+              actionLabel="Review"
+            />
           )}
           {uniqueUnscreened.map(p => (
-            <ActionRow
+            <AttentionCard
               key={p.id + '-unscreened'}
-              candidateId={p.candidates.id}
-              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              stage={p.current_stage}
-              roleTitle={p.roles?.title}
               variant="unscreened"
-              label="no score"
-            />
-          ))}
-          {items.unscheduled.map(p => (
-            <ActionRow
-              key={p.id}
-              candidateId={p.candidates.id}
+              insight="No fit score yet"
               name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              stage={p.current_stage}
-              roleTitle={p.roles?.title}
-              variant="unscheduled"
-              label={`${daysSince(p.created_at)}d, no action set`}
+              role={p.roles?.title}
+              href={`/candidates/${p.candidates.id}`}
+              actionLabel="View"
             />
           ))}
+          {items.unscheduled.map(p => {
+            const n = daysSince(p.created_at)
+            return (
+              <AttentionCard
+                key={p.id}
+                variant="unscheduled"
+                insight={`${n} day${n !== 1 ? 's' : ''} in pipeline, no action set`}
+                name={`${p.candidates.first_name} ${p.candidates.last_name}`}
+                role={p.roles?.title}
+                href={`/candidates/${p.candidates.id}`}
+                actionLabel="View"
+              />
+            )
+          })}
         </div>
       )}
     </section>

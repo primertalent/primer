@@ -42,6 +42,13 @@ function formatComp(min, max, type) {
 
 // ── Sub-components ────────────────────────────────────────
 
+function fitScoreClass(score) {
+  if (score == null) return ''
+  if (score >= 70) return 'kcard-score--green'
+  if (score >= 40) return 'kcard-score--amber'
+  return 'kcard-score--red'
+}
+
 function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRemove, advancing }) {
   const uClass = urgencyClass(entry.next_action_due_at)
   const [confirmRemove, setConfirmRemove] = useState(false)
@@ -60,6 +67,8 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
     }
   }
 
+  const hasScores = entry.fit_score != null || entry.recruiter_score != null
+
   return (
     <div className="pipeline-candidate-card">
       <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-info">
@@ -69,15 +78,25 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
         {entry.candidates.current_title && (
           <span className="pipeline-candidate-title">{entry.candidates.current_title}</span>
         )}
-        {entry.fit_score != null && (
-          <span className="pipeline-candidate-fit">
-            {Math.round(entry.fit_score)}<span className="fit-denom">/100</span>
-          </span>
+        {hasScores && (
+          <div className="kcard-scores">
+            {entry.fit_score != null && (
+              <span className={`kcard-score ${fitScoreClass(entry.fit_score)}`}>
+                <span className="kcard-score-label">AI </span>{Math.round(entry.fit_score)}
+              </span>
+            )}
+            {entry.fit_score != null && entry.recruiter_score != null && (
+              <span className="kcard-score-divider">·</span>
+            )}
+            {entry.recruiter_score != null && (
+              <span className="kcard-score kcard-score--recruiter">
+                <span className="kcard-score-label">You </span>{entry.recruiter_score}
+              </span>
+            )}
+          </div>
         )}
-        {entry.recruiter_score != null && (
-          <span className="recruiter-score-badge recruiter-score-badge--sm" title="Your score">
-            {entry.recruiter_score}/10
-          </span>
+        {entry.recruiter_note && (
+          <span className="kcard-signal">"{entry.recruiter_note}"</span>
         )}
         {entry.next_action_due_at && (
           <span className="due-date">
