@@ -85,7 +85,11 @@ function ActivityDigest({ recruiter }) {
     <section className="digest-card">
       <p className="digest-eyebrow">Since yesterday</p>
       {loading ? (
-        <div className="digest-loading"><div className="spinner spinner--sm" /></div>
+        <div className="digest-skeleton">
+          <div className="skeleton skeleton-line" style={{ width: '60%' }} />
+          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '45%' }} />
+          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '52%' }} />
+        </div>
       ) : lines.length === 0 ? (
         <p className="digest-empty">No activity since yesterday.</p>
       ) : (
@@ -107,19 +111,24 @@ const ATTENTION_ICONS = {
   queue:       '📋',
 }
 
-function AttentionCard({ variant, insight, name, role, href, actionLabel }) {
+function AttentionCard({ variant, signal, name, role, primaryLabel, primaryHref, secondaryLabel, secondaryHref }) {
   return (
     <div className={`attention-card attention-card--${variant}`}>
       <div className="attention-card-body">
         <span className="attention-card-icon">{ATTENTION_ICONS[variant]}</span>
         <div className="attention-card-content">
-          <p className="attention-insight">{insight}</p>
           {(name || role) && (
-            <p className="attention-who">{[name, role].filter(Boolean).join(' · ')}</p>
+            <p className="attention-name">{[name, role].filter(Boolean).join(' · ')}</p>
           )}
+          <p className="attention-signal">{signal}</p>
         </div>
       </div>
-      <Link to={href} className="attention-action">{actionLabel}</Link>
+      <div className="attention-card-actions">
+        <Link to={primaryHref} className="attention-action attention-action--primary">{primaryLabel}</Link>
+        {secondaryHref && (
+          <Link to={secondaryHref} className="attention-action">{secondaryLabel ?? 'View'}</Link>
+        )}
+      </div>
     </div>
   )
 }
@@ -221,8 +230,19 @@ function NeedsAttention({ recruiter }) {
       </div>
 
       {loading ? (
-        <div className="today-actions-loading">
-          <div className="spinner spinner--sm" />
+        <div className="today-actions-skeleton">
+          <div className="skeleton-attention-row">
+            <div className="skeleton skeleton-line" style={{ width: '55%' }} />
+            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '30%' }} />
+          </div>
+          <div className="skeleton-attention-row">
+            <div className="skeleton skeleton-line" style={{ width: '70%' }} />
+            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '28%' }} />
+          </div>
+          <div className="skeleton-attention-row">
+            <div className="skeleton skeleton-line" style={{ width: '48%' }} />
+            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '32%' }} />
+          </div>
         </div>
       ) : isEmpty ? (
         <p className="today-actions-empty">
@@ -239,11 +259,13 @@ function NeedsAttention({ recruiter }) {
               <AttentionCard
                 key={p.id}
                 variant="overdue"
-                insight={`Action overdue ${n} day${n !== 1 ? 's' : ''}`}
+                signal={`Overdue ${n} day${n !== 1 ? 's' : ''}`}
                 name={`${p.candidates.first_name} ${p.candidates.last_name}`}
                 role={p.roles?.title}
-                href={`/candidates/${p.candidates.id}`}
-                actionLabel="View"
+                primaryLabel="Draft Follow-Up"
+                primaryHref={`/candidates/${p.candidates.id}`}
+                secondaryLabel="View"
+                secondaryHref={`/candidates/${p.candidates.id}`}
               />
             )
           })}
@@ -251,30 +273,34 @@ function NeedsAttention({ recruiter }) {
             <AttentionCard
               key={p.id}
               variant="today"
-              insight="Follow up due today"
+              signal="Follow-up due today"
               name={`${p.candidates.first_name} ${p.candidates.last_name}`}
               role={p.roles?.title}
-              href={`/candidates/${p.candidates.id}`}
-              actionLabel="View"
+              primaryLabel="Draft Follow-Up"
+              primaryHref={`/candidates/${p.candidates.id}`}
+              secondaryLabel="View"
+              secondaryHref={`/candidates/${p.candidates.id}`}
             />
           ))}
           {items.draftedCount > 0 && (
             <AttentionCard
               variant="queue"
-              insight={`${items.draftedCount} submission ${items.draftedCount !== 1 ? 'drafts' : 'draft'} ready to review`}
-              href="/queue"
-              actionLabel="Review"
+              signal={`${items.draftedCount} submission ${items.draftedCount !== 1 ? 'drafts' : 'draft'} ready`}
+              primaryLabel="Review Queue"
+              primaryHref="/queue"
             />
           )}
           {uniqueUnscreened.map(p => (
             <AttentionCard
               key={p.id + '-unscreened'}
               variant="unscreened"
-              insight="No fit score yet"
+              signal="Not screened yet"
               name={`${p.candidates.first_name} ${p.candidates.last_name}`}
               role={p.roles?.title}
-              href={`/candidates/${p.candidates.id}`}
-              actionLabel="View"
+              primaryLabel="Run Screener"
+              primaryHref={`/candidates/${p.candidates.id}`}
+              secondaryLabel="View"
+              secondaryHref={`/candidates/${p.candidates.id}`}
             />
           ))}
           {items.unscheduled.map(p => {
@@ -283,11 +309,13 @@ function NeedsAttention({ recruiter }) {
               <AttentionCard
                 key={p.id}
                 variant="unscheduled"
-                insight={`${n} day${n !== 1 ? 's' : ''} in pipeline, no action set`}
+                signal={`${n} day${n !== 1 ? 's' : ''} with no next action`}
                 name={`${p.candidates.first_name} ${p.candidates.last_name}`}
                 role={p.roles?.title}
-                href={`/candidates/${p.candidates.id}`}
-                actionLabel="View"
+                primaryLabel="Set Action"
+                primaryHref={`/candidates/${p.candidates.id}`}
+                secondaryLabel="View"
+                secondaryHref={`/candidates/${p.candidates.id}`}
               />
             )
           })}
@@ -343,7 +371,11 @@ function TodayPipeline({ recruiter }) {
     <section className="today-pipeline-card">
       <p className="today-pipeline-eyebrow">Active Roles</p>
       {loading ? (
-        <div className="today-pipeline-loading"><div className="spinner spinner--sm" /></div>
+        <div className="today-pipeline-skeleton">
+          <div className="skeleton skeleton-line" style={{ width: '65%' }} />
+          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '40%' }} />
+          <div className="skeleton skeleton-line" style={{ width: '72%' }} />
+        </div>
       ) : !roles?.length ? (
         <p className="today-pipeline-empty">
           No active pipeline.{' '}

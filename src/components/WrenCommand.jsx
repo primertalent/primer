@@ -216,15 +216,17 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
     }
   }
 
-  const hasSignals     = c?.signals && Object.entries(c.signals).some(([k, v]) => k !== 'red_flags' ? !!v : v?.length > 0)
   const hasBullets     = pitch?.bullets?.length > 0
   const hasNextActions = next_actions?.length > 0
+  const concerns       = c?.signals?.red_flags ?? []
 
   return (
     <div className="intake-result">
-      <div className="intake-header">
-        <div className="intake-header-left">
-          <div className="intake-candidate-name">
+
+      {/* Hero: name + score */}
+      <div className="intake-hero">
+        <div className="intake-hero-left">
+          <p className="intake-hero-name">
             {c?.name || 'Unknown Candidate'}
             {saved && savedCandidateId && (
               <span className="intake-saved-links">
@@ -232,97 +234,73 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
                 <Link to={`/candidates/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
               </span>
             )}
-          </div>
+          </p>
           {(c?.current_title || c?.current_company) && (
-            <div className="intake-candidate-meta">
-              {[c.current_title, c.current_company].filter(Boolean).join(' · ')}
-            </div>
+            <p className="intake-hero-meta">{[c.current_title, c.current_company].filter(Boolean).join(' · ')}</p>
           )}
           {r?.title && (
-            <div className="intake-role-line">
-              {r.title}{r.company ? ` @ ${r.company}` : ''}
-            </div>
+            <p className="intake-hero-role">{r.title}{r.company ? ` · ${r.company}` : ''}</p>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <button className="btn-ghost btn-sm" onClick={onClear} title="Dismiss result">✕ Clear</button>
+        <div className="intake-hero-right">
           {s?.score > 0 && (
-            <div className="intake-score">
-              <span className="intake-score-value">{s.score}<span className="intake-score-denom">/10</span></span>
-              {s.score_label && <span className="intake-score-label">{s.score_label}</span>}
+            <div className="intake-hero-score">
+              <span className="intake-hero-score-value">{s.score}</span>
+              <span className="intake-hero-score-denom">/10</span>
             </div>
           )}
+          <button className="btn-ghost btn-sm" onClick={onClear}>✕</button>
         </div>
       </div>
 
-      {hasSignals && (
-        <div className="intake-section">
-          <p className="intake-eyebrow">Call Signals</p>
-          <div className="intake-signals">
-            <SignalRow label="Motivation" value={c.signals.motivation} />
-            <SignalRow label="Relocation" value={c.signals.relocation} />
-            <SignalRow label="Comp"       value={c.signals.comp_expectations} />
-            <SignalRow label="Timeline"   value={c.signals.timeline} />
-            {(c.signals.red_flags || []).map((flag, i) => (
-              <SignalRow key={i} label="Flag" value={flag} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {pitch?.one_liner && (
-        <div className="intake-section">
-          <p className="intake-eyebrow">Pitch</p>
-          <p className="intake-pitch">{pitch.one_liner}</p>
-        </div>
-      )}
-
+      {/* Strengths */}
       {hasBullets && (
-        <div className="intake-section">
-          <p className="intake-eyebrow">Submission Bullets</p>
-          <ul className="intake-bullets">
-            {pitch.bullets.map((b, i) => <li key={i}>{b}</li>)}
+        <div className="intake-packet-row">
+          <p className="intake-packet-label">Strengths</p>
+          <ul className="intake-packet-list intake-packet-list--strengths">
+            {pitch.bullets.slice(0, 3).map((b, i) => <li key={i}>{b}</li>)}
           </ul>
         </div>
       )}
 
+      {/* Concerns */}
+      {concerns.length > 0 && (
+        <div className="intake-packet-row">
+          <p className="intake-packet-label intake-packet-label--concern">Concerns</p>
+          <ul className="intake-packet-list intake-packet-list--concerns">
+            {concerns.slice(0, 2).map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Next action — prominent */}
       {hasNextActions && (
-        <div className="intake-section">
-          <p className="intake-eyebrow">Next Actions</p>
-          <ul className="intake-next-actions">
-            {next_actions.map((a, i) => <li key={i}>{a}</li>)}
-          </ul>
+        <div className="intake-next-action-block">
+          <p className="intake-next-action-label">Next Action</p>
+          <p className="intake-next-action-text">{next_actions[0]}</p>
         </div>
       )}
 
+      {/* Freeform answer */}
       {freeform_answer && (
-        <div className="intake-section">
-          <p className="intake-eyebrow">Answer</p>
+        <div className="intake-packet-row">
+          <p className="intake-packet-label">Answer</p>
           <p className="intake-freeform">{freeform_answer}</p>
         </div>
       )}
 
       <div className="intake-actions">
-        {pitch?.one_liner && (
-          <button className="btn-ghost" onClick={() => handleCopy('pitch')}>
-            {copied === 'pitch' ? 'Copied ✓' : 'Copy Pitch'}
-          </button>
-        )}
-        {hasBullets && (
-          <button className="btn-ghost" onClick={() => handleCopy('bullets')}>
-            {copied === 'bullets' ? 'Copied ✓' : 'Copy Bullets'}
-          </button>
-        )}
         <div className="intake-actions-right">
           {saveError && <span className="intake-save-error">Couldn't save. Try again.</span>}
           {saved ? (
-            <span className="saved-label">Saved ✓</span>
+            <>
+              <span className="saved-label">Saved ✓</span>
+              {savedCandidateId && (
+                <Link to={`/candidates/${savedCandidateId}`} className="btn-ghost btn-sm">View Candidate →</Link>
+              )}
+            </>
           ) : (
-            <button
-              className="btn-primary"
-              onClick={handleSaveAll}
-              disabled={saving}
-            >
+            <button className="btn-primary" onClick={handleSaveAll} disabled={saving}>
               {saving ? 'Saving…' : 'Save All'}
             </button>
           )}
