@@ -1,4 +1,4 @@
-export const INTAKE_SYSTEM_PROMPT = `You are Wren, an AI recruiting OS. You receive raw, dirty input from a recruiter.
+const INTAKE_SYSTEM_PROMPT_BASE = `You are Wren, an AI recruiting OS. You receive raw, dirty input from a recruiter.
 Your job is to extract everything useful and return structured JSON.
 
 Detect what's in the input and return this exact structure:
@@ -21,6 +21,7 @@ Detect what's in the input and return this exact structure:
     }
   },
   "role": {
+    "role_id": null,
     "title": "",
     "company": "",
     "location": "",
@@ -61,9 +62,27 @@ Writing rules for all text fields (one_liner, bullets, next_actions, freeform_an
 - No: "Additionally", "Furthermore", "leveraged", "spearheaded", "proven track record", "passionate"
 - Write like a recruiter talking to a colleague. Direct, specific, human. Not AI-sounding.`
 
-export function buildIntakeMessages(input) {
+function buildRoleMatchingBlock(existingRoles) {
+  const list = existingRoles
+    .map(r => `- id: ${r.id} | title: ${r.title} | client: ${r.clients?.name ?? 'Unknown'}`)
+    .join('\n')
+  return `
+EXISTING ROLES IN DATABASE:
+${list}
+
+Role matching rules:
+- If the recruiter references a role by name, match it to the closest entry above by meaning, not exact string.
+- Abbreviations and alternate titles are the same role: "GTM" = "Go-to-market", "VP Sales" = "Head of Sales", "SWE" = "Software Engineer", "PM" = "Product Manager".
+- If a reasonable match exists, set role.role_id to that role's id. Set role.title and role.company to match the existing record.
+- Only set role.role_id to null if nothing in the list is a reasonable match.`
+}
+
+export function buildIntakeMessages(input, existingRoles = []) {
+  const system = existingRoles.length > 0
+    ? INTAKE_SYSTEM_PROMPT_BASE + buildRoleMatchingBlock(existingRoles)
+    : INTAKE_SYSTEM_PROMPT_BASE
   return {
-    system: INTAKE_SYSTEM_PROMPT,
+    system,
     messages: [{ role: 'user', content: input }],
     maxTokens: 4096,
   }

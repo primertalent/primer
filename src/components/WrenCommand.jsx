@@ -151,28 +151,32 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
         }
 
         let roleId
-        const { data: existingRole } = await supabase
-          .from('roles').select('id')
-          .eq('recruiter_id', recruiter.id).eq('client_id', clientId).ilike('title', r.title)
-          .maybeSingle()
-
-        if (existingRole) {
-          roleId = existingRole.id
+        if (r.role_id) {
+          roleId = r.role_id
         } else {
-          const jdText = jdChips[0]?.content ?? null
-          const { data, error } = await supabase
-            .from('roles')
-            .insert({
-              recruiter_id: recruiter.id,
-              client_id: clientId,
-              title: r.title,
-              status: 'open',
-              process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
-              ...(jdText && { notes: jdText }),
-            })
-            .select('id').single()
-          if (error) throw error
-          roleId = data.id
+          const { data: existingRole } = await supabase
+            .from('roles').select('id')
+            .eq('recruiter_id', recruiter.id).eq('client_id', clientId).ilike('title', r.title)
+            .maybeSingle()
+
+          if (existingRole) {
+            roleId = existingRole.id
+          } else {
+            const jdText = jdChips[0]?.content ?? null
+            const { data, error } = await supabase
+              .from('roles')
+              .insert({
+                recruiter_id: recruiter.id,
+                client_id: clientId,
+                title: r.title,
+                status: 'open',
+                process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+                ...(jdText && { notes: jdText }),
+              })
+              .select('id').single()
+            if (error) throw error
+            roleId = data.id
+          }
         }
 
         const fitScore = s?.score ? Math.min(100, Math.round(s.score * 10)) : null
@@ -921,7 +925,14 @@ export default function WrenCommand() {
         if (!parsed) throw new Error('No valid JSON in response')
         setMultiResult(parsed)
       } else {
-        const { system, messages, maxTokens } = buildIntakeMessages(fullInput)
+        const { data: existingRoles } = recruiter?.id
+          ? await supabase
+              .from('roles')
+              .select('id, title, clients(name)')
+              .eq('recruiter_id', recruiter.id)
+              .eq('status', 'open')
+          : { data: [] }
+        const { system, messages, maxTokens } = buildIntakeMessages(fullInput, existingRoles ?? [])
         const text = await generateText({ system, messages, maxTokens })
         const parsed = parseJson(text)
         if (!parsed) throw new Error('No valid JSON in response')
