@@ -1355,11 +1355,14 @@ export default function CandidateCard() {
 
     const pipeline = pipelines.find(p => p.id === pipelineId)
 
+    const resolvedPipelineId = pipelineId || pipelines[0]?.id || null
+    const resolvedPipeline   = pipelines.find(p => p.id === resolvedPipelineId) ?? null
+
     const payload = {
       recruiter_id:             recruiter.id,
       candidate_id:             id,
-      pipeline_id:              pipelineId || pipelines[0]?.id,
-      role_id:                  pipeline?.role_id ?? pipelines[0]?.role_id,
+      pipeline_id:              resolvedPipelineId,
+      role_id:                  resolvedPipeline?.role_id ?? null,
       interaction_id:           interactionId ?? null,
       outcome,
       feedback_raw:             raw,
@@ -1378,20 +1381,21 @@ export default function CandidateCard() {
 
     const { data: saved, error } = await supabase.from('debriefs').insert(payload).select().single()
     if (error) {
-      setDebriefModal(prev => ({ ...prev, phase: 'error', error: 'Couldn\'t save debrief. Try again.' }))
+      console.error('debrief save failed:', error)
+      setDebriefModal(prev => ({ ...prev, phase: 'error', error: `Save failed: ${error.message}` }))
       return
     }
 
     setDebriefs(prev => [saved, ...prev])
 
     // Update pipeline next_action if we have a pipeline entry
-    if (pipelineId && reviewNextAction) {
+    if (resolvedPipelineId && reviewNextAction) {
       await supabase
         .from('pipeline')
         .update({ next_action: reviewNextAction })
-        .eq('id', pipelineId)
+        .eq('id', resolvedPipelineId)
       setPipelines(prev => prev.map(p =>
-        p.id === pipelineId ? { ...p, next_action: reviewNextAction } : p
+        p.id === resolvedPipelineId ? { ...p, next_action: reviewNextAction } : p
       ))
     }
 
