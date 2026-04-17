@@ -5930,3 +5930,266 @@ select.field-input {
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── Fee toggle (CreateRole / EditRole) ───────────────── */
+.fee-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+.fee-toggle-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.fee-toggle-btn + .fee-toggle-btn {
+  border-left: 1px solid var(--color-border);
+}
+.fee-toggle-btn--active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* ── Pipeline Value (Zone 1) ──────────────────────────── */
+.pv-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.pv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.pv-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.pv-link {
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.pv-link:hover { color: var(--color-text); }
+.pv-numbers {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+}
+.pv-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pv-big {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+.pv-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pv-weighted {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-muted);
+  line-height: 1;
+}
+.pv-label {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pv-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--color-border);
+  align-self: flex-end;
+}
+.pv-empty {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-top: 12px;
+}
+.pv-movement {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.pv-move-item {
+  font-size: 12px;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.pv-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── The Desk (Zone 2) ────────────────────────────────── */
+.desk-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.desk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.desk-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.desk-link {
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.desk-link:hover { color: var(--color-text); }
+.desk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.desk-divider {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-muted);
+  padding: 10px 0 4px;
+}
+.desk-divider--overdue { color: #c0392b; }
+.desk-divider--today   { color: #e67e22; }
+.desk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.desk-row:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+.desk-row--overdue { border-left: 3px solid #c0392b; }
+.desk-row--today   { border-left: 3px solid #e67e22; }
+.desk-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.desk-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-role {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.desk-stage {
+  font-size: 12px;
+  color: var(--color-muted);
+  text-transform: capitalize;
+}
+.risk-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.risk-pill--overdue {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
+}
+.risk-pill--today {
+  background: rgba(230, 126, 34, 0.12);
+  color: #d35400;
+}
+.risk-pill--stale {
+  background: rgba(0,0,0,0.06);
+  color: var(--color-muted);
+}
+.desk-empty {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.desk-empty a {
+  color: inherit;
+  text-decoration-color: var(--color-border);
+}
+.desk-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Comp prompt (soft missing-comp nudge) ─────────────── */
+.comp-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(230, 126, 34, 0.07);
+  border: 1px solid rgba(230, 126, 34, 0.25);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.comp-prompt-text {
+  font-size: 13px;
+  color: var(--color-text);
+}
+.comp-prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

@@ -9,6 +9,9 @@ export class ClaudeProvider {
     })
 
     if (!res.ok) {
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        throw new Error('API server unreachable. Make sure `vercel dev` is running on port 3000.')
+      }
       const { error } = await res.json().catch(() => ({}))
       throw new Error(error || `AI request failed (${res.status})`)
     }

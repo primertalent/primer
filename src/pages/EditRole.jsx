@@ -92,6 +92,9 @@ export default function EditRole() {
   const [compType, setCompType] = useState('salary')
   const [steps, setSteps]       = useState([])
   const [notes, setNotes]       = useState('')
+  const [feeType, setFeeType]   = useState('pct')
+  const [feePct, setFeePct]     = useState('')
+  const [feeFlat, setFeeFlat]   = useState('')
 
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState(null)
@@ -106,7 +109,7 @@ export default function EditRole() {
 
     supabase
       .from('roles')
-      .select('title, status, comp_min, comp_max, comp_type, process_steps, notes, clients(name)')
+      .select('title, status, comp_min, comp_max, comp_type, process_steps, notes, placement_fee_pct, placement_fee_flat, clients(name)')
       .eq('id', id)
       .eq('recruiter_id', recruiter.id)
       .single()
@@ -122,6 +125,13 @@ export default function EditRole() {
           setSteps(data.process_steps ?? [])
           setNotes(data.notes ?? '')
           setClientName(data.clients?.name ?? '')
+          if (data.placement_fee_flat != null) {
+            setFeeType('flat')
+            setFeeFlat(String(data.placement_fee_flat))
+          } else if (data.placement_fee_pct != null) {
+            setFeeType('pct')
+            setFeePct(String(data.placement_fee_pct * 100))
+          }
           setRoleContext({ title: data.title, clients: { name: data.clients?.name }, comp_min: data.comp_min, comp_max: data.comp_max, comp_type: data.comp_type })
         }
         setLoading(false)
@@ -170,6 +180,8 @@ export default function EditRole() {
         comp_type:     compType || null,
         process_steps: steps.filter(s => s.trim()),
         notes:         notes.trim() || null,
+        placement_fee_pct:  feeType === 'pct' && feePct ? Number(feePct) / 100 : null,
+        placement_fee_flat: feeType === 'flat' && feeFlat ? Number(feeFlat) : null,
       })
       .eq('id', id)
       .eq('recruiter_id', recruiter.id)
@@ -273,6 +285,25 @@ export default function EditRole() {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="form-field">
+          <label className="form-label">Placement Fee</label>
+          <div className="fee-toggle">
+            <button type="button" className={`fee-toggle-btn${feeType === 'pct' ? ' fee-toggle-btn--active' : ''}`} onClick={() => setFeeType('pct')}>% of comp</button>
+            <button type="button" className={`fee-toggle-btn${feeType === 'flat' ? ' fee-toggle-btn--active' : ''}`} onClick={() => setFeeType('flat')}>Flat fee</button>
+          </div>
+          {feeType === 'pct' ? (
+            <div className="comp-input-wrap" style={{ marginTop: 8 }}>
+              <input type="number" className="field-input comp-input" value={feePct} onChange={e => setFeePct(e.target.value)} placeholder="e.g. 20" min="0" max="100" />
+              <span style={{ marginLeft: 8, color: 'var(--color-muted)', fontSize: 14 }}>%</span>
+            </div>
+          ) : (
+            <div className="comp-input-wrap" style={{ marginTop: 8 }}>
+              <span className="comp-prefix">$</span>
+              <input type="number" className="field-input comp-input" value={feeFlat} onChange={e => setFeeFlat(e.target.value)} placeholder="Flat fee in dollars" min="0" />
+            </div>
+          )}
         </div>
 
         <div className="form-field">

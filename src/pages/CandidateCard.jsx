@@ -776,6 +776,44 @@ function ScorecardResult({ result }) {
   )
 }
 
+// ── Expected comp soft prompt ─────────────────────────────
+
+function CompPrompt({ entry, onSave }) {
+  const [comp, setComp] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    const val = parseInt(comp, 10)
+    if (!val || val <= 0) return
+    setSaving(true)
+    await onSave(val)
+    setSaving(false)
+  }
+
+  const roleName = entry.roles?.title ?? 'this role'
+
+  return (
+    <div className="comp-prompt">
+      <p className="comp-prompt-label">Expected comp for {roleName}?</p>
+      <p className="comp-prompt-hint">Wren uses this to track your pipeline value.</p>
+      <div className="comp-prompt-row">
+        <span className="comp-prefix">$</span>
+        <input
+          type="number"
+          className="field-input comp-prompt-input"
+          placeholder="Annual base"
+          value={comp}
+          onChange={e => setComp(e.target.value)}
+          min="0"
+        />
+        <button className="btn-primary btn-sm" onClick={handleSave} disabled={saving || !comp}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Debrief signal panel ──────────────────────────────────
 
 const DEBRIEF_SIGNAL_CATS = [
@@ -923,6 +961,9 @@ export default function CandidateCard() {
     reviewNextAction: '',
     error: null,
   })
+
+  // Expected comp modal (blocking on stage advance to interview+)
+  const [compModal, setCompModal] = useState({ open: false, entry: null, nextStage: '', comp: '', saving: false })
 
   // Delete
   const [deleting, setDeleting] = useState(false)
@@ -1133,10 +1174,18 @@ export default function CandidateCard() {
 
   const [advancingId, setAdvancingId] = useState(null)
 
+  const COMP_REQUIRED_STAGES = new Set(['interviewing', 'offer', 'placed'])
+
   async function handleAdvanceStage(entry) {
     const currentIdx = PIPELINE_STAGES.indexOf(entry.current_stage?.toLowerCase())
     if (currentIdx < 0 || currentIdx >= PIPELINE_STAGES.length - 1) return
     const nextStage = PIPELINE_STAGES[currentIdx + 1]
+
+    if (COMP_REQUIRED_STAGES.has(nextStage) && entry.expected_comp == null) {
+      setCompModal({ open: true, entry, nextStage, comp: '', saving: false })
+      return
+    }
+
     setAdvancingId(entry.id)
 
     // Optimistic update
@@ -1185,6 +1234,17 @@ export default function CandidateCard() {
     if (historyRes.error) console.error('stage history insert failed:', historyRes.error)
 
     setAdvancingId(null)
+  }
+
+  async function handleCompModalSave() {
+    const compValue = parseInt(compModal.comp, 10)
+    if (!compValue || compValue <= 0) return
+    setCompModal(prev => ({ ...prev, saving: true }))
+    await supabase.from('pipeline').update({ expected_comp: compValue }).eq('id', compModal.entry.id)
+    const updatedEntry = { ...compModal.entry, expected_comp: compValue }
+    setPipelines(prev => prev.map(p => p.id === updatedEntry.id ? updatedEntry : p))
+    setCompModal({ open: false, entry: null, nextStage: '', comp: '', saving: false })
+    handleAdvanceStage(updatedEntry)
   }
 
   function handleLogOpen() {
@@ -2041,6 +2101,13 @@ export default function CandidateCard() {
                 {addError && <p className="error" style={{ marginTop: 8 }}>{addError}</p>}
               </div>
             )}
+            {/* Soft prompt: fill expected comp for interview+ entries missing it */}
+            {pipelines.filter(p => ['interviewing','offer','placed'].includes(p.current_stage?.toLowerCase()) && p.expected_comp == null).map(p => (
+              <CompPrompt key={p.id + '-comp'} entry={p} onSave={async (val) => {
+                await supabase.from('pipeline').update({ expected_comp: val }).eq('id', p.id)
+                setPipelines(prev => prev.map(pe => pe.id === p.id ? { ...pe, expected_comp: val } : pe))
+              }} />
+            ))}
             {pipelines.length === 0 && !pickerOpen ? (
               <p className="muted" style={{ marginTop: 8 }}>Not in any pipeline yet.</p>
             ) : (
@@ -2369,6 +2436,51 @@ export default function CandidateCard() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Expected comp modal — blocking on stage advance to interview+ */}
+      {compModal.open && (
+        <div className="modal-overlay">
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Expected Comp</h2>
+                <p className="modal-subtitle">Advancing to {compModal.nextStage}</p>
+              </div>
+            </div>
+            <p className="sub-mode-hint" style={{ marginBottom: 16 }}>
+              What's this candidate's expected comp for this role? Wren uses this to track your pipeline value. You can update it later if it changes.
+            </p>
+            <div className="comp-prompt-row">
+              <span className="comp-prefix">$</span>
+              <input
+                type="number"
+                className="field-input comp-prompt-input"
+                placeholder="Annual base in dollars"
+                value={compModal.comp}
+                onChange={e => setCompModal(prev => ({ ...prev, comp: e.target.value }))}
+                min="0"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleCompModalSave()}
+              />
+            </div>
+            <div className="modal-actions" style={{ marginTop: 16 }}>
+              <button
+                className="btn-primary"
+                onClick={handleCompModalSave}
+                disabled={compModal.saving || !compModal.comp}
+              >
+                {compModal.saving ? 'Saving…' : 'Save and advance'}
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => setCompModal({ open: false, entry: null, nextStage: '', comp: '', saving: false })}
+              >
+                Cancel stage advance
+              </button>
+            </div>
           </div>
         </div>
       )}

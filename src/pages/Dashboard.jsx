@@ -5,30 +5,40 @@ import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 import WrenCommand from '../components/WrenCommand'
 
-function getGreeting() {
-  const hour = new Date().getHours()
-  if (hour >= 5 && hour < 12) return 'Good morning'
-  if (hour >= 12 && hour < 17) return 'Good afternoon'
-  return 'Good evening'
-}
-
-function getFormattedDate() {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+const STAGE_PROB = { interviewing: 0.25, offer: 0.75, placed: 1.00 }
+const URGENCY_ORDER = { overdue: 0, today: 1, active: 2, stale: 3 }
 
 function daysSince(isoString) {
   return Math.floor((Date.now() - new Date(isoString).getTime()) / 86400000)
 }
 
-// ── Activity Digest ───────────────────────────────────────
+function daysDiff(isoString) {
+  return Math.floor((new Date(isoString).getTime() - Date.now()) / 86400000)
+}
 
-function ActivityDigest({ recruiter }) {
-  const [digest, setDigest] = useState(null)
-  const [loading, setLoading] = useState(true)
+function fmtDollar(n) {
+  if (!n) return '$0'
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)    return `$${Math.round(n / 1_000)}K`
+  return `$${Math.round(n)}`
+}
+
+function urgencyOf(entry, today) {
+  if (!entry.next_action_due_at) {
+    return daysSince(entry.created_at) >= 7 ? 'stale' : 'active'
+  }
+  const diff = daysDiff(entry.next_action_due_at)
+  if (diff < 0) return 'overdue'
+  if (diff === 0) return 'today'
+  return 'active'
+}
+
+// ── Pipeline Value (Zone 1) ───────────────────────────────
+
+function PipelineValue({ recruiter }) {
+  const [data, setData]         = useState(null)
+  const [movement, setMovement] = useState([])
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
     if (!recruiter?.id) return
@@ -36,300 +46,126 @@ function ActivityDigest({ recruiter }) {
   }, [recruiter?.id])
 
   async function load() {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-    const [candidatesRes, stagesRes, screenersRes, interactionsRes] = await Promise.allSettled([
+    const [pipeRes, moveRes] = await Promise.allSettled([
       supabase
-        .from('candidates')
-        .select('*', { count: 'exact', head: true })
+        .from('pipeline')
+        .select('id, current_stage, expected_comp, roles(placement_fee_pct, placement_fee_flat)')
         .eq('recruiter_id', recruiter.id)
-        .gte('created_at', yesterday),
+        .eq('status', 'active')
+        .in('current_stage', ['interviewing', 'offer', 'placed']),
 
       supabase
         .from('pipeline_stage_history')
-        .select('*', { count: 'exact', head: true })
+        .select('id, to_stage, created_at, candidates(first_name, last_name)')
         .eq('recruiter_id', recruiter.id)
-        .gte('created_at', yesterday),
-
-      supabase
-        .from('screener_results')
-        .select('*', { count: 'exact', head: true })
-        .eq('recruiter_id', recruiter.id)
-        .gte('created_at', yesterday),
-
-      supabase
-        .from('interactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('recruiter_id', recruiter.id)
-        .gte('created_at', yesterday),
+        .in('to_stage', ['interviewing', 'offer', 'placed'])
+        .order('created_at', { ascending: false })
+        .limit(5),
     ])
 
-    setDigest({
-      newCandidates: candidatesRes.status === 'fulfilled' ? (candidatesRes.value.count ?? 0) : 0,
-      stageAdvances: stagesRes.status     === 'fulfilled' ? (stagesRes.value.count     ?? 0) : 0,
-      screenersRun:  screenersRes.status  === 'fulfilled' ? (screenersRes.value.count  ?? 0) : 0,
-      interactions:  interactionsRes.status === 'fulfilled' ? (interactionsRes.value.count ?? 0) : 0,
-    })
+    const entries = pipeRes.status === 'fulfilled' ? (pipeRes.value.data ?? []) : []
+
+    let totalFull = 0
+    let totalWeighted = 0
+
+    for (const entry of entries) {
+      const role = entry.roles
+      let fee = 0
+      if (role?.placement_fee_flat) {
+        fee = role.placement_fee_flat
+      } else if (entry.expected_comp && role?.placement_fee_pct) {
+        fee = entry.expected_comp * role.placement_fee_pct
+      }
+      const prob = STAGE_PROB[entry.current_stage] ?? 0
+      totalFull     += fee
+      totalWeighted += fee * prob
+    }
+
+    setData({ total: totalFull, weighted: totalWeighted, count: entries.length })
+    setMovement(moveRes.status === 'fulfilled' ? (moveRes.value.data ?? []) : [])
     setLoading(false)
   }
 
-  const lines = []
-  if (digest) {
-    if (digest.newCandidates > 0) lines.push(`${digest.newCandidates} new candidate${digest.newCandidates !== 1 ? 's' : ''} added`)
-    if (digest.stageAdvances > 0) lines.push(`${digest.stageAdvances} pipeline advance${digest.stageAdvances !== 1 ? 's' : ''}`)
-    if (digest.screenersRun  > 0) lines.push(`${digest.screenersRun} screener${digest.screenersRun !== 1 ? 's' : ''} run`)
-    if (digest.interactions  > 0) lines.push(`${digest.interactions} interaction${digest.interactions !== 1 ? 's' : ''} logged`)
-  }
-
   return (
-    <section className="digest-card">
-      <p className="digest-eyebrow">Since yesterday</p>
+    <section className="pv-section">
+      <div className="pv-header">
+        <span className="pv-eyebrow">Pipeline Value</span>
+        <Link to="/roles" className="pv-link">Roles →</Link>
+      </div>
+
       {loading ? (
-        <div className="digest-skeleton">
-          <div className="skeleton skeleton-line" style={{ width: '60%' }} />
-          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '45%' }} />
-          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '52%' }} />
+        <div className="pv-skeleton">
+          <div className="skeleton skeleton-line" style={{ width: '40%', height: 36 }} />
+          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '28%' }} />
         </div>
-      ) : lines.length === 0 ? (
-        <p className="digest-empty">No activity since yesterday.</p>
       ) : (
-        <ul className="digest-list">
-          {lines.map((line, i) => <li key={i} className="digest-item">{line}</li>)}
-        </ul>
+        <>
+          <div className="pv-numbers">
+            <div className="pv-primary">
+              <span className="pv-big">{fmtDollar(data?.total)}</span>
+              <span className="pv-label">full value</span>
+            </div>
+            <div className="pv-divider" />
+            <div className="pv-secondary">
+              <span className="pv-weighted">{fmtDollar(data?.weighted)}</span>
+              <span className="pv-label">probability-weighted</span>
+            </div>
+          </div>
+
+          {data?.count === 0 && (
+            <p className="pv-empty">No deals in interview, offer, or placed stages yet.</p>
+          )}
+
+          {movement.length > 0 && (
+            <div className="pv-movement">
+              {movement.map(m => (
+                <span key={m.id} className="pv-move-item">
+                  {m.candidates?.first_name} → {m.to_stage}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   )
 }
 
-// ── Needs Attention ───────────────────────────────────────
+// ── The Desk (Zone 2) ─────────────────────────────────────
 
-const ATTENTION_ICONS = {
-  overdue:     '⚠️',
-  today:       '⏰',
-  unscreened:  '🟡',
-  unscheduled: '💤',
-  queue:       '📋',
-}
+function DeskRow({ entry, today }) {
+  const urgency   = urgencyOf(entry, today)
+  const candidate = entry.candidates
+  const name      = `${candidate?.first_name ?? ''} ${candidate?.last_name ?? ''}`.trim()
 
-function AttentionCard({ variant, signal, name, role, primaryLabel, primaryHref, secondaryLabel, secondaryHref }) {
-  return (
-    <div className={`attention-card attention-card--${variant}`}>
-      <div className="attention-card-body">
-        <span className="attention-card-icon">{ATTENTION_ICONS[variant]}</span>
-        <div className="attention-card-content">
-          {(name || role) && (
-            <p className="attention-name">{[name, role].filter(Boolean).join(' · ')}</p>
-          )}
-          <p className="attention-signal">{signal}</p>
-        </div>
-      </div>
-      <div className="attention-card-actions">
-        <Link to={primaryHref} className="attention-action attention-action--primary">{primaryLabel}</Link>
-        {secondaryHref && (
-          <Link to={secondaryHref} className="attention-action">{secondaryLabel ?? 'View'}</Link>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function NeedsAttention({ recruiter }) {
-  const [items, setItems]     = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!recruiter?.id) return
-    load()
-  }, [recruiter?.id])
-
-  async function load() {
-    setLoading(true)
-    const today     = new Date().toISOString().slice(0, 10)
-    const staleDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
-    const [overdueRes, dueTodayRes, queueRes, unscheduledRes, unscreenedRes] = await Promise.allSettled([
-      supabase
-        .from('pipeline')
-        .select('id, current_stage, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'active')
-        .lt('next_action_due_at', today)
-        .not('next_action_due_at', 'is', null)
-        .order('next_action_due_at', { ascending: true })
-        .limit(8),
-
-      supabase
-        .from('pipeline')
-        .select('id, current_stage, next_action_due_at, candidates(id, first_name, last_name), roles(title)')
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'active')
-        .gte('next_action_due_at', today)
-        .lte('next_action_due_at', today + 'T23:59:59')
-        .limit(8),
-
-      supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'drafted'),
-
-      supabase
-        .from('pipeline')
-        .select('id, current_stage, created_at, candidates(id, first_name, last_name), roles(title)')
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'active')
-        .is('next_action_due_at', null)
-        .lt('created_at', staleDate)
-        .order('created_at', { ascending: true })
-        .limit(5),
-
-      supabase
-        .from('pipeline')
-        .select('id, current_stage, candidates(id, first_name, last_name), roles(title)')
-        .eq('recruiter_id', recruiter.id)
-        .eq('status', 'active')
-        .is('fit_score', null)
-        .neq('current_stage', 'placed')
-        .limit(5),
-    ])
-
-    setItems({
-      overdue:      overdueRes.status      === 'fulfilled' ? (overdueRes.value.data      ?? []) : [],
-      dueToday:     dueTodayRes.status     === 'fulfilled' ? (dueTodayRes.value.data     ?? []) : [],
-      draftedCount: queueRes.status        === 'fulfilled' ? (queueRes.value.count       ?? 0)  : 0,
-      unscheduled:  unscheduledRes.status  === 'fulfilled' ? (unscheduledRes.value.data  ?? []) : [],
-      unscreened:   unscreenedRes.status   === 'fulfilled' ? (unscreenedRes.value.data   ?? []) : [],
-    })
-    setLoading(false)
+  let riskText = null
+  if (urgency === 'overdue') {
+    const n = Math.abs(daysDiff(entry.next_action_due_at))
+    riskText = `${n}d overdue`
+  } else if (urgency === 'today') {
+    riskText = 'due today'
+  } else if (urgency === 'stale') {
+    riskText = `${daysSince(entry.created_at)}d no action`
   }
 
-  const overdueCount = items?.overdue.length ?? 0
-
-  // Deduplicate: unscreened rows that already appear in overdue/dueToday/unscheduled
-  const seenIds = new Set([
-    ...(items?.overdue.map(p => p.candidates.id) ?? []),
-    ...(items?.dueToday.map(p => p.candidates.id) ?? []),
-    ...(items?.unscheduled.map(p => p.candidates.id) ?? []),
-  ])
-  const uniqueUnscreened = (items?.unscreened ?? []).filter(p => !seenIds.has(p.candidates.id))
-
-  const isEmpty = !loading && items &&
-    items.overdue.length === 0 &&
-    items.dueToday.length === 0 &&
-    items.draftedCount === 0 &&
-    uniqueUnscreened.length === 0 &&
-    items.unscheduled.length === 0
-
   return (
-    <section className="today-actions-card">
-      <div className="today-actions-header">
-        <p className="today-actions-eyebrow">Needs Attention</p>
-        {overdueCount > 0 && (
-          <span className="today-badge-overdue">{overdueCount} overdue</span>
-        )}
+    <Link to={`/candidates/${candidate?.id}`} className={`desk-row desk-row--${urgency}`}>
+      <div className="desk-row-main">
+        <span className="desk-name">{name}</span>
+        <span className="desk-role">{entry.roles?.title ?? '—'}</span>
       </div>
-
-      {loading ? (
-        <div className="today-actions-skeleton">
-          <div className="skeleton-attention-row">
-            <div className="skeleton skeleton-line" style={{ width: '55%' }} />
-            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '30%' }} />
-          </div>
-          <div className="skeleton-attention-row">
-            <div className="skeleton skeleton-line" style={{ width: '70%' }} />
-            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '28%' }} />
-          </div>
-          <div className="skeleton-attention-row">
-            <div className="skeleton skeleton-line" style={{ width: '48%' }} />
-            <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '32%' }} />
-          </div>
-        </div>
-      ) : isEmpty ? (
-        <p className="today-actions-empty">
-          Pipeline clear. Nothing urgent right now.{' '}
-          <Link to="/candidates" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
-            Review candidates →
-          </Link>
-        </p>
-      ) : (
-        <div className="today-actions-list">
-          {items.overdue.map(p => {
-            const n = daysSince(p.next_action_due_at)
-            return (
-              <AttentionCard
-                key={p.id}
-                variant="overdue"
-                signal={`Overdue ${n} day${n !== 1 ? 's' : ''}`}
-                name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-                role={p.roles?.title}
-                primaryLabel="Draft Follow-Up"
-                primaryHref={`/candidates/${p.candidates.id}`}
-                secondaryLabel="View"
-                secondaryHref={`/candidates/${p.candidates.id}`}
-              />
-            )
-          })}
-          {items.dueToday.map(p => (
-            <AttentionCard
-              key={p.id}
-              variant="today"
-              signal="Follow-up due today"
-              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              role={p.roles?.title}
-              primaryLabel="Draft Follow-Up"
-              primaryHref={`/candidates/${p.candidates.id}`}
-              secondaryLabel="View"
-              secondaryHref={`/candidates/${p.candidates.id}`}
-            />
-          ))}
-          {items.draftedCount > 0 && (
-            <AttentionCard
-              variant="queue"
-              signal={`${items.draftedCount} submission ${items.draftedCount !== 1 ? 'drafts' : 'draft'} ready`}
-              primaryLabel="Review Queue"
-              primaryHref="/queue"
-            />
-          )}
-          {uniqueUnscreened.map(p => (
-            <AttentionCard
-              key={p.id + '-unscreened'}
-              variant="unscreened"
-              signal="Not screened yet"
-              name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-              role={p.roles?.title}
-              primaryLabel="Run Screener"
-              primaryHref={`/candidates/${p.candidates.id}`}
-              secondaryLabel="View"
-              secondaryHref={`/candidates/${p.candidates.id}`}
-            />
-          ))}
-          {items.unscheduled.map(p => {
-            const n = daysSince(p.created_at)
-            return (
-              <AttentionCard
-                key={p.id}
-                variant="unscheduled"
-                signal={`${n} day${n !== 1 ? 's' : ''} with no next action`}
-                name={`${p.candidates.first_name} ${p.candidates.last_name}`}
-                role={p.roles?.title}
-                primaryLabel="Set Action"
-                primaryHref={`/candidates/${p.candidates.id}`}
-                secondaryLabel="View"
-                secondaryHref={`/candidates/${p.candidates.id}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </section>
+      <div className="desk-row-meta">
+        <span className="desk-stage">{entry.current_stage}</span>
+        {riskText && <span className={`risk-pill risk-pill--${urgency}`}>{riskText}</span>}
+      </div>
+    </Link>
   )
 }
 
-// ── Today's Pipeline ──────────────────────────────────────
-
-function TodayPipeline({ recruiter }) {
-  const [roles, setRoles]   = useState(null)
+function TheDesk({ recruiter }) {
+  const [entries, setEntries] = useState(null)
   const [loading, setLoading] = useState(true)
+  const today = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     if (!recruiter?.id) return
@@ -339,69 +175,72 @@ function TodayPipeline({ recruiter }) {
   async function load() {
     const { data, error } = await supabase
       .from('pipeline')
-      .select('role_id, current_stage, roles(id, title, clients(name))')
+      .select('id, current_stage, next_action_due_at, created_at, candidates(id, first_name, last_name), roles(id, title)')
       .eq('recruiter_id', recruiter.id)
       .eq('status', 'active')
       .neq('current_stage', 'placed')
 
     if (error || !data) { setLoading(false); return }
 
-    const roleMap = {}
-    for (const entry of data) {
-      const rid = entry.role_id
-      if (!roleMap[rid]) {
-        roleMap[rid] = {
-          id:     rid,
-          title:  entry.roles?.title ?? 'Unknown role',
-          client: entry.roles?.clients?.name ?? null,
-          stages: {},
-          count:  0,
-        }
-      }
-      const stage = entry.current_stage ?? 'unknown'
-      roleMap[rid].stages[stage] = (roleMap[rid].stages[stage] ?? 0) + 1
-      roleMap[rid].count++
-    }
+    const sorted = [...data].sort((a, b) => {
+      const ua = URGENCY_ORDER[urgencyOf(a, today)] ?? 99
+      const ub = URGENCY_ORDER[urgencyOf(b, today)] ?? 99
+      if (ua !== ub) return ua - ub
+      if (a.next_action_due_at && b.next_action_due_at)
+        return new Date(a.next_action_due_at) - new Date(b.next_action_due_at)
+      if (a.next_action_due_at) return -1
+      if (b.next_action_due_at) return 1
+      return 0
+    })
 
-    setRoles(Object.values(roleMap).sort((a, b) => b.count - a.count))
+    setEntries(sorted)
     setLoading(false)
   }
 
+  const overdue  = (entries ?? []).filter(e => urgencyOf(e, today) === 'overdue')
+  const dueToday = (entries ?? []).filter(e => urgencyOf(e, today) === 'today')
+  const rest     = (entries ?? []).filter(e => !['overdue', 'today'].includes(urgencyOf(e, today)))
+
   return (
-    <section className="today-pipeline-card">
-      <p className="today-pipeline-eyebrow">Active Roles</p>
+    <section className="desk-section">
+      <div className="desk-header">
+        <span className="desk-eyebrow">The Desk</span>
+        <Link to="/candidates/new" className="desk-link">+ Add candidate</Link>
+      </div>
+
       {loading ? (
-        <div className="today-pipeline-skeleton">
-          <div className="skeleton skeleton-line" style={{ width: '65%' }} />
-          <div className="skeleton skeleton-line skeleton-line--sm" style={{ width: '40%' }} />
-          <div className="skeleton skeleton-line" style={{ width: '72%' }} />
+        <div className="desk-skeleton">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton skeleton-line" style={{ height: 48, marginBottom: 6 }} />
+          ))}
         </div>
-      ) : !roles?.length ? (
-        <p className="today-pipeline-empty">
+      ) : !entries?.length ? (
+        <p className="desk-empty">
           No active pipeline.{' '}
-          <Link to="/roles/new" style={{ color: 'inherit', textDecorationColor: 'var(--color-border)' }}>
-            Add a role →
-          </Link>
+          <Link to="/roles/new">Add a role →</Link>
         </p>
       ) : (
-        <div className="today-pipeline-list">
-          {roles.map(role => (
-            <Link key={role.id} to={`/roles/${role.id}`} className="today-pipeline-row">
-              <div className="today-pipeline-left">
-                <span className="today-pipeline-title">{role.title}</span>
-                {role.client && <span className="today-pipeline-client">{role.client}</span>}
-              </div>
-              <div className="today-pipeline-right">
-                <span className="today-pipeline-count">{role.count} active</span>
-                <span className="today-pipeline-stages">
-                  {Object.entries(role.stages)
-                    .map(([stage, count]) => `${count} ${stage}`)
-                    .join(', ')}
-                </span>
-              </div>
-              <span className="today-action-arrow">View →</span>
-            </Link>
-          ))}
+        <div className="desk-list">
+          {overdue.length > 0 && (
+            <>
+              <div className="desk-divider desk-divider--overdue">Overdue · {overdue.length}</div>
+              {overdue.map(e => <DeskRow key={e.id} entry={e} today={today} />)}
+            </>
+          )}
+          {dueToday.length > 0 && (
+            <>
+              <div className="desk-divider desk-divider--today">Due Today · {dueToday.length}</div>
+              {dueToday.map(e => <DeskRow key={e.id} entry={e} today={today} />)}
+            </>
+          )}
+          {rest.length > 0 && (
+            <>
+              {(overdue.length > 0 || dueToday.length > 0) && (
+                <div className="desk-divider">Active · {rest.length}</div>
+              )}
+              {rest.map(e => <DeskRow key={e.id} entry={e} today={today} />)}
+            </>
+          )}
         </div>
       )}
     </section>
@@ -411,24 +250,18 @@ function TodayPipeline({ recruiter }) {
 // ── Dashboard ─────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { recruiter, loading: recruiterLoading } = useRecruiter()
-
-  const firstName = recruiter?.full_name?.split(' ')[0] ?? ''
+  const { recruiter } = useRecruiter()
 
   return (
     <AppLayout>
-      <section className="brief-greeting">
-        <h1 className="brief-headline">
-          {getGreeting()}{!recruiterLoading && firstName ? `, ${firstName}` : ''}
-        </h1>
-        <p className="brief-date">{getFormattedDate()}</p>
-      </section>
-
-      {recruiter && <ActivityDigest recruiter={recruiter} />}
-      {recruiter && <NeedsAttention recruiter={recruiter} />}
-      {recruiter && <TodayPipeline recruiter={recruiter} />}
-
+      {/* Zone 3 — WrenCommand */}
       <WrenCommand />
+
+      {/* Zone 1 — Pipeline Value */}
+      {recruiter && <PipelineValue recruiter={recruiter} />}
+
+      {/* Zone 2 — The Desk */}
+      {recruiter && <TheDesk recruiter={recruiter} />}
     </AppLayout>
   )
 }

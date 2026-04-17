@@ -16,12 +16,6 @@ export default function AppLayout({ children, fullBleed = false }) {
             Home
           </NavLink>
           <NavLink
-            to="/wren"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Agent
-          </NavLink>
-          <NavLink
             to="/roles"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
@@ -39,12 +33,7 @@ export default function AppLayout({ children, fullBleed = false }) {
           >
             Queue
           </NavLink>
-          <NavLink
-            to="/clients"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Clients
-          </NavLink>
+
         </nav>
         <button className="btn-ghost" onClick={signOut}>Sign out</button>
       </header>

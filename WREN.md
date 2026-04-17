@@ -196,7 +196,7 @@ Active tables — all read and written by current code:
 
 | Component | Role |
 |---|---|
-| `Dashboard.jsx` | The Brief. ActivityDigest, NeedsAttention, TodayPipeline, WrenCommand. |
+| `Dashboard.jsx` | Deal desk home: WrenCommand (Zone 3), Pipeline Value (Zone 1), The Desk (Zone 2). |
 | `WrenCommand.jsx` | Command bar. Paste / file / URL → chips → intake or multi-screen result. |
 | `CandidateCard.jsx` | Candidate view. Sticky context bar + single-column scroll. |
 | `RoleDetail.jsx` | Role view with kanban, search strings, interview questions, JD. |
@@ -232,18 +232,24 @@ If any answer is wrong, redesign or defer.
 
 **What's built and working:**
 - WrenCommand: paste/upload/URL → intake → candidate created or multi-screen result
-- Dashboard: The Brief (ActivityDigest, NeedsAttention)
+- Dashboard: Deal desk home (Zone 3 WrenCommand, Zone 1 Pipeline Value, Zone 2 The Desk)
+  - Pipeline Value: primary total + probability-weighted, stage probabilities interviewing=0.25/offer=0.75/placed=1.00
+  - The Desk: urgency-sorted deal rows (overdue → today → active/stale) with risk pills
 - CandidateCard: full deal view — timeline, signals, screener, scorecard, pipeline, interactions, submission drafts
+  - Expected comp blocking modal on stage advance to interviewing/offer/placed when expected_comp is null
 - RoleDetail: kanban pipeline + interview questions + search strings + JD
 - Queue: drafted / approved / sent / held outreach
 - Candidates: network search by stage, signal, skill, fit score, recency
 - Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create, auto-debrief prompt on call/meeting log
 - Recruiter score + AI score as separate permanent tracks on every pipeline entry
 - Debrief capture: paste transcript or brain dump → extract structured signal (motivation, competitive, risk, positive, HM signals, next action, questions to ask, record updates) → save to debriefs table → surface on sticky context bar and debrief signals section
+- Placement fee fields on roles (% of comp or flat fee, defaults from recruiter profile)
+- Schema: `roles.placement_fee_pct`, `roles.placement_fee_flat`, `pipeline.expected_comp`, `recruiters.default_placement_fee_pct`
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
 - Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
+- Dashboard ActivityDigest / NeedsAttention / TodayPipeline — replaced by deal desk zones.
 - Daily Brief skill — removed. Redundant with Dashboard.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 
@@ -282,6 +288,9 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Save All confirmation.** After successful save, action button replaced by static "Saved ✓" label.
 - **AI calls are server-side only.** All Anthropic calls go through `api/ai.js`. Non-negotiable.
 - **JSONB for flexible data.** Career timeline, signals, process steps, screener results, scorecard results, interview guide.
+- **Pipeline value formula.** `placement_fee_flat` takes precedence. If null, `expected_comp * placement_fee_pct`. Stage probabilities: interviewing=0.25, offer=0.75, placed=1.00. Weighted = sum(fee * prob) across active entries in those stages.
+- **Expected comp is required for interview+ stages.** Blocking modal fires on stage advance to interviewing/offer/placed when `pipeline.expected_comp` is null. Soft prompt surfaces on load for existing entries missing comp.
+- **Placement fee defaults from recruiter profile.** `recruiters.default_placement_fee_pct` auto-fills `placement_fee_pct` on new role creation.
 - **No LinkedIn API.** Too locked down. Draft in Wren, copy to send.
 - **Document block pattern for multi-input AI calls.** Multiple inputs wrapped as labeled `<document>` blocks with type and name. Standard for all multi-input features.
 - **Classify calls are intentionally minimal.** 100 token max, 2000 char input slice. Speed over completeness. Never block the UI waiting on classification.

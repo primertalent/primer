@@ -210,6 +210,9 @@ export default function CreateRole() {
   const [compType, setCompType] = useState('salary')
   const [steps, setSteps]       = useState(DEFAULT_STEPS)
   const [notes, setNotes]       = useState('')
+  const [feeType, setFeeType]   = useState('pct')   // 'pct' | 'flat'
+  const [feePct, setFeePct]     = useState('')
+  const [feeFlat, setFeeFlat]   = useState('')
 
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState(null)
@@ -281,6 +284,13 @@ export default function CreateRole() {
     }
   }
 
+  // Default fee from recruiter settings
+  useEffect(() => {
+    if (recruiter?.default_placement_fee_pct != null && !feePct) {
+      setFeePct(String(recruiter.default_placement_fee_pct * 100))
+    }
+  }, [recruiter?.default_placement_fee_pct])
+
   // Fetch existing clients for combobox
   useEffect(() => {
     if (!recruiter?.id) return
@@ -332,16 +342,18 @@ export default function CreateRole() {
 
       // Create role — get ID back for search string generation
       const rolePayload = {
-        recruiter_id:  recruiter.id,
-        client_id:     clientId,
-        title:         title.trim(),
-        comp_min:      compMin ? Number(compMin) : null,
-        comp_max:      compMax ? Number(compMax) : null,
-        comp_currency: 'USD',
-        comp_type:     compType || null,
-        process_steps: steps.filter(s => s.trim()),
-        notes:         notes.trim() || null,
-        status:        'open',
+        recruiter_id:       recruiter.id,
+        client_id:          clientId,
+        title:              title.trim(),
+        comp_min:           compMin ? Number(compMin) : null,
+        comp_max:           compMax ? Number(compMax) : null,
+        comp_currency:      'USD',
+        comp_type:          compType || null,
+        process_steps:      steps.filter(s => s.trim()),
+        notes:              notes.trim() || null,
+        status:             'open',
+        placement_fee_pct:  feeType === 'pct' && feePct ? Number(feePct) / 100 : null,
+        placement_fee_flat: feeType === 'flat' && feeFlat ? Number(feeFlat) : null,
       }
 
       const { data: newRole, error: roleErr } = await supabase
@@ -485,6 +497,53 @@ export default function CreateRole() {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Placement fee */}
+        <div className="form-field">
+          <label className="form-label">Placement Fee</label>
+          <div className="fee-toggle">
+            <button
+              type="button"
+              className={`fee-toggle-btn${feeType === 'pct' ? ' fee-toggle-btn--active' : ''}`}
+              onClick={() => setFeeType('pct')}
+            >
+              % of comp
+            </button>
+            <button
+              type="button"
+              className={`fee-toggle-btn${feeType === 'flat' ? ' fee-toggle-btn--active' : ''}`}
+              onClick={() => setFeeType('flat')}
+            >
+              Flat fee
+            </button>
+          </div>
+          {feeType === 'pct' ? (
+            <div className="comp-input-wrap" style={{ marginTop: 8 }}>
+              <input
+                type="number"
+                className="field-input comp-input"
+                value={feePct}
+                onChange={e => setFeePct(e.target.value)}
+                placeholder="e.g. 20"
+                min="0"
+                max="100"
+              />
+              <span style={{ marginLeft: 8, color: 'var(--color-muted)', fontSize: 14 }}>%</span>
+            </div>
+          ) : (
+            <div className="comp-input-wrap" style={{ marginTop: 8 }}>
+              <span className="comp-prefix">$</span>
+              <input
+                type="number"
+                className="field-input comp-input"
+                value={feeFlat}
+                onChange={e => setFeeFlat(e.target.value)}
+                placeholder="Flat fee in dollars"
+                min="0"
+              />
+            </div>
+          )}
         </div>
 
         {/* Process steps */}
