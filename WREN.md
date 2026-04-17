@@ -184,12 +184,7 @@ Active tables — all read and written by current code:
 | `interactions` | every touchpoint (call, email, note, meeting) |
 | `screener_results` | standalone screener history, no pipeline dependency |
 | `messages` | drafted / approved / sent / held outreach |
-
-Scaffolded, implementation pending:
-
-| Table | Status |
-|---|---|
-| `debriefs` | Schema only. Intended for post-interview debrief capture. V3 priority item. |
+| `debriefs` | post-interaction signal capture: `outcome`, `feedback_raw`, `summary`, `motivation_signals`, `competitive_signals`, `risk_flags`, `positive_signals`, `hiring_manager_signals`, `next_action`, `questions_to_ask_next`, `updates_to_record` (all JSONB signals) |
 
 **JSONB where structure will evolve.** Career timeline, signals, process steps, screener results, scorecard results. No migrations needed when the shape changes.
 
@@ -242,8 +237,9 @@ If any answer is wrong, redesign or defer.
 - RoleDetail: kanban pipeline + interview questions + search strings + JD
 - Queue: drafted / approved / sent / held outreach
 - Candidates: network search by stage, signal, skill, fit score, recency
-- Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create
+- Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create, auto-debrief prompt on call/meeting log
 - Recruiter score + AI score as separate permanent tracks on every pipeline entry
+- Debrief capture: paste transcript or brain dump → extract structured signal (motivation, competitive, risk, positive, HM signals, next action, questions to ask, record updates) → save to debriefs table → surface on sticky context bar and debrief signals section
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
@@ -252,7 +248,6 @@ If any answer is wrong, redesign or defer.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 
 **V3 priority queue (do not build this session — queued for future):**
-- Debrief capture on interactions (`debriefs` table scaffolded, zero implementation)
 - Role activation scans candidate database for existing fits
 - Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
 - Close sequence generator by stage (what needs to happen to get from here to offer)

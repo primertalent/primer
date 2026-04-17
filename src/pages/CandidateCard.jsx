@@ -12,6 +12,7 @@ import { buildCandidatePitchMessages } from '../lib/prompts/candidatePitchBuilde
 import { buildScorecardMessages } from '../lib/prompts/candidateScorecard'
 import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmail'
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
+import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
 import { urgencyClass } from '../lib/urgency'
 
 // ── Helpers ───────────────────────────────────────────────
@@ -364,7 +365,7 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
   )
 }
 
-function InteractionEntry({ interaction, onDelete }) {
+function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief }) {
   const [confirm, setConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -395,6 +396,17 @@ function InteractionEntry({ interaction, onDelete }) {
       )}
       {interaction.body && (
         <p className="interaction-body">{interaction.body}</p>
+      )}
+      {onDebrief && !hasDebrief && (
+        <button
+          className="btn-ghost btn-sm debrief-btn"
+          onClick={() => onDebrief(interaction.id)}
+        >
+          + Debrief
+        </button>
+      )}
+      {hasDebrief && (
+        <span className="debrief-logged-badge">Debriefed</span>
       )}
       {confirm && (
         <div className="inline-confirm">
@@ -764,6 +776,68 @@ function ScorecardResult({ result }) {
   )
 }
 
+// ── Debrief signal panel ──────────────────────────────────
+
+const DEBRIEF_SIGNAL_CATS = [
+  { key: 'motivation_signals',     label: 'Motivation',   cls: 'dsig--motivation' },
+  { key: 'competitive_signals',    label: 'Competitive',  cls: 'dsig--competitive' },
+  { key: 'risk_flags',             label: 'Risk',         cls: 'dsig--risk' },
+  { key: 'positive_signals',       label: 'Positive',     cls: 'dsig--positive' },
+  { key: 'hiring_manager_signals', label: 'HM Signals',   cls: 'dsig--hm' },
+]
+
+function DebriefSignalPanel({ debriefs, onOpenDebrief }) {
+  const latest = debriefs[0]
+  if (!latest) return null
+
+  const outcomeClass = {
+    advance: 'debrief-outcome--advance',
+    reject:  'debrief-outcome--reject',
+    hold:    'debrief-outcome--hold',
+    neutral: 'debrief-outcome--neutral',
+  }[latest.outcome] ?? ''
+
+  return (
+    <div className="debrief-signal-panel">
+      <div className="debrief-signal-header">
+        <span className={`debrief-outcome-badge ${outcomeClass}`}>{latest.outcome}</span>
+        <span className="debrief-signal-date">{formatDateShort(latest.captured_at)}</span>
+        <button className="btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={onOpenDebrief}>
+          + New debrief
+        </button>
+      </div>
+      {DEBRIEF_SIGNAL_CATS.map(cat => {
+        const items = latest[cat.key]
+        if (!items?.length) return null
+        return (
+          <div key={cat.key} className="debrief-signal-cat">
+            <span className={`debrief-signal-cat-label ${cat.cls}`}>{cat.label}</span>
+            <ul className="debrief-signal-list">
+              {items.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+          </div>
+        )
+      })}
+      {latest.questions_to_ask_next?.length > 0 && (
+        <div className="debrief-signal-cat">
+          <span className="debrief-signal-cat-label dsig--questions">Ask next</span>
+          <ul className="debrief-signal-list">
+            {latest.questions_to_ask_next.map((q, i) => <li key={i}>{q}</li>)}
+          </ul>
+        </div>
+      )}
+      {latest.updates_to_record?.length > 0 && (
+        <div className="debrief-signal-cat">
+          <span className="debrief-signal-cat-label dsig--updates">Update record</span>
+          <ul className="debrief-signal-list debrief-signal-list--updates">
+            {latest.updates_to_record.map((u, i) => <li key={i}>{u}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 export default function CandidateCard() {
@@ -834,6 +908,21 @@ export default function CandidateCard() {
   const [logForm, setLogForm] = useState({ type: 'call', direction: 'outbound', occurred_at: '', body: '' })
   const [logSaving, setLogSaving] = useState(false)
   const [logError, setLogError] = useState(null)
+
+  // Debriefs
+  const [debriefs, setDebriefs] = useState([])
+  const [debriefModal, setDebriefModal] = useState({
+    open: false,
+    phase: 'input',  // 'input' | 'extracting' | 'review' | 'saving' | 'error'
+    interactionId: null,
+    pipelineId: '',
+    raw: '',
+    outcome: 'neutral',
+    extracted: null,
+    reviewSummary: '',
+    reviewNextAction: '',
+    error: null,
+  })
 
   // Delete
   const [deleting, setDeleting] = useState(false)
@@ -906,8 +995,14 @@ export default function CandidateCard() {
           .select('*, roles(title, clients(name))')
           .eq('candidate_id', id)
           .order('scored_at', { ascending: false }),
+
+        supabase
+          .from('debriefs')
+          .select('*')
+          .eq('candidate_id', id)
+          .order('captured_at', { ascending: false }),
       ])
-      const [candidateRes, pipelineRes, interactionRes, rolesRes, screenerHistoryRes] = settled.map(r =>
+      const [candidateRes, pipelineRes, interactionRes, rolesRes, screenerHistoryRes, debriefsRes] = settled.map(r =>
         r.status === 'fulfilled' ? r.value : { data: null, error: { message: 'Request failed' } }
       )
 
@@ -943,6 +1038,7 @@ export default function CandidateCard() {
         setInteractions(interactionRes.data ?? [])
         setOpenRoles(rolesRes.data ?? [])
         setScreenerHistory(screenerHistoryRes.data ?? [])
+        setDebriefs(debriefsRes.data ?? [])
 
         // Restore persisted career data if available
         if (c.career_timeline?.length > 0) {
@@ -1120,6 +1216,22 @@ export default function CandidateCard() {
     } else {
       setInteractions(prev => [data, ...prev])
       setLogOpen(false)
+      // Auto-prompt for debrief after logging a call or meeting
+      if (logForm.type === 'call' || logForm.type === 'meeting') {
+        const autoRoleId = pipelines.length === 1 ? pipelines[0].id : ''
+        setDebriefModal({
+          open: true,
+          phase: 'input',
+          interactionId: data.id,
+          pipelineId: autoRoleId,
+          raw: '',
+          outcome: 'neutral',
+          extracted: null,
+          reviewSummary: '',
+          reviewNextAction: '',
+          error: null,
+        })
+      }
     }
     setLogSaving(false)
   }
@@ -1192,6 +1304,107 @@ export default function CandidateCard() {
     if (error) return error
     setScreenerHistory(prev => prev.filter(r => r.id !== resultId))
     return null
+  }
+
+  function handleOpenDebrief(interactionId) {
+    const autoRoleId = pipelines.length === 1 ? pipelines[0].id : ''
+    setDebriefModal({
+      open: true,
+      phase: 'input',
+      interactionId,
+      pipelineId: autoRoleId,
+      raw: '',
+      outcome: 'neutral',
+      extracted: null,
+      reviewSummary: '',
+      reviewNextAction: '',
+      error: null,
+    })
+  }
+
+  function closeDebriefModal() {
+    setDebriefModal(prev => ({ ...prev, open: false }))
+  }
+
+  async function handleExtractDebrief() {
+    if (!debriefModal.raw.trim()) return
+    setDebriefModal(prev => ({ ...prev, phase: 'extracting', error: null }))
+    try {
+      const role = pipelines.find(p => p.id === debriefModal.pipelineId)?.roles ?? null
+      const stage = pipelines.find(p => p.id === debriefModal.pipelineId)?.current_stage ?? null
+      const messages = buildDebriefExtractorMessages(candidate, role, stage, debriefs, debriefModal.raw)
+      const raw = await generateText({ messages, maxTokens: 2048 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const extracted = JSON.parse(cleaned)
+      setDebriefModal(prev => ({
+        ...prev,
+        phase: 'review',
+        extracted,
+        reviewSummary: extracted.summary ?? '',
+        reviewNextAction: extracted.next_action ?? '',
+      }))
+    } catch (err) {
+      setDebriefModal(prev => ({ ...prev, phase: 'error', error: err.message ?? 'Extraction failed.' }))
+    }
+  }
+
+  async function handleSaveDebrief() {
+    const { extracted, reviewSummary, reviewNextAction, interactionId, pipelineId, outcome, raw } = debriefModal
+    if (!extracted) return
+    setDebriefModal(prev => ({ ...prev, phase: 'saving' }))
+
+    const pipeline = pipelines.find(p => p.id === pipelineId)
+
+    const payload = {
+      recruiter_id:             recruiter.id,
+      candidate_id:             id,
+      pipeline_id:              pipelineId || pipelines[0]?.id,
+      role_id:                  pipeline?.role_id ?? pipelines[0]?.role_id,
+      interaction_id:           interactionId ?? null,
+      outcome,
+      feedback_raw:             raw,
+      summary:                  reviewSummary,
+      motivation_signals:       extracted.motivation_signals ?? [],
+      competitive_signals:      extracted.competitive_signals ?? [],
+      risk_flags:               extracted.risk_flags ?? [],
+      positive_signals:         extracted.positive_signals ?? [],
+      hiring_manager_signals:   extracted.hiring_manager_signals ?? [],
+      objections:               extracted.risk_flags ?? [],
+      strengths:                extracted.positive_signals ?? [],
+      next_action:              reviewNextAction,
+      questions_to_ask_next:    extracted.questions_to_ask_next ?? [],
+      updates_to_record:        extracted.updates_to_record ?? [],
+    }
+
+    const { data: saved, error } = await supabase.from('debriefs').insert(payload).select().single()
+    if (error) {
+      setDebriefModal(prev => ({ ...prev, phase: 'error', error: 'Couldn\'t save debrief. Try again.' }))
+      return
+    }
+
+    setDebriefs(prev => [saved, ...prev])
+
+    // Update pipeline next_action if we have a pipeline entry
+    if (pipelineId && reviewNextAction) {
+      await supabase
+        .from('pipeline')
+        .update({ next_action: reviewNextAction })
+        .eq('id', pipelineId)
+      setPipelines(prev => prev.map(p =>
+        p.id === pipelineId ? { ...p, next_action: reviewNextAction } : p
+      ))
+    }
+
+    // Surface latest summary on the candidate-level next action
+    if (reviewNextAction) {
+      await supabase
+        .from('candidates')
+        .update({ enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: reviewNextAction } })
+        .eq('id', id)
+      setSavedNextAction(reviewNextAction)
+    }
+
+    closeDebriefModal()
   }
 
   async function handleAddToRole(role) {
@@ -1531,6 +1744,12 @@ export default function CandidateCard() {
               : <span className="cc-sticky-next-action-empty">No next action set</span>
             }
           </div>
+          {debriefs[0]?.summary && (
+            <div className="cc-sticky-debrief">
+              <span className="cc-sticky-debrief-label">Last debrief</span>
+              <span className="cc-sticky-debrief-summary">{debriefs[0].summary}</span>
+            </div>
+          )}
         </div>
 
         {/* Next action edit form — shown inline when editing */}
@@ -1644,6 +1863,17 @@ export default function CandidateCard() {
           {signals?.length > 0 && (
             <section className="candidate-section">
               <SignalBadges signals={signals} />
+            </section>
+          )}
+
+          {/* Debrief signals */}
+          {debriefs.length > 0 && (
+            <section className="candidate-section">
+              <div className="section-heading-row">
+                <h2 className="section-heading">Debrief Signals</h2>
+                <span className="muted" style={{ fontSize: 12 }}>{debriefs.length} debrief{debriefs.length > 1 ? 's' : ''}</span>
+              </div>
+              <DebriefSignalPanel debriefs={debriefs} onOpenDebrief={() => handleOpenDebrief(null)} />
             </section>
           )}
 
@@ -1850,9 +2080,18 @@ export default function CandidateCard() {
               <p className="muted" style={{ marginTop: logOpen ? 16 : 4 }}>No interactions logged yet.</p>
             ) : (
               <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
-                {interactions.map(i => (
-                  <InteractionEntry key={i.id} interaction={i} onDelete={handleDeleteInteraction} />
-                ))}
+                {interactions.map(i => {
+                  const hasDebrief = debriefs.some(d => d.interaction_id === i.id)
+                  return (
+                    <InteractionEntry
+                      key={i.id}
+                      interaction={i}
+                      onDelete={handleDeleteInteraction}
+                      hasDebrief={hasDebrief}
+                      onDebrief={handleOpenDebrief}
+                    />
+                  )
+                })}
               </div>
             )}
           </section>
@@ -2123,6 +2362,161 @@ export default function CandidateCard() {
                   </button>
                   <button className="btn-ghost" onClick={handleSubGenerate}>Regenerate</button>
                   <button className="btn-ghost" onClick={closeSubModal}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Debrief modal */}
+      {debriefModal.open && (
+        <div className="modal-overlay" onClick={closeDebriefModal}>
+          <div className="modal modal--debrief" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Debrief</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name}</p>
+              </div>
+              <button className="modal-close" onClick={closeDebriefModal}>✕</button>
+            </div>
+
+            {debriefModal.phase === 'input' && (
+              <>
+                <div className="debrief-input-grid">
+                  <div className="debrief-input-row">
+                    <label className="debrief-input-label">Outcome</label>
+                    <select
+                      className="log-select"
+                      value={debriefModal.outcome}
+                      onChange={e => setDebriefModal(prev => ({ ...prev, outcome: e.target.value }))}
+                    >
+                      <option value="neutral">Neutral</option>
+                      <option value="advance">Advance</option>
+                      <option value="hold">Hold</option>
+                      <option value="reject">Reject</option>
+                    </select>
+                  </div>
+                  {pipelines.length > 1 && (
+                    <div className="debrief-input-row">
+                      <label className="debrief-input-label">Role</label>
+                      <select
+                        className="log-select"
+                        value={debriefModal.pipelineId}
+                        onChange={e => setDebriefModal(prev => ({ ...prev, pipelineId: e.target.value }))}
+                      >
+                        <option value="">Select role…</option>
+                        {pipelines.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.roles?.title ?? 'Unknown'}{p.roles?.clients?.name ? ` — ${p.roles.clients.name}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <textarea
+                  className="debrief-raw-textarea"
+                  placeholder="Paste transcript or brain dump — Zoom, Fathom, Granola, or typed notes…"
+                  rows={10}
+                  value={debriefModal.raw}
+                  onChange={e => setDebriefModal(prev => ({ ...prev, raw: e.target.value }))}
+                  autoFocus
+                />
+                <div className="modal-actions">
+                  <button
+                    className="btn-primary"
+                    onClick={handleExtractDebrief}
+                    disabled={!debriefModal.raw.trim()}
+                  >
+                    Extract signal
+                  </button>
+                  <button className="btn-ghost" onClick={closeDebriefModal}>Skip</button>
+                </div>
+              </>
+            )}
+
+            {debriefModal.phase === 'extracting' && (
+              <div className="modal-generating">
+                <div className="spinner spinner--sm" />
+                Extracting signal…
+              </div>
+            )}
+
+            {debriefModal.phase === 'error' && (
+              <>
+                <p className="error" style={{ marginTop: 8 }}>{debriefModal.error ?? 'Something went wrong.'}</p>
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={() => setDebriefModal(prev => ({ ...prev, phase: 'input', error: null }))}>
+                    Try again
+                  </button>
+                  <button className="btn-ghost" onClick={closeDebriefModal}>Close</button>
+                </div>
+              </>
+            )}
+
+            {(debriefModal.phase === 'review' || debriefModal.phase === 'saving') && debriefModal.extracted && (
+              <>
+                <div className="debrief-review">
+                  <div className="debrief-review-field">
+                    <label className="debrief-review-label">Summary</label>
+                    <textarea
+                      className="debrief-review-textarea"
+                      rows={3}
+                      value={debriefModal.reviewSummary}
+                      onChange={e => setDebriefModal(prev => ({ ...prev, reviewSummary: e.target.value }))}
+                    />
+                  </div>
+                  <div className="debrief-review-field">
+                    <label className="debrief-review-label">Next action</label>
+                    <textarea
+                      className="debrief-review-textarea"
+                      rows={2}
+                      value={debriefModal.reviewNextAction}
+                      onChange={e => setDebriefModal(prev => ({ ...prev, reviewNextAction: e.target.value }))}
+                    />
+                  </div>
+                  {DEBRIEF_SIGNAL_CATS.map(cat => {
+                    const items = debriefModal.extracted[cat.key]
+                    if (!items?.length) return null
+                    return (
+                      <div key={cat.key} className="debrief-review-signals">
+                        <span className={`debrief-signal-cat-label ${cat.cls}`}>{cat.label}</span>
+                        <ul className="debrief-signal-list">
+                          {items.map((item, i) => <li key={i}>{item}</li>)}
+                        </ul>
+                      </div>
+                    )
+                  })}
+                  {debriefModal.extracted.questions_to_ask_next?.length > 0 && (
+                    <div className="debrief-review-signals">
+                      <span className="debrief-signal-cat-label dsig--questions">Ask next</span>
+                      <ul className="debrief-signal-list">
+                        {debriefModal.extracted.questions_to_ask_next.map((q, i) => <li key={i}>{q}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {debriefModal.extracted.updates_to_record?.length > 0 && (
+                    <div className="debrief-review-signals">
+                      <span className="debrief-signal-cat-label dsig--updates">Update record</span>
+                      <ul className="debrief-signal-list debrief-signal-list--updates">
+                        {debriefModal.extracted.updates_to_record.map((u, i) => <li key={i}>{u}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-actions">
+                  <button
+                    className="btn-primary"
+                    onClick={handleSaveDebrief}
+                    disabled={debriefModal.phase === 'saving'}
+                  >
+                    {debriefModal.phase === 'saving' ? 'Saving…' : 'Save debrief'}
+                  </button>
+                  <button className="btn-ghost" onClick={() => setDebriefModal(prev => ({ ...prev, phase: 'input' }))}>
+                    Back
+                  </button>
+                  <button className="btn-ghost" onClick={closeDebriefModal}>Discard</button>
                 </div>
               </>
             )}
