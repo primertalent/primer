@@ -7,6 +7,7 @@ import { generateText } from '../lib/ai/index.js'
 import { buildJdMessages, buildJdPdfMessages } from '../lib/prompts/jdExtractor.js'
 import { buildBooleanSearchMessages } from '../lib/prompts/booleanSearchBuilder.js'
 import { buildJobDescriptionMessages } from '../lib/prompts/jobDescriptionWriter.js'
+import { useAgent } from '../context/AgentContext'
 
 async function fileToBase64(file) {
   const buffer = await file.arrayBuffer()
@@ -199,6 +200,7 @@ function StepsBuilder({ steps, onChange }) {
 export default function CreateRole() {
   const { recruiter } = useRecruiter()
   const navigate      = useNavigate()
+  const { fireResponse } = useAgent()
 
   const [clients, setClients] = useState([])
 
@@ -380,6 +382,18 @@ export default function CreateRole() {
           .catch(err => console.warn('Auto search string generation failed:', err.message))
       }
 
+      const hasFee = rolePayload.placement_fee_pct != null || rolePayload.placement_fee_flat != null
+      fireResponse('role_created', {
+        role: {
+          id:          newRole.id,
+          title:       rolePayload.title,
+          client_name: client.name,
+          comp_min:    rolePayload.comp_min,
+          comp_max:    rolePayload.comp_max,
+          has_fee:     hasFee,
+          has_jd:      !!rolePayload.notes,
+        },
+      })
       navigate('/roles')
     } catch (err) {
       setError(err.message)

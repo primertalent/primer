@@ -14,6 +14,7 @@ import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmai
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
 import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
 import { urgencyClass } from '../lib/urgency'
+import { useAgent } from '../context/AgentContext'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -882,6 +883,7 @@ export default function CandidateCard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { recruiter } = useRecruiter()
+  const { fireResponse, registerAction, unregisterAction } = useAgent()
 
   const [candidate, setCandidate] = useState(null)
   const [pipelines, setPipelines] = useState([])
@@ -1094,6 +1096,22 @@ export default function CandidateCard() {
     fetchAll()
   }, [id, recruiter])
 
+  // Register page-level action handlers so suggestion chips work while on this page
+  useEffect(() => {
+    registerAction('log_debrief',     ()    => handleOpenDebrief(null))
+    registerAction('log_interaction', ()    => handleLogOpen())
+    registerAction('set_expected_comp', (ctx) => {
+      const entry = pipelines.find(p => p.id === ctx?.pipeline_id) ?? pipelines[0]
+      if (entry) setCompModal({ open: true, entry, nextStage: entry.current_stage, comp: '', saving: false })
+    })
+    return () => {
+      unregisterAction('log_debrief')
+      unregisterAction('log_interaction')
+      unregisterAction('set_expected_comp')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelines])
+
   async function handleGenerateNextAction() {
     if (!candidate) return
     setSuggestion(null)
@@ -1210,6 +1228,21 @@ export default function CandidateCard() {
       // Roll back
       setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p))
     } else {
+      fireResponse('stage_advanced', {
+        candidate: {
+          id:              candidate?.id,
+          name:            candidate ? `${candidate.first_name} ${candidate.last_name}` : null,
+          current_title:   candidate?.current_title,
+        },
+        from_stage:    entry.current_stage,
+        to_stage:      nextStage,
+        expected_comp: entry.expected_comp,
+        role_title:    entry.roles?.title,
+        has_debriefs:  debriefs.length > 0,
+        risk_flags:    debriefs.flatMap(d => d.risk_flags ?? []).slice(0, 3),
+        motivation_signals: debriefs.flatMap(d => d.motivation_signals ?? []).slice(0, 2),
+        interactions_at_stage: interactions.filter(i => i.pipeline_id === entry.id).length,
+      })
       // Auto-regenerate next action in background — no await, never blocks UI
       ;(async () => {
         try {
@@ -1276,6 +1309,11 @@ export default function CandidateCard() {
     } else {
       setInteractions(prev => [data, ...prev])
       setLogOpen(false)
+      fireResponse('interaction_logged', {
+        candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
+        interaction: { type: logForm.type, occurred_at: data.occurred_at },
+        pipeline: pipelines[0] ? { id: pipelines[0].id, role_title: pipelines[0].roles?.title, current_stage: pipelines[0].current_stage } : null,
+      })
       // Auto-prompt for debrief after logging a call or meeting
       if (logForm.type === 'call' || logForm.type === 'meeting') {
         const autoRoleId = pipelines.length === 1 ? pipelines[0].id : ''
@@ -1447,6 +1485,18 @@ export default function CandidateCard() {
     }
 
     setDebriefs(prev => [saved, ...prev])
+
+    fireResponse('debrief_saved', {
+      candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
+      debrief: {
+        summary:             saved.summary,
+        risk_flags:          saved.risk_flags ?? [],
+        motivation_signals:  saved.motivation_signals ?? [],
+        competitive_signals: saved.competitive_signals ?? [],
+        next_action:         saved.next_action,
+      },
+      pipeline: resolvedPipeline ? { id: resolvedPipeline.id, role_title: resolvedPipeline.roles?.title, current_stage: resolvedPipeline.current_stage } : null,
+    })
 
     // Update pipeline next_action if we have a pipeline entry
     if (resolvedPipelineId && reviewNextAction) {

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { AgentProvider } from './context/AgentContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AgentProvider>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Login />} />
@@ -35,6 +37,7 @@ export default function App() {
           <Route path="/roles/:id/edit" element={<ProtectedRoute><EditRole /></ProtectedRoute>} />
           <Route path="/roles/new" element={<ProtectedRoute><CreateRole /></ProtectedRoute>} />
         </Routes>
+        </AgentProvider>
       </AuthProvider>
     </BrowserRouter>
   )

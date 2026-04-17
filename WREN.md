@@ -197,8 +197,10 @@ Active tables — all read and written by current code:
 | Component | Role |
 |---|---|
 | `Dashboard.jsx` | Deal desk home: WrenCommand (Zone 3), Pipeline Value (Zone 1), The Desk (Zone 2). |
-| `WrenCommand.jsx` | Command bar. Paste / file / URL → chips → intake or multi-screen result. |
-| `CandidateCard.jsx` | Candidate view. Sticky context bar + single-column scroll. |
+| `WrenCommand.jsx` | Command bar. Paste / file / URL → chips → auto-save intake or multi-screen result. Resume auto-parses on drop. File dedup by name+size. |
+| `WrenResponse.jsx` | Sticky bottom agent response bar. Shows after every action: thinking animation → message + suggestion chips. |
+| `AgentContext.jsx` | Global agent state. `fireResponse(action, context)` fires agentResponse prompt. `dispatch(actionId, context)` routes chip actions via page registry then navigation fallback. `registerAction` / `unregisterAction` for page-level handlers. |
+| `CandidateCard.jsx` | Candidate view. Sticky context bar + single-column scroll. Registers `log_debrief`, `log_interaction`, `set_expected_comp` action handlers. |
 | `RoleDetail.jsx` | Role view with kanban, search strings, interview questions, JD. |
 | `Queue.jsx` | End-of-day inbox. Drafts, approved, sent, held. |
 | `Candidates.jsx` | Network search. Find past candidates by stage, signal, skill, fit score, recency. Deal history, not inventory. |
@@ -231,7 +233,8 @@ If any answer is wrong, redesign or defer.
 ## Current state
 
 **What's built and working:**
-- WrenCommand: paste/upload/URL → intake → candidate created or multi-screen result
+- Conversational agent layer: WrenResponse sticky bottom bar speaks back after every action. Message + 1-3 suggestion chips. Thinking/speaking/error states with personality text rotation.
+- WrenCommand: paste/upload/URL → auto-saves intake/multi-screen → WrenResponse confirms. No Save All button. Resume auto-parses on drop (single resume, no result showing). File dedup by name+size.
 - Dashboard: Deal desk home (Zone 3 WrenCommand, Zone 1 Pipeline Value, Zone 2 The Desk)
   - Pipeline Value: primary total + probability-weighted, stage probabilities interviewing=0.25/offer=0.75/placed=1.00
   - The Desk: urgency-sorted deal rows (overdue → today → active/stale) with risk pills
@@ -288,6 +291,13 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Save All confirmation.** After successful save, action button replaced by static "Saved ✓" label.
 - **AI calls are server-side only.** All Anthropic calls go through `api/ai.js`. Non-negotiable.
 - **JSONB for flexible data.** Career timeline, signals, process steps, screener results, scorecard results, interview guide.
+- **Agent response fires after save, not during.** Save must commit before agentResponse is called. If agentResponse fails, save is already committed. WrenResponse renders error state: "Saved. Wren hit a branch generating next steps." User never loses data due to agent failure.
+- **WrenResponse renders in AppLayout as fixed bottom bar.** Lives above routes, persists across navigation. Thinking state sets before navigate; response fills in on the next page.
+- **Action dispatcher: page registry first, navigation fallback second.** Pages register handlers via `registerAction(actionId, fn)` on mount. `dispatch` checks registry before navigating. CandidateCard registers log_debrief, log_interaction, set_expected_comp.
+- **Pushback is honest observation, not blocking.** Action completes first. One pushback max per response. ~30-40% frequency. Never stacked.
+- **agentResponse voice rules.** 1-2 sentences. No em dashes. No "I have completed." Bird metaphors max every 4-5 responses. Banned verbs: tweet, fly, feather, nest, wings, egg, flutter, chirp. Never "you should" or "you need to."
+- **Save All removed from WrenCommand intake flow only.** CreateCandidate and CreateRole forms keep their submit buttons. Auto-save fires on IntakeResult/MultiScreenResult mount.
+- **Resume auto-parse: fires on drop only when no result is showing.** Single resume chip, no JD chips, no freeform text. Dedup: same name+size returns cached chip content, no re-fire.
 - **Pipeline value formula.** `placement_fee_flat` takes precedence. If null, `expected_comp * placement_fee_pct`. Stage probabilities: interviewing=0.25, offer=0.75, placed=1.00. Weighted = sum(fee * prob) across active entries in those stages.
 - **Expected comp is required for interview+ stages.** Blocking modal fires on stage advance to interviewing/offer/placed when `pipeline.expected_comp` is null. Soft prompt surfaces on load for existing entries missing comp.
 - **Placement fee defaults from recruiter profile.** `recruiters.default_placement_fee_pct` auto-fills `placement_fee_pct` on new role creation.

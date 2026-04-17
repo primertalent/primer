@@ -6,6 +6,7 @@ import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 import { generateText } from '../lib/ai'
 import { buildCvPdfMessages, buildCvTextMessages } from '../lib/prompts/cvExtraction'
+import { useAgent } from '../context/AgentContext'
 
 const ACCEPTED_TYPES = {
   'application/pdf': 'pdf',
@@ -157,6 +158,7 @@ function SkillsInput({ skills, onChange }) {
 export default function CreateCandidate() {
   const { recruiter } = useRecruiter()
   const navigate      = useNavigate()
+  const { fireResponse } = useAgent()
 
   const [roles, setRoles]         = useState([])
   const [extracting, setExtracting] = useState(false)
@@ -286,6 +288,18 @@ export default function CreateCandidate() {
         if (pipelineErr) throw new Error(pipelineErr.message)
       }
 
+      const selectedRole = roles.find(r => r.id === selectedRoleId) ?? null
+      fireResponse('candidate_created', {
+        candidate: {
+          id:              candidate.id,
+          name:            `${firstName.trim()} ${lastName.trim()}`,
+          current_title:   currentTitle.trim() || null,
+          current_company: currentCompany.trim() || null,
+          skills:          skills.slice(0, 8),
+          has_cv:          !!cvText,
+        },
+        role: selectedRole ? { id: selectedRole.id, title: selectedRole.title } : null,
+      })
       navigate(`/candidates/${candidate.id}`)
     } catch (err) {
       setFormError(err.message)

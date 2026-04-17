@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import mammoth from 'mammoth'
 import { supabase } from '../lib/supabase'
@@ -8,6 +8,7 @@ import { buildIntakeMessages, buildClassifyMessages } from '../lib/prompts/intak
 import { buildMultiScreenMessages } from '../lib/prompts/multiScreen'
 import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
 import { buildCvPdfMessages } from '../lib/prompts/cvExtraction'
+import { useAgent } from '../context/AgentContext'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -61,12 +62,15 @@ function SignalRow({ label, value }) {
   )
 }
 
-function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
+function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
   const [saveError, setSaveError]      = useState(null)
   const [copied, setCopied]            = useState(null)
+
+  // Auto-save on mount
+  useEffect(() => { handleSaveAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { candidate: c, role: r, screening: s, pitch, call_log, next_actions, freeform_answer } = result
 
@@ -208,6 +212,7 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
 
       setSaved(true)
       setSavedId(candidateId)
+      onSaved?.({ candidateId, candidate: c, role: r, screening: s })
     } catch (err) {
       console.error('Save All failed:', err)
       setSaveError('Save failed. Check console.')
@@ -291,18 +296,20 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
 
       <div className="intake-actions">
         <div className="intake-actions-right">
-          {saveError && <span className="intake-save-error">Couldn't save. Try again.</span>}
-          {saved ? (
+          {saving && <span className="intake-save-status">Saving…</span>}
+          {saveError && (
+            <>
+              <span className="intake-save-error">Couldn't save.</span>
+              <button className="btn-ghost btn-sm" onClick={handleSaveAll}>Try again</button>
+            </>
+          )}
+          {saved && (
             <>
               <span className="saved-label">Saved ✓</span>
               {savedCandidateId && (
                 <Link to={`/candidates/${savedCandidateId}`} className="btn-ghost btn-sm">View Candidate →</Link>
               )}
             </>
-          ) : (
-            <button className="btn-primary" onClick={handleSaveAll} disabled={saving}>
-              {saving ? 'Saving…' : 'Save All'}
-            </button>
           )}
         </div>
       </div>
@@ -315,11 +322,14 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear }) {
 const REC_LABEL = { advance: 'Advance', 'hold/advance': 'Hold → Advance', hold: 'Hold', 'hold/pass': 'Hold → Pass', pass: 'Pass' }
 const REC_CLASS = { advance: 'screener-rec--advance', 'hold/advance': 'screener-rec--hold', hold: 'screener-rec--hold', 'hold/pass': 'screener-rec--hold', pass: 'screener-rec--pass' }
 
-function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
+function MultiScreenResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
   const [saveError, setSaveError]      = useState(null)
+
+  // Auto-save on mount
+  useEffect(() => { handleSaveAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Per-role pitch state: { [rank]: { phase, email, bullets, emailCopied, bulletsCopied, emailSaved, bulletsSaved } }
   const [pitches, setPitches] = useState({})
@@ -464,6 +474,7 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
 
       setSaved(true)
       setSavedId(candidateId)
+      onSaved?.({ candidateId, candidate: c, rankings })
     } catch (err) {
       console.error('MultiScreen Save All failed:', err)
       setSaveError('Couldn\'t save. Try again.')
@@ -724,17 +735,17 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
         })}
       </div>
 
-      {/* Save */}
+      {/* Auto-save status */}
       <div className="intake-actions">
         <div className="intake-actions-right">
-          {saveError && <span className="intake-save-error">{saveError}</span>}
-          {saved ? (
-            <span className="saved-label">Saved ✓</span>
-          ) : (
-            <button className="btn-primary" onClick={handleSaveAll} disabled={saving}>
-              {saving ? 'Saving…' : `Save All (${rankings.length} roles)`}
-            </button>
+          {saving && <span className="intake-save-status">Saving…</span>}
+          {saveError && (
+            <>
+              <span className="intake-save-error">{saveError}</span>
+              <button className="btn-ghost btn-sm" onClick={handleSaveAll}>Try again</button>
+            </>
           )}
+          {saved && <span className="saved-label">Saved ✓</span>}
         </div>
       </div>
 
@@ -746,13 +757,29 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear }) {
 
 export default function WrenCommand() {
   const { recruiter }       = useRecruiter()
+  const { fireResponse }    = useAgent()
   const fileInputRef        = useRef(null)
+  const fileHashRef         = useRef(new Map()) // key: "name:size" → { type, label, content }
+  const autoSubmitRef       = useRef(false)
   const [chips, setChips]   = useState([])
   const [freeform, setFreeform] = useState('')
   const [loading, setLoading]       = useState(false)
   const [result, setResult]         = useState(null)
   const [multiResult, setMultiResult] = useState(null)
   const [error, setError]           = useState(null)
+
+  // Auto-parse: when a single resume chip finishes classifying and no result is showing, auto-submit
+  useEffect(() => {
+    if (!autoSubmitRef.current) return
+    if (chips.some(c => c.loading)) return
+    if (result || multiResult) { autoSubmitRef.current = false; return }
+    if (chips.length === 1 && chips[0]?.type === 'resume' && !freeform.trim()) {
+      autoSubmitRef.current = false
+      handleSubmit()
+    }
+  // handleSubmit is defined below — safe because useEffect fires after render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chips, result, multiResult])
 
   // ── Classify a text block and resolve a loading chip ──
 
@@ -764,11 +791,12 @@ export default function WrenCommand() {
       setChips(prev => prev.map(c =>
         c.id === id ? { ...c, type: parsed.type, label: parsed.label, loading: false } : c
       ))
+      return { type: parsed.type, label: parsed.label }
     } catch {
-      // Fallback: keep chip as 'notes'
       setChips(prev => prev.map(c =>
         c.id === id ? { ...c, type: 'notes', label: 'Document', loading: false } : c
       ))
+      return { type: 'notes', label: 'Document' }
     }
   }
 
@@ -825,6 +853,17 @@ export default function WrenCommand() {
   async function handleFiles(fileList) {
     const files = Array.from(fileList)
     for (const file of files) {
+      const fileKey = `${file.name}:${file.size}`
+
+      // Dedup: reuse cached parse result for same file
+      if (fileHashRef.current.has(fileKey)) {
+        const cached = fileHashRef.current.get(fileKey)
+        const id = Date.now() + Math.random()
+        setChips(prev => [...prev, { id, ...cached, loading: false }])
+        if (cached.type === 'resume' && !result && !multiResult) autoSubmitRef.current = true
+        continue
+      }
+
       const id = Date.now() + Math.random()
       setChips(prev => [...prev, { id, type: null, label: 'Reading…', content: null, loading: true }])
 
@@ -837,16 +876,16 @@ export default function WrenCommand() {
           const parsed = parseJson(raw)
           text = parsed?.cv_text || raw
         } else {
-          // .docx
           const buffer = await file.arrayBuffer()
           const res = await mammoth.extractRawText({ arrayBuffer: buffer })
           text = res.value
         }
 
         if (text.trim()) {
-          // Update chip content first, then classify
           setChips(prev => prev.map(c => c.id === id ? { ...c, content: text } : c))
-          await classifyAndUpdateChip(text, id)
+          const { type, label } = await classifyAndUpdateChip(text, id)
+          fileHashRef.current.set(fileKey, { type, label, content: text })
+          if (type === 'resume' && !result && !multiResult) autoSubmitRef.current = true
         } else {
           setChips(prev => prev.filter(c => c.id !== id))
         }
@@ -1022,8 +1061,45 @@ export default function WrenCommand() {
       )}
 
       {error && <p className="wren-command-error">{error}</p>}
-      {result && <IntakeResult result={result} recruiter={recruiter} jdChips={jdChips} onClear={() => setResult(null)} />}
-      {multiResult && <MultiScreenResult result={multiResult} recruiter={recruiter} jdChips={jdChips} onClear={() => setMultiResult(null)} />}
+      {result && (
+        <IntakeResult
+          result={result}
+          recruiter={recruiter}
+          jdChips={jdChips}
+          onClear={() => setResult(null)}
+          onSaved={({ candidate, role, screening }) => {
+            fireResponse('candidate_created', {
+              candidate: {
+                name:            candidate?.name,
+                current_title:   candidate?.current_title,
+                current_company: candidate?.current_company,
+              },
+              role:     role ? { title: role.title, company: role.company } : null,
+              screening: screening ? { score: screening.score } : null,
+            })
+          }}
+        />
+      )}
+      {multiResult && (
+        <MultiScreenResult
+          result={multiResult}
+          recruiter={recruiter}
+          jdChips={jdChips}
+          onClear={() => setMultiResult(null)}
+          onSaved={({ candidate, rankings }) => {
+            fireResponse('candidate_created', {
+              candidate: {
+                name:            candidate?.name,
+                current_title:   candidate?.current_title,
+                current_company: candidate?.current_company,
+              },
+              multi_screen: true,
+              roles_compared: rankings?.length ?? 0,
+              top_role: rankings?.[0] ? { title: rankings[0].role_title, score: rankings[0].match_score } : null,
+            })
+          }}
+        />
+      )}
     </section>
   )
 }
