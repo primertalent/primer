@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export default function AppLayout({ children }) {
+export default function AppLayout({ children, fullBleed = false }) {
   const { signOut } = useAuth()
 
   return (
@@ -14,6 +14,12 @@ export default function AppLayout({ children }) {
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
             Home
+          </NavLink>
+          <NavLink
+            to="/wren"
+            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+          >
+            Agent
           </NavLink>
           <NavLink
             to="/roles"
@@ -43,9 +49,10 @@ export default function AppLayout({ children }) {
         <button className="btn-ghost" onClick={signOut}>Sign out</button>
       </header>
 
-      <main className="app-main">
-        {children}
-      </main>
+      {fullBleed
+        ? <div className="app-full">{children}</div>
+        : <main className="app-main">{children}</main>
+      }
     </div>
   )
 }

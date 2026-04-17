@@ -59,7 +59,8 @@ function extractSkillsFromNotes(notes) {
   const commonSkills = ['Python', 'JavaScript', 'TypeScript', 'Go', 'Rust', 'Java', 'C++', 'React',
     'Node', 'AWS', 'GCP', 'Azure', 'Kubernetes', 'Docker', 'SQL', 'PostgreSQL', 'Salesforce',
     'Figma', 'Product', 'Sales', 'Marketing', 'Finance', 'Legal', 'HR', 'Operations']
-  return commonSkills.filter(s => new RegExp(s, 'i').test(notes)).slice(0, 5)
+  const notesLower = notes.toLowerCase()
+  return commonSkills.filter(s => notesLower.includes(s.toLowerCase())).slice(0, 5)
 }
 
 function formatComp(min, max, type) {

@@ -16,6 +16,7 @@ import Clients from './pages/Clients'
 import ClientDetail from './pages/ClientDetail'
 import EditCandidate from './pages/EditCandidate'
 import CallMode from './pages/CallMode'
+import Wren from './pages/Wren'
 
 export default function App() {
   return (
@@ -126,6 +127,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CreateRole />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wren"
+            element={
+              <ProtectedRoute>
+                <Wren />
               </ProtectedRoute>
             }
           />
