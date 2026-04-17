@@ -3,6 +3,20 @@
 
 ---
 
+## The thesis
+
+**Wren turns candidates into placements.**
+
+You know how to source. Your Sales Navigator, your network, your referrals — that's your craft. Wren starts the moment you have a candidate. Paste a URL, a resume, ugly LinkedIn copy — any of it works. From there, Wren handles everything between "I found them" and "they signed the offer": screening, pitching, submissions, outreach, follow-ups, replies, interview prep, debriefs, re-engagement.
+
+Sourcing is the *visible* part of the job. Closing is the *real* one. Competitors pitch on the top of the funnel. Wren owns the bottom — the part where the money lives, where relationships deepen, and where every existing tool fails to help.
+
+The moat is the memory. Every interaction, submission, objection, and debrief gets captured and compounds. A recruiter with six months in Wren has a system that knows their book of business. Sourcing tools are replaceable. That is not.
+
+Every build decision defends that thesis. If a feature doesn't help turn a candidate into a placement, it doesn't ship.
+
+---
+
 ## What Wren is
 
 Wren is an agent that works the desk of a solo independent recruiter.
@@ -193,9 +207,10 @@ If any answer is wrong, redesign or defer.
 - Auto-generate search strings on role create
 
 **What's next:**
-- Real-use audit in progress (2026-04-16 through 2026-04-23). Friction logged in `friction.md`.
-- Phase 3 items after audit: split CandidateCard, split WrenCommand, auto-set `next_action_due_at`, wire "Draft Follow-Up"
-- Time-elapsed triggers via Supabase Edge Functions (after audit)
+- Friction fixes from the real-use audit (see `AUDIT.md` when active)
+- Time-elapsed triggers via Supabase Edge Functions on a schedule
+- Auto-set `next_action_due_at` when next action fires
+- Wire "Draft Follow-Up" on Needs Attention to actually draft
 
 **Do not build yet:**
 - Team features, shared pipelines, assignments
