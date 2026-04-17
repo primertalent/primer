@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -7,15 +7,26 @@ import { highestUrgencyClass } from '../lib/urgency'
 
 // ── Constants ─────────────────────────────────────────
 
-const SOURCE_LABELS = {
-  sourced:   'Sourced',
-  inbound:   'Inbound',
-  referral:  'Referral',
-  job_board: 'Job Board',
-  other:     'Other',
+const SIGNAL_CONFIG = {
+  'Promoted':          { color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
+  'Long Tenure':       { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  'Fast Riser':        { color: '#6b21a8', bg: '#faf5ff', border: '#e9d5ff' },
+  'AI Experience':     { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc' },
+  "President's Club":  { color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
+  'Quota Buster':      { color: '#166534', bg: '#dcfce7', border: '#86efac' },
 }
 
+const ALL_SIGNALS = Object.keys(SIGNAL_CONFIG)
+
+const STAGE_OPTIONS = ['sourced', 'screening', 'shortlisted', 'interviewing', 'offer', 'placed']
+
 // ── Helpers ───────────────────────────────────────────
+
+function topEntry(pipeline) {
+  const active = (pipeline ?? []).filter(p => p.status === 'active')
+  if (!active.length) return null
+  return active.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+}
 
 function highestFit(pipeline) {
   return (pipeline ?? []).reduce((max, p) => {
@@ -24,8 +35,11 @@ function highestFit(pipeline) {
   }, -1)
 }
 
-function activePipelineCount(pipeline) {
-  return (pipeline ?? []).filter(p => p.status === 'active').length
+function highestRecruiterScore(pipeline) {
+  return (pipeline ?? []).reduce((max, p) => {
+    if (p.recruiter_score != null && p.recruiter_score > max) return p.recruiter_score
+    return max
+  }, -1)
 }
 
 function formatLastTouch(iso) {
@@ -43,17 +57,13 @@ function formatLastTouch(iso) {
 
 // ── Sub-components ────────────────────────────────────
 
-function FitBadge({ score, inPipeline }) {
-  if (score < 0) {
-    if (inPipeline) return <span className="fit-badge fit-badge--unscreened">Unscreened</span>
-    return <span className="fit-badge fit-badge--none">—</span>
-  }
+function FitBadge({ score }) {
+  if (score < 0) return <span className="muted">—</span>
   const tenth = score / 10
   const display = Number.isInteger(tenth) ? tenth : tenth.toFixed(1)
-  let variant = 'none'
+  let variant = 'red'
   if (score >= 80) variant = 'green'
   else if (score >= 50) variant = 'amber'
-  else variant = 'red'
   return (
     <span className={`fit-badge fit-badge--${variant}`}>
       {display}<span className="fit-badge-denom">/10</span>
@@ -61,14 +71,42 @@ function FitBadge({ score, inPipeline }) {
   )
 }
 
-function SkillTags({ skills }) {
-  if (!skills?.length) return <span className="muted" style={{ fontSize: 12 }}>—</span>
-  const visible = skills.slice(0, 3)
-  const extra = skills.length - 3
+function RecruiterScoreBadge({ score }) {
+  if (score < 0) return <span className="muted">—</span>
+  let variant = 'red'
+  if (score >= 8) variant = 'green'
+  else if (score >= 5) variant = 'amber'
   return (
-    <div className="skill-tags-sm">
-      {visible.map(s => <span key={s} className="skill-tag-sm">{s}</span>)}
-      {extra > 0 && <span className="skill-tag-sm skill-tag-sm--more">+{extra}</span>}
+    <span className={`fit-badge fit-badge--${variant}`}>
+      {score}<span className="fit-badge-denom">/10</span>
+    </span>
+  )
+}
+
+function SignalPips({ signals }) {
+  const arr = signals ?? []
+  if (!arr.length) return <span className="muted">—</span>
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {arr.slice(0, 3).map(s => {
+        const cfg = SIGNAL_CONFIG[s]
+        if (!cfg) return null
+        return (
+          <span
+            key={s}
+            className="signal-badge"
+            title={s}
+            style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}
+          >
+            {s}
+          </span>
+        )
+      })}
+      {arr.length > 3 && (
+        <span className="signal-badge" style={{ background: 'var(--color-bg)', color: 'var(--color-muted)', borderColor: 'var(--color-border)' }}>
+          +{arr.length - 3}
+        </span>
+      )}
     </div>
   )
 }
@@ -91,18 +129,21 @@ export default function Candidates() {
   const { recruiter } = useRecruiter()
   const navigate = useNavigate()
 
-  const [candidates, setCandidates] = useState([])
-  const [lastTouchMap, setLastTouchMap] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [fetchError, setFetchError] = useState(null)
+  const [candidates, setCandidates]       = useState([])
+  const [lastTouchMap, setLastTouchMap]   = useState({})
+  const [loading, setLoading]             = useState(true)
+  const [fetchError, setFetchError]       = useState(null)
 
   const [search, setSearch]               = useState('')
-  const [searchResults, setSearchResults] = useState(null) // null = not in search mode
+  const [searchResults, setSearchResults] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
-  const [sourceFilter, setSourceFilter]   = useState('')
+  const [stageFilter, setStageFilter]     = useState('')
+  const [signalFilter, setSignalFilter]   = useState('')
   const [skillFilter, setSkillFilter]     = useState('')
-  const [sortCol, setSortCol]             = useState('name')
-  const [sortDir, setSortDir]             = useState('asc')
+  const [fitFilter, setFitFilter]         = useState('')
+  const [recencyFilter, setRecencyFilter] = useState('')
+  const [sortCol, setSortCol]             = useState('lastTouch')
+  const [sortDir, setSortDir]             = useState('desc')
 
   useEffect(() => {
     if (!recruiter?.id) return
@@ -113,8 +154,12 @@ export default function Candidates() {
           .from('candidates')
           .select(`
             id, first_name, last_name, current_title, current_company,
-            location, source, skills,
-            pipeline ( id, status, fit_score, next_action_due_at )
+            skills, career_signals,
+            pipeline (
+              id, status, current_stage, fit_score, recruiter_score,
+              next_action_due_at, created_at,
+              roles ( id, title )
+            )
           `)
           .eq('recruiter_id', recruiter.id)
           .order('created_at', { ascending: false }),
@@ -129,7 +174,6 @@ export default function Candidates() {
       if (candidatesRes.error) setFetchError('Couldn\'t load candidates. Try refreshing.')
       else setCandidates(candidatesRes.data ?? [])
 
-      // Build candidate_id → most recent interaction date map
       const map = {}
       for (const row of interactionsRes.data ?? []) {
         if (!map[row.candidate_id]) map[row.candidate_id] = row.occurred_at
@@ -151,13 +195,21 @@ export default function Candidates() {
     }
     setSearchLoading(true)
     const timer = setTimeout(async () => {
-      const terms = q.split(/\s+/).slice(0, 3) // cap at 3 terms
+      const terms = q.split(/\s+/).slice(0, 3)
       const orClause = terms
         .map(t => `first_name.ilike.%${t}%,last_name.ilike.%${t}%,current_title.ilike.%${t}%,current_company.ilike.%${t}%`)
         .join(',')
       const { data } = await supabase
         .from('candidates')
-        .select('id, first_name, last_name, current_title, current_company, location, source, skills, pipeline ( id, status, fit_score, next_action_due_at )')
+        .select(`
+          id, first_name, last_name, current_title, current_company,
+          skills, career_signals,
+          pipeline (
+            id, status, current_stage, fit_score, recruiter_score,
+            next_action_due_at, created_at,
+            roles ( id, title )
+          )
+        `)
         .eq('recruiter_id', recruiter.id)
         .or(orClause)
         .order('created_at', { ascending: false })
@@ -167,7 +219,6 @@ export default function Candidates() {
     return () => clearTimeout(timer)
   }, [search, recruiter?.id])
 
-  // Unique skills across all candidates for the filter dropdown
   const allSkills = useMemo(() => {
     const set = new Set()
     for (const c of candidates) {
@@ -179,17 +230,37 @@ export default function Candidates() {
   function handleSort(col) {
     setSortCol(prev => {
       if (prev === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return col }
-      setSortDir('asc')
+      setSortDir('desc')
       return col
     })
   }
 
   const filtered = useMemo(() => {
-    // Use DB search results when a search is active, otherwise the full loaded list
     const base = searchResults ?? candidates
+    const cutoff = recencyFilter
+      ? new Date(Date.now() - parseInt(recencyFilter, 10) * 86400000)
+      : null
+
     let list = base.filter(c => {
-      if (sourceFilter && c.source !== sourceFilter) return false
       if (skillFilter && !(c.skills ?? []).includes(skillFilter)) return false
+      if (signalFilter && !(c.career_signals ?? []).includes(signalFilter)) return false
+
+      const top = topEntry(c.pipeline)
+      if (stageFilter && top?.current_stage?.toLowerCase() !== stageFilter) return false
+
+      if (fitFilter) {
+        const fit = highestFit(c.pipeline)
+        if (fitFilter === 'strong'     && fit < 80)                   return false
+        if (fitFilter === 'solid'      && (fit < 50 || fit >= 80))    return false
+        if (fitFilter === 'low'        && (fit < 0  || fit >= 50))    return false
+        if (fitFilter === 'unscreened' && fit >= 0)                   return false
+      }
+
+      if (cutoff) {
+        const lt = lastTouchMap[c.id]
+        if (!lt || new Date(lt) < cutoff) return false
+      }
+
       return true
     })
 
@@ -197,8 +268,10 @@ export default function Candidates() {
       let cmp = 0
       if (sortCol === 'name') {
         cmp = `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
-      } else if (sortCol === 'fit') {
+      } else if (sortCol === 'aiScore') {
         cmp = highestFit(b.pipeline) - highestFit(a.pipeline)
+      } else if (sortCol === 'recruiterScore') {
+        cmp = highestRecruiterScore(b.pipeline) - highestRecruiterScore(a.pipeline)
       } else if (sortCol === 'lastTouch') {
         const aD = lastTouchMap[a.id] ? new Date(lastTouchMap[a.id]).getTime() : 0
         const bD = lastTouchMap[b.id] ? new Date(lastTouchMap[b.id]).getTime() : 0
@@ -208,13 +281,24 @@ export default function Candidates() {
     })
 
     return list
-  }, [candidates, searchResults, sourceFilter, skillFilter, sortCol, sortDir, lastTouchMap])
+  }, [candidates, searchResults, stageFilter, signalFilter, skillFilter, fitFilter, recencyFilter, sortCol, sortDir, lastTouchMap])
+
+  const hasFilters = stageFilter || signalFilter || skillFilter || fitFilter || recencyFilter || search
+
+  function clearFilters() {
+    setSearch('')
+    setStageFilter('')
+    setSignalFilter('')
+    setSkillFilter('')
+    setFitFilter('')
+    setRecencyFilter('')
+  }
 
   return (
     <AppLayout>
       <div className="roles-header">
         <div>
-          <h1 className="brief-headline">Candidates</h1>
+          <h1 className="brief-headline">Your Network</h1>
           <p className="brief-date">
             {loading
               ? 'Loading…'
@@ -222,11 +306,11 @@ export default function Candidates() {
               ? 'Searching…'
               : searchResults !== null
               ? `${filtered.length} ${filtered.length === 1 ? 'result' : 'results'}`
-              : `${filtered.length} of ${candidates.length} ${candidates.length === 1 ? 'candidate' : 'candidates'}`}
+              : `${filtered.length} of ${candidates.length} in network`}
           </p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/candidates/new')}>
-          New Candidate
+          Add Candidate
         </button>
       </div>
 
@@ -241,12 +325,33 @@ export default function Candidates() {
           />
           <select
             className="field-input candidates-source-filter"
-            value={sourceFilter}
-            onChange={e => setSourceFilter(e.target.value)}
+            value={stageFilter}
+            onChange={e => setStageFilter(e.target.value)}
           >
-            <option value="">All sources</option>
-            {Object.entries(SOURCE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            <option value="">All stages</option>
+            {STAGE_OPTIONS.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+          <select
+            className="field-input candidates-source-filter"
+            value={fitFilter}
+            onChange={e => setFitFilter(e.target.value)}
+          >
+            <option value="">All fit scores</option>
+            <option value="strong">Strong (8+)</option>
+            <option value="solid">Solid (5–7)</option>
+            <option value="low">Low (&lt;5)</option>
+            <option value="unscreened">Unscreened</option>
+          </select>
+          <select
+            className="field-input candidates-source-filter"
+            value={signalFilter}
+            onChange={e => setSignalFilter(e.target.value)}
+          >
+            <option value="">All signals</option>
+            {ALL_SIGNALS.map(s => (
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
           <select
@@ -259,6 +364,21 @@ export default function Candidates() {
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+          <select
+            className="field-input candidates-source-filter"
+            value={recencyFilter}
+            onChange={e => setRecencyFilter(e.target.value)}
+          >
+            <option value="">Any time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          {hasFilters && (
+            <button className="btn-ghost btn-sm" onClick={clearFilters}>
+              Clear
+            </button>
+          )}
         </div>
       )}
 
@@ -280,15 +400,9 @@ export default function Candidates() {
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <p className="empty-state-title">No candidates match your filters.</p>
-          <p className="empty-state-body" style={{ marginBottom: 0 }}>
-            <button
-              className="btn-ghost btn-sm"
-              onClick={() => { setSearch(''); setSourceFilter(''); setSkillFilter('') }}
-              style={{ marginTop: 12 }}
-            >
-              Clear filters
-            </button>
-          </p>
+          <button className="btn-ghost btn-sm" onClick={clearFilters} style={{ marginTop: 12 }}>
+            Clear filters
+          </button>
         </div>
       ) : (
         <div className="candidates-table-wrap">
@@ -296,62 +410,57 @@ export default function Candidates() {
             <thead>
               <tr>
                 <SortHeader label="Name" col="name" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                <th className="candidates-th">Title / Company</th>
-                <th className="candidates-th">Location</th>
-                <th className="candidates-th">Source</th>
-                <th className="candidates-th">Skills</th>
-                <SortHeader label="Fit" col="fit" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                <th className="candidates-th">Roles</th>
+                <th className="candidates-th">Last Role</th>
+                <th className="candidates-th">Stage</th>
                 <SortHeader label="Last Touch" col="lastTouch" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <th className="candidates-th">Signals</th>
+                <SortHeader label="You" col="recruiterScore" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <SortHeader label="AI" col="aiScore" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
               {filtered.map(c => {
-                const fit = highestFit(c.pipeline)
-                const active = activePipelineCount(c.pipeline)
+                const top = topEntry(c.pipeline)
+                const aiScore = highestFit(c.pipeline)
+                const recScore = highestRecruiterScore(c.pipeline)
                 const lastTouch = lastTouchMap[c.id] ?? null
+                const urgency = highestUrgencyClass(c.pipeline)
                 return (
                   <tr key={c.id} className="candidates-tr">
                     <td className="candidates-td candidates-td--name">
                       <Link to={`/candidates/${c.id}`} className="candidate-table-name">
+                        {urgency && <span className={`urgency-dot ${urgency}`} />}
                         {c.first_name} {c.last_name}
                       </Link>
-                    </td>
-                    <td className="candidates-td">
-                      {(c.current_title || c.current_company) ? (
-                        <span className="candidate-table-role">
+                      {(c.current_title || c.current_company) && (
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
                           {[c.current_title, c.current_company].filter(Boolean).join(' · ')}
                         </span>
-                      ) : <span className="muted">—</span>}
+                      )}
                     </td>
                     <td className="candidates-td">
-                      <span className="candidate-table-location">{c.location || '—'}</span>
+                      {top?.roles?.title
+                        ? <span className="candidate-table-role">{top.roles.title}</span>
+                        : <span className="muted">—</span>}
                     </td>
                     <td className="candidates-td">
-                      {c.source ? (
-                        <span className={`source-badge source-badge--${c.source}`}>
-                          {SOURCE_LABELS[c.source] ?? c.source}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td className="candidates-td">
-                      <SkillTags skills={c.skills} />
-                    </td>
-                    <td className="candidates-td">
-                      <FitBadge score={fit} inPipeline={active > 0} />
-                    </td>
-                    <td className="candidates-td">
-                      {active > 0 ? (
-                        <span className="candidate-table-roles">
-                          {(() => { const uc = highestUrgencyClass(c.pipeline); return uc ? <span className={`urgency-dot ${uc}`} /> : null })()}
-                          {active} {active === 1 ? 'role' : 'roles'}
-                        </span>
-                      ) : <span className="muted">—</span>}
+                      {top?.current_stage
+                        ? <span className="stage-badge">{top.current_stage}</span>
+                        : <span className="muted">—</span>}
                     </td>
                     <td className="candidates-td">
                       <span className="candidate-table-touch">
                         {formatLastTouch(lastTouch) ?? <span className="muted">—</span>}
                       </span>
+                    </td>
+                    <td className="candidates-td">
+                      <SignalPips signals={c.career_signals} />
+                    </td>
+                    <td className="candidates-td">
+                      <RecruiterScoreBadge score={recScore} />
+                    </td>
+                    <td className="candidates-td">
+                      <FitBadge score={aiScore} />
                     </td>
                   </tr>
                 )

@@ -3,6 +3,24 @@
 
 ---
 
+## V3 Product Framing
+
+**Wren is the deal desk for solo recruiters.**
+
+It pressure-tests candidates, runs closes, and surfaces signals and risk. At every decision point in a live deal — intake, screen, submission, follow-up, debrief, offer — Wren tells the recruiter what the situation is and what to do next.
+
+Not an OS. Not a co-pilot. Not a chatbot. A deal desk agent with recruiter logic.
+
+The questions Wren answers:
+- Is this candidate closeable?
+- What are the gaps — motivation, comp, competing offers, hiring manager readiness?
+- What's the next move to advance or protect this deal?
+- Where is this deal at risk?
+
+Every build decision should advance one of these four questions.
+
+---
+
 ## The thesis
 
 **Wren turns candidates into placements.**
@@ -35,11 +53,19 @@ The agent is useless without the platform. The platform is just an ATS without t
 
 ## The shift that defines the roadmap
 
-**Today:** Skills fire on button press.
-**Next:** Skills fire on events. (Three are live: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create.)
+**Today:** Most skills fire on button press. Three are event-driven (see below).
+**Next:** More skills migrate to event triggers as real-use patterns confirm the right firing conditions.
 **Later:** Wren works overnight. Screens incoming resumes. Drafts submissions. Queues follow-ups. Surfaces what needs action tomorrow.
 
 Every feature should move one step toward the later version. The test on every build: *did Wren get more autonomous this session, or just prettier?*
+
+**Event-driven today (fire without a button press):**
+- Auto-screen when a candidate is added to a role (fires on pipeline insert)
+- Auto-regenerate next action when stage advances (fires on stage change)
+- Auto-generate search strings when a role is created (fires on role create)
+
+**Button-driven today (candidates for future event migration):**
+- Resume screener, scorecard, pitch builder, submission draft, outreach, interview questions, intake — all triggered manually. Migration path: identify the event that makes each one useful (e.g., submission draft fires when stage advances to "Shortlisted").
 
 ---
 
@@ -144,19 +170,26 @@ Wren is channel-agnostic. It drafts. The recruiter delivers.
 
 ## Data model (Supabase)
 
+Active tables — all read and written by current code:
+
 | Table | Purpose |
 |---|---|
 | `recruiters` | auth user profile |
 | `candidates` | full record: `cv_text`, `career_timeline` (JSONB), `career_signals` (JSONB), `enrichment_data` (JSONB) |
-| `roles` | open positions: `notes` (JD), `process_steps` (JSONB), `interview_guide` (JSONB) |
+| `roles` | open positions: `notes` (JD), `process_steps` (JSONB) |
 | `clients` | companies with contacts |
 | `client_contacts` | contacts linked to clients |
-| `pipeline` | candidate × role: `current_stage`, `fit_score`, `fit_score_rationale`, `recruiter_score`, `recruiter_note`, `scorecard_result` (JSONB), `screener_result` (JSONB), `next_action`, `next_action_due_at` |
+| `pipeline` | candidate × role: `current_stage`, `fit_score`, `fit_score_rationale`, `recruiter_score`, `recruiter_note`, `scorecard_result` (JSONB), `screener_result` (JSONB), `next_action`, `next_action_due_at`, `submitted_at`, `last_followup_at` |
 | `pipeline_stage_history` | every stage movement |
 | `interactions` | every touchpoint (call, email, note, meeting) |
 | `screener_results` | standalone screener history, no pipeline dependency |
 | `messages` | drafted / approved / sent / held outreach |
-| `daily_briefs` | morning brief data |
+
+Scaffolded, implementation pending:
+
+| Table | Status |
+|---|---|
+| `debriefs` | Schema only. Intended for post-interview debrief capture. V3 priority item. |
 
 **JSONB where structure will evolve.** Career timeline, signals, process steps, screener results, scorecard results. No migrations needed when the shape changes.
 
@@ -173,6 +206,7 @@ Wren is channel-agnostic. It drafts. The recruiter delivers.
 | `CandidateCard.jsx` | Candidate view. Sticky context bar + single-column scroll. |
 | `RoleDetail.jsx` | Role view with kanban, search strings, interview questions, JD. |
 | `Queue.jsx` | End-of-day inbox. Drafts, approved, sent, held. |
+| `Candidates.jsx` | Network search. Find past candidates by stage, signal, skill, fit score, recency. Deal history, not inventory. |
 | `api/ai.js` | Server-side Anthropic passthrough. |
 | `src/lib/prompts/` | Every skill. |
 
@@ -201,18 +235,35 @@ If any answer is wrong, redesign or defer.
 
 ## Current state
 
-**Event-based triggers (live):**
-- Auto-screen when a candidate is added to a role
-- Auto-regenerate next action on stage advance
-- Auto-generate search strings on role create
+**What's built and working:**
+- WrenCommand: paste/upload/URL → intake → candidate created or multi-screen result
+- Dashboard: The Brief (ActivityDigest, NeedsAttention)
+- CandidateCard: full deal view — timeline, signals, screener, scorecard, pipeline, interactions, submission drafts
+- RoleDetail: kanban pipeline + interview questions + search strings + JD
+- Queue: drafted / approved / sent / held outreach
+- Candidates: network search by stage, signal, skill, fit score, recency
+- Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create
+- Recruiter score + AI score as separate permanent tracks on every pipeline entry
 
-**What's next:**
-- Friction fixes from the real-use audit (see `AUDIT.md` when active)
+**What's been cut:**
+- Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
+- Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
+- Daily Brief skill — removed. Redundant with Dashboard.
+- Boolean Search skill — removed. Sourcing tool, not deal desk.
+
+**V3 priority queue (do not build this session — queued for future):**
+- Debrief capture on interactions (`debriefs` table scaffolded, zero implementation)
+- Role activation scans candidate database for existing fits
+- Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
+- Close sequence generator by stage (what needs to happen to get from here to offer)
+- Risk flags: counter-offer risk, thin motivation, stalled hiring manager
+
+**What's next (current priorities):**
 - Time-elapsed triggers via Supabase Edge Functions on a schedule
 - Auto-set `next_action_due_at` when next action fires
 - Wire "Draft Follow-Up" on Needs Attention to actually draft
 
-**Do not build yet:**
+**Do not build:**
 - Team features, shared pipelines, assignments
 - Chrome extension (v2)
 - Gmail integration (v2)
