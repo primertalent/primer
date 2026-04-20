@@ -90,7 +90,7 @@ function PipelineValue({ recruiter }) {
     <section className="pv-section">
       <div className="pv-header">
         <span className="pv-eyebrow">Pipeline Value</span>
-        <Link to="/roles" className="pv-link">Roles →</Link>
+        <Link to="/roles" className="pv-link">Deals →</Link>
       </div>
 
       {loading ? (
@@ -205,7 +205,7 @@ function TheDesk({ recruiter }) {
     <section className="desk-section">
       <div className="desk-header">
         <span className="desk-eyebrow">The Desk</span>
-        <Link to="/candidates/new" className="desk-link">+ Add candidate</Link>
+        <Link to="/network/new" className="desk-link">+ Add candidate</Link>
       </div>
 
       {loading ? (

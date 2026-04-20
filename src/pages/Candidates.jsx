@@ -309,7 +309,7 @@ export default function Candidates() {
               : `${filtered.length} of ${candidates.length} in network`}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => navigate('/candidates/new')}>
+        <button className="btn-primary" onClick={() => navigate('/network/new')}>
           Add Candidate
         </button>
       </div>
@@ -393,7 +393,7 @@ export default function Candidates() {
         <div className="empty-state">
           <p className="empty-state-title">No candidates yet.</p>
           <p className="empty-state-body">Drop a resume in the command bar or add one manually to get started.</p>
-          <button className="btn-primary" onClick={() => navigate('/candidates/new')}>
+          <button className="btn-primary" onClick={() => navigate('/network/new')}>
             Add a candidate
           </button>
         </div>

@@ -92,7 +92,7 @@ export default function Roles() {
     <AppLayout>
       <div className="roles-header">
         <div>
-          <h1 className="brief-headline">Roles</h1>
+          <h1 className="brief-headline">Deals</h1>
           <p className="brief-date">Active positions in your pipeline</p>
         </div>
         <button className="btn-primary" onClick={() => navigate('/roles/new')}>

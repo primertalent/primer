@@ -22,15 +22,18 @@ export default function App() {
       <AuthProvider>
         <AgentProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/desk" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/candidates" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
-          <Route path="/candidates/new" element={<ProtectedRoute><CreateCandidate /></ProtectedRoute>} />
-          <Route path="/candidates/:id" element={<ProtectedRoute><CandidateCard /></ProtectedRoute>} />
-          <Route path="/candidates/:id/edit" element={<ProtectedRoute><EditCandidate /></ProtectedRoute>} />
-          <Route path="/candidates/:id/call" element={<ProtectedRoute><CallMode /></ProtectedRoute>} />
+          <Route path="/desk" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<Navigate to="/desk" replace />} />
+          <Route path="/network" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
+          <Route path="/network/new" element={<ProtectedRoute><CreateCandidate /></ProtectedRoute>} />
+          <Route path="/network/:id" element={<ProtectedRoute><CandidateCard /></ProtectedRoute>} />
+          <Route path="/network/:id/edit" element={<ProtectedRoute><EditCandidate /></ProtectedRoute>} />
+          <Route path="/network/:id/call" element={<ProtectedRoute><CallMode /></ProtectedRoute>} />
+          <Route path="/candidates" element={<Navigate to="/network" replace />} />
+          <Route path="/candidates/new" element={<Navigate to="/network/new" replace />} />
           <Route path="/queue" element={<ProtectedRoute><Queue /></ProtectedRoute>} />
           <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
           <Route path="/roles/:id" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />

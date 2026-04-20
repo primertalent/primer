@@ -82,7 +82,7 @@ export default function CallMode() {
     return (
       <div className="call-mode-shell">
         <p className="call-mode-not-found">Candidate not found.</p>
-        <button className="btn-ghost" onClick={() => navigate('/candidates')}>Back</button>
+        <button className="btn-ghost" onClick={() => navigate('/network')}>Back</button>
       </div>
     )
   }

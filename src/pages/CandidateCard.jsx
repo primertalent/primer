@@ -1696,7 +1696,7 @@ export default function CandidateCard() {
     if (!window.confirm(`Delete ${candidate.first_name} ${candidate.last_name}? This cannot be undone.`)) return
     setDeleting(true)
     await supabase.from('candidates').delete().eq('id', id)
-    navigate('/candidates')
+    navigate('/network')
   }
 
   async function handleParseCareer() {
@@ -2269,7 +2269,7 @@ export default function CandidateCard() {
         <div className="page-error">
           <p className="page-error-title">Candidate not found.</p>
           <p className="page-error-body">This record may have been deleted or you may not have access.</p>
-          <button className="btn-ghost" onClick={() => navigate('/candidates')}>Back to Candidates</button>
+          <button className="btn-ghost" onClick={() => navigate('/network')}>Back to Network</button>
         </div>
       </AppLayout>
     )
@@ -2290,7 +2290,7 @@ export default function CandidateCard() {
         {/* Page header — back + Zone C only */}
         <div className="page-header">
           <div className="page-header-left">
-            <button className="btn-back" onClick={() => navigate('/candidates')}>← Back</button>
+            <button className="btn-back" onClick={() => navigate('/network')}>← Back</button>
           </div>
           <div className="page-header-actions" style={{ position: 'relative' }}>
             <button className="btn-ghost btn-sm" onClick={() => setZoneCOpen(v => !v)}>⋯ More</button>

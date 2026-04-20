@@ -11,22 +11,22 @@ export default function AppLayout({ children, fullBleed = false }) {
         <span className="wordmark">Wren</span>
         <nav className="app-nav">
           <NavLink
-            to="/dashboard"
+            to="/desk"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
-            Home
+            Desk
           </NavLink>
           <NavLink
             to="/roles"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
-            Roles
+            Deals
           </NavLink>
           <NavLink
-            to="/candidates"
+            to="/network"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >
-            Candidates
+            Network
           </NavLink>
         </nav>
         <button className="btn-ghost" onClick={signOut}>Sign out</button>
