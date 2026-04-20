@@ -6445,6 +6445,57 @@ select.field-input {
   color: var(--color-muted);
 }
 
+/* ── Role Status Bar extensions ──────────────────────────── */
+
+.rsb-value-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.rsb-potential {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.rsb-in-play {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.rsb-fee-label {
+  font-size: 11px;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.rsb-no-value {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.rsb-days-open {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.zone-c-item--danger {
+  color: var(--color-error);
+}
+.zone-c-item--danger:hover {
+  background: var(--color-error-bg);
+}
+
 /* ── Debrief summary card ────────────────────────────────── */
 
 .debrief-summary-card {

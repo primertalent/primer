@@ -6,6 +6,23 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 18 — 2026-04-20
+**WREN.md strategy updates + Role page deal cockpit refactor.**
+
+- **WREN.md**: 7 additive sections — ICP (solo recruiter, no ATS, LinkedIn + spreadsheets), "Wren is not an ATS" architecture principle, Wren Actions Tray spec, Bulk Import / Onboarding spec (candidates, clients, roles, agreements), Data Integration Path (Phase 1/2/3 + market signal triggers), 6 new Decisions Log entries. V3 priority queue updated. Role page redesign removed from deferred list (shipped).
+- **RoleDetail refactored as role-level deal cockpit**:
+  - Role Status Bar (sticky): drool number (potential deal value) + current pipeline value + fee label | days open | health pills (Stalled, Cold client, No interviews, Overdue follow-up, Fee not set, Agreement missing) | next action. Potential value: `target_comp midpoint × openings × fee_pct`, or `fee_flat × openings`.
+  - Health pills: stalled from pipeline_stage_history, cold client from candidate interactions, overdue from `next_action_due_at`. Non-blocking secondary fetch.
+  - Zone A/B/C: Zone A = Edit role; Zone B = Build search strings + Generate IQ; Zone C = Close/Delete popover.
+  - Network match suggestions: stub UI, logic deferred.
+  - JD auto-format on load: fires once if `notes` exists and `formatted_jd` null. Stores clean version in `formatted_jd`. Raw JD in collapsible details below. Format button removed.
+  - Candidate row action buttons now `stopPropagation` (fixes link navigation bug).
+  - Fee fields (`placement_fee_pct`, `placement_fee_flat`) now fetched on load (fixes EditRole return bug).
+- **Queue removed from nav**. File/route preserved. Queue deleted when Actions Tray ships.
+- **Schema (pending Supabase run)**: Migration A — `external_id`, `source` on candidates/roles/clients; `target_comp_min`, `target_comp_max`, `openings`, `formatted_jd` on roles. Migration B — `agreements` table, `candidate_imports` table, FK links on roles/clients.
+
+---
+
 ## Session 17 — 2026-04-20
 **CandidateCard workflow refactor. Deal view, not ATS record.**
 

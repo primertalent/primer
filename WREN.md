@@ -21,6 +21,28 @@ Every build decision should advance one of these four questions.
 
 ---
 
+## ICP
+
+Primary user: the solo independent recruiter running on LinkedIn Recruiter, spreadsheets, email, and maybe Paraform. No ATS. No coordinator. No team. 5 to 20+ years of recruiting experience. Billing $150k to $1M+ annually, entirely on their own effort.
+
+This user is underserved by every existing tool. Enterprise ATSes (Bullhorn, Greenhouse, Ashby) are too heavy. Modern ATSes (Crelate, Recruiterflow, Loxo) still require setup, training, data migration. Sourcing tools (Gem, HireEZ) solve the wrong problem. AI recruiting startups target in-house TA teams.
+
+Wren meets them where they are. Paste a resume, paste a JD, paste call notes. Wren does the deal desk work the recruiter doesn't have time for. No migration, no integration, no setup.
+
+Secondary users eventually: small boutiques (2–3 recruiters), recruiters inside Paraform's network, agency recruiters frustrated by their firm's ATS. Not the focus now.
+
+Not the user: in-house TA teams, corporate recruiters, high-volume sourcing shops, anyone whose primary job is req management rather than closing.
+
+---
+
+## Wren is not an ATS
+
+An ATS stores data. Wren uses data to run the deal. Wren coexists with whatever system of record a recruiter already uses, or with no system at all. The intelligence layer is what Wren owns.
+
+Design principle: Wren's architecture should not assume it is the system of record. Candidates, roles, and clients get `external_id` (nullable) and `source` fields. Wren-native records get `source = 'wren'`. Future imports or integrations get their own source tags. Intelligence layer data (debriefs, signals, agent actions, pipeline value calculations) stays separate from source records.
+
+---
+
 ## The thesis
 
 **Wren turns candidates into placements.**
@@ -255,6 +277,18 @@ If any answer is wrong, redesign or defer.
 - Debrief capture: paste transcript or brain dump → extract structured signal (motivation, competitive, risk, positive, HM signals, next action, questions to ask, record updates) → save to debriefs table → surface on sticky context bar and debrief signals section
 - Placement fee fields on roles (% of comp or flat fee, defaults from recruiter profile)
 - Schema: `roles.placement_fee_pct`, `roles.placement_fee_flat`, `pipeline.expected_comp`, `recruiters.default_placement_fee_pct`
+- RoleDetail refactored as role-level deal cockpit:
+  - **Role Status Bar** (sticky top): role title + client subtitle | potential deal value (big) + current pipeline value + fee label | days open | health pills (Stalled, Cold client, No interviews, Overdue follow-up, Fee not set, Agreement missing) | next action
+  - Potential deal value: `target_comp_min/max midpoint × openings × fee_pct`, or `fee_flat × openings`. Falls back to sum of `expected_comp × fee` across active pipeline.
+  - Health pills derive from pipeline state, stage history, and interactions — non-blocking secondary fetch.
+  - Zone A/B/C structure: Zone A = Edit role link; Zone B = Build search strings, Generate IQ; Zone C = Close role, Delete (overflow popover).
+  - Network match suggestions: stubbed, logic deferred to next session.
+  - JD auto-format on load: if `notes` exists and `formatted_jd` is null, auto-runs cleaning prompt, stores result in `formatted_jd`. No Format button. Raw JD in collapsible `<details>` below.
+  - Submission draft modal retained (unchanged functionality).
+  - Bug fixes: fee fields now fetched on load (visible after EditRole return); candidate row click has `stopPropagation` on action buttons.
+- Queue removed from nav. File preserved, route preserved. Queue deleted when Actions Tray ships.
+- Schema Migration A (pending run in Supabase): `external_id` + `source` on candidates, roles, clients; `target_comp_min`, `target_comp_max`, `openings`, `formatted_jd` on roles.
+- Schema Migration B (pending run in Supabase): `agreements` table, `candidate_imports` table, `roles.agreement_id`, `clients.default_agreement_id`.
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
@@ -264,6 +298,8 @@ If any answer is wrong, redesign or defer.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 
 **V3 priority queue (do not build this session — queued for future):**
+- Wren Actions Tray (replaces Queue)
+- Bulk Import / Onboarding (candidates, clients, roles, agreements)
 - Role activation scans candidate database for existing fits
 - Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
 - Close sequence generator by stage (what needs to happen to get from here to offer)
@@ -280,6 +316,110 @@ If any answer is wrong, redesign or defer.
 - Gmail integration (v2)
 - New analytics or reporting surfaces
 - Any second recruiter's feature requests
+
+---
+
+## Wren Actions Tray
+
+Purpose: make Wren's ongoing work visible to the user. Replace Queue with a persistent ambient action layer that surfaces what needs attention across all deals, from anywhere in the app.
+
+Design inspiration: Crusader Kings 3 suggestion panel. Always available, never empty past a certain point, respects dismissals, regenerates based on state.
+
+**Behavior:**
+- Persistent across all pages (sticky side or bottom, collapsible)
+- Badge count shows pending actions
+- Click to expand, see full list sorted by priority
+- Each row: icon, short description, entity context, click-to-navigate, dismiss button, snooze button
+- Click action navigates to the right surface with context loaded
+- Dismiss removes from tray
+- Snooze hides for 24 hours
+- Vital actions regenerate if ignored past a threshold
+- Priority: risk flags > overdue > missing data > opportunities
+
+**Action types Wren generates:**
+- Risk flags (counter offer, stalled, cold client, thin motivation)
+- Overdue next actions (candidate follow-up due, HM check-in due)
+- Missing data (expected comp, fee, target comp range, debrief after logged call)
+- Opportunities (network candidates matching active roles, MPC pitch moments)
+- Drafted messages awaiting send
+
+**Architecture:**
+- `actions` table: `id`, `recruiter_id`, `action_type`, `context` JSONB, `priority`, `created_at`, `dismissed_at`, `snoozed_until`, `linked_entity_id`, `linked_entity_type`
+- Actions generator runs on a cadence plus on key state changes
+- Client-side render on page load, subscribe to new actions via Supabase realtime
+
+Replaces Queue entirely. Queue gets deleted when Actions Tray ships.
+
+Positioning: proves Wren is always working. Foundation for overnight autonomous mode.
+
+---
+
+## Bulk Import / Onboarding
+
+Purpose: A solo recruiter with years of history shouldn't rebuild their desk from scratch. First-run Wren should feel like they brought their career into the product.
+
+Scope: candidates, clients, roles, and agreements.
+
+**Candidate import:**
+- CSV/Excel with column mapping (ATS exports: Bullhorn, Greenhouse, Loxo, Crelate, Recruiterflow, PCRecruiter; LinkedIn Recruiter TSV; personal spreadsheets)
+- Bulk resume folder (PDFs/DOCXs via drag-drop or Google Drive)
+- Per-row: create record, deduplicate, queue enrichment (CV extraction, career timeline, signals, initial scoring), flag gaps
+
+**Client import:**
+- CRM export CSVs and spreadsheets
+- Fields: company name, contact info, past roles, past placements, notes, preferred comms
+- Dedupe on domain and company name
+
+**Role import:**
+- ATS role tables, closed role archives
+- Fields: title, client, comp range, status, dates, candidates, outcomes
+- Link to clients on import, enrich JDs if attached
+
+**Agreement import:**
+- PDFs of fee agreements, engagement letters, MSAs, NDAs
+- Parse with Claude: fee %, flat fee, refund clauses, exclusivity, replacement guarantees, payment terms, effective/expiration dates
+- Store both raw PDF (Supabase Storage) and structured extracted terms
+- Link to client, optionally link to specific role
+- User reviews and confirms extracted terms before source of truth
+- Agreement informs fee calculations, pipeline value, and Wren pushback on missing/expired contracts
+
+**Data model additions:**
+- `candidate_imports` table tracks import runs
+- `agreements` table (raw PDF + parsed terms JSONB + structured core fields)
+- `roles.agreement_id` as optional link
+- `clients.default_agreement_id` as fallback
+
+**Pipeline per import:**
+- File to Supabase Storage
+- Serverless function processes asynchronously
+- Reuses existing prompts, adds new `agreementExtractor` prompt
+- Progress tracked, report at end
+
+**Surfaces:**
+- Onboarding: "Bring your history into Wren" flow after account creation
+- Ongoing: Import button on Your Network, Roles, and Settings
+- Agreement review: dedicated review screen after parsing
+
+**Why agreements matter:** Every deal desk move that touches money references a contract. Parsed terms mean pipeline value is grounded in reality, not manual input. Wren surfaces expiring agreements, missing agreements on active roles, terms relevant to stalled deals. Most recruiting tools ignore agreements entirely. Real differentiator.
+
+Priority: V1 important but not this week. Likely ships before second user is onboarded or when demos to prospects begin.
+
+---
+
+## Data Integration Path
+
+**Phase 1 (now):** Manual entry + bulk import covers all data needs. Solo recruiters on Paraform, spreadsheets, and LinkedIn have full Wren value without integrations.
+
+**Phase 2 (triggered by market signal, not timeline):** Direct ATS integrations. Build order driven by user demand. Likely starting with Paraform, Loxo, Crelate, Recruiterflow. Consider Merge.dev as Unified API accelerator for broader coverage.
+
+**Phase 3 (long game):** Wren becomes the intelligence layer over whichever ATS the recruiter uses. ATS holds the record, Wren runs the deal. Bidirectional sync so Wren's enrichment flows back into the ATS optionally.
+
+**Triggers to start Phase 2:**
+- 3+ prospects request the same ATS integration in a short window
+- Existing users cite integration as the reason for churn or blocked upgrade
+- A prospect says "I'd pay more for this" with ATS integration specifically named
+
+Not a user count threshold. A market signal threshold.
 
 ---
 
@@ -322,6 +462,12 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Resume auto-parses on card load if cv_text exists but no career_timeline.** One-shot via ref guard — fires once per card load, not on every render.
 - **Call Prep module is a stub in Zone A.** "Prep for next interview", "Lock comp expectations", "Prep for counter offer" show a stub message until the Wednesday build replaces them.
 - **Zone B pitch and interview questions render inline below Zone B.** No separate modal needed for results. Copy button available. Dismiss button clears result.
+- **ICP locked as solo recruiter with no ATS, LinkedIn + spreadsheets + Paraform.** Secondary users (boutiques, Paraform network, frustrated agency recruiters) are eventually in scope but not the build focus now. Not the user: in-house TA, corporate recruiters, high-volume sourcing shops.
+- **Wren is positioned as the intelligence layer, not the system of record.** Coexists with any ATS or no ATS. `external_id` and `source` fields added to candidates, roles, and clients for future optionality. Wren-native records get `source = 'wren'`.
+- **Queue to be deleted, replaced by Actions Tray.** Queue is a passive inbox. Actions Tray is ambient, persistent, prioritized, and Wren-generated. Deletion happens after Actions Tray ships.
+- **Bulk import scoped for candidates, clients, roles, and agreements.** Agreements parsed via Claude — fee %, refund clauses, exclusivity, expiration. Raw PDF stored in Supabase Storage alongside structured extracted terms. User confirms before source of truth.
+- **ATS integrations deferred until market signal.** Trigger: 3+ prospects request the same integration, churn citing integration gap, or explicit willingness to pay. Not a user count threshold. Merge.dev considered as Unified API accelerator.
+- **`external_id` and `source` fields added to candidates, roles, clients schema.** Migration A. `source` defaults to `'wren'`. Future imports tag their own source. Intelligence layer data stays separate from source records.
 
 ---
 
@@ -388,7 +534,6 @@ Daily brief opens with BD vs recruit guidance based on reqs and Good Client coun
 - BD activity counter: 10 suggested touches a day, ranked by conversion likelihood
 
 **DEFERRED THIS SESSION:**
-- Role page redesign (next session)
 - Network page sorting (separate cleanup)
 - Fit score vs tier debate (product decision, not a build)
 - Off topic fallback (backlog)

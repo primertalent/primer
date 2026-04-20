@@ -28,13 +28,6 @@ export default function AppLayout({ children, fullBleed = false }) {
           >
             Candidates
           </NavLink>
-          <NavLink
-            to="/queue"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Queue
-          </NavLink>
-
         </nav>
         <button className="btn-ghost" onClick={signOut}>Sign out</button>
       </header>
