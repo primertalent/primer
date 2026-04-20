@@ -1312,7 +1312,6 @@ export default function CandidateCard() {
   const [collapseSignals, setCollapseSignals] = useState(true)
   const [collapsePipeline, setCollapsePipeline] = useState(true)
   const [collapseScoreHistory, setCollapseScoreHistory] = useState(true)
-  const [collapseDetails, setCollapseDetails] = useState(true)
   const [stageHistory, setStageHistory] = useState(null)
   const [stageHistoryLoading, setStageHistoryLoading] = useState(false)
   const [zoneCOpen, setZoneCOpen] = useState(false)
@@ -2655,27 +2654,10 @@ export default function CandidateCard() {
             </CollapsibleSection>
           )}
 
-          {/* Edit / Details (collapsed) */}
-          <CollapsibleSection
-            title="Details & Edit"
-            collapsed={collapseDetails}
-            onToggle={() => setCollapseDetails(v => !v)}
-          >
-            <DetailRow label="Email" value={candidate.email} />
-            <DetailRow label="Phone" value={candidate.phone} />
-            <DetailRow label="Location" value={candidate.location} />
-            {candidate.linkedin_url && (
-              <DetailRow label="LinkedIn" value={<a href={candidate.linkedin_url} target="_blank" rel="noreferrer">Profile ↗</a>} />
-            )}
-            <DetailRow label="Source" value={SOURCE_LABELS[candidate.source] ?? candidate.source} />
-            <div className="detail-row"><span className="detail-label">Skills</span><SkillTags skills={candidate.skills} /></div>
-            {candidate.notes && (
-              <div className="detail-row detail-row--block"><span className="detail-label">Notes</span><p className="detail-notes">{candidate.notes}</p></div>
-            )}
-            <div style={{ marginTop: 16 }}>
-              <Link className="btn-ghost btn-sm" to={`/candidates/${id}/edit`}>Edit candidate →</Link>
-            </div>
-          </CollapsibleSection>
+          {/* Edit candidate link */}
+          <section className="candidate-section">
+            <Link className="btn-ghost btn-sm" to={`/candidates/${id}/edit`}>Edit candidate →</Link>
+          </section>
 
         </div>
 
