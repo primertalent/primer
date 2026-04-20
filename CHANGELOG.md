@@ -6,6 +6,22 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 17 — 2026-04-20
+**CandidateCard workflow refactor. Deal view, not ATS record.**
+
+- **Deal Status Bar**: replaced old sticky context bar. Two-row layout — identity + role + stage + days-in-stage + AI/recruiter scores + risk pills | next action + expected comp chip. Risk pills (Comp gap, Counter offer risk, Thin motivation, Slow HM, Stalled) derived from debrief JSONB at render time. Counter offer risk also fires on Long Tenure + passive signals.
+- **Card hierarchy reordered**: latest debrief summary card → debrief signals → Zone A/B/C actions → interactions log → pipeline (collapsed) → resume/timeline (collapsed) → all debriefs (collapsed) → career signals (collapsed) → screener results (collapsed) → details (collapsed).
+- **Zone A "Work this deal"**: state-based rules (stage + last interaction age + debrief status) pick max 3 primary actions. Call-prep stubs for interview/offer-stage actions (Wednesday build).
+- **Zone B "Generate"**: submission, outreach, LinkedIn, pitch, interview questions. Pitch + IQ results render inline.
+- **Zone C "More"**: popover — Call Mode, Edit, Remove from pipeline, Mark as placed.
+- **Interaction editing**: click any interaction row → modal to edit type + notes. Debrief link preserved.
+- **Resume auto-parse on load**: if `cv_text` exists but no `career_timeline`, fires once on card mount. No button needed.
+- **Interactions log**: 3 visible by default, "show more" expands.
+- **Collapsible below-fold sections**: resume, all debriefs, career signals, screener results, details all collapsed by default. Content not rendered until expanded (lazy).
+- **WREN.md**: current state updated, new decisions logged, V3 priority queue updated with Call Prep module, Knowledge Base / V2 Feature Concepts section added.
+
+---
+
 ## Session 16 — 2026-04-16
 **Audit phases 1 and 2. No new features. Debt cleared before real-use testing.**
 

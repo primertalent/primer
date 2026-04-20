@@ -200,7 +200,7 @@ Active tables — all read and written by current code:
 | `WrenCommand.jsx` | Command bar. Paste / file / URL → chips → auto-save intake or multi-screen result. Resume auto-parses on drop. File dedup by name+size. |
 | `WrenResponse.jsx` | Sticky bottom agent response bar. Shows after every action: thinking animation → message + suggestion chips. |
 | `AgentContext.jsx` | Global agent state. `fireResponse(action, context)` fires agentResponse prompt. `dispatch(actionId, context)` routes chip actions via page registry then navigation fallback. `registerAction` / `unregisterAction` for page-level handlers. |
-| `CandidateCard.jsx` | Candidate view. Sticky context bar + single-column scroll. Registers `log_debrief`, `log_interaction`, `set_expected_comp` action handlers. |
+| `CandidateCard.jsx` | Candidate deal view. Deal Status Bar (sticky, replaces old context bar) + three-zone action panel + single-column scroll. Registers `log_debrief`, `log_interaction`, `set_expected_comp` action handlers. |
 | `RoleDetail.jsx` | Role view with kanban, search strings, interview questions, JD. |
 | `Queue.jsx` | End-of-day inbox. Drafts, approved, sent, held. |
 | `Candidates.jsx` | Network search. Find past candidates by stage, signal, skill, fit score, recency. Deal history, not inventory. |
@@ -238,7 +238,14 @@ If any answer is wrong, redesign or defer.
 - Dashboard: Deal desk home (Zone 3 WrenCommand, Zone 1 Pipeline Value, Zone 2 The Desk)
   - Pipeline Value: primary total + probability-weighted, stage probabilities interviewing=0.25/offer=0.75/placed=1.00
   - The Desk: urgency-sorted deal rows (overdue → today → active/stale) with risk pills
-- CandidateCard: full deal view — timeline, signals, screener, scorecard, pipeline, interactions, submission drafts
+- CandidateCard: refactored as a live deal view (not a record view)
+  - **Deal Status Bar** (sticky top): candidate name + current role/company | role link | stage + days-in-stage | AI score / recruiter score (color-coded) | risk pills (Comp gap, Counter offer risk, Thin motivation, Slow HM, Stalled) | next action | expected comp or "Set comp" chip. For off-pipeline candidates: last touch + signal badges + "Add to a role" chip. Counter offer risk derives from `debrief.motivation_signals`, `competitive_signals`, `risk_flags` (keywords: underpaid, comp gap, passive, below market) + `career_signals` Long Tenure flag.
+  - **Card hierarchy**: Deal Status Bar → Latest debrief summary card → Debrief signals panel → Zone A/B/C actions → Interactions log (3 visible, show more) → Pipeline (collapsed) → Resume & timeline (collapsed) → All debriefs (collapsed) → Career signals (collapsed) → Screener results (collapsed) → Details & edit (collapsed)
+  - **Zone A "Work this deal"**: max 3 contextual primary actions via state-based rules (stage + last interaction + debrief status). Stage-specific: log interaction, log debrief, screen vs role, prep interview, lock comp, prep counter offer. Call-prep stubs for interview/offer actions (Wednesday build replaces stubs).
+  - **Zone B "Generate"**: draft submission, outreach, LinkedIn, pitch, interview questions. Pitch + IQ results render inline below Zone B.
+  - **Zone C "More"**: overflow popover — Call Mode, Edit candidate, Remove from pipeline, Mark as placed.
+  - Interaction editing: click any interaction row → edit modal for type + notes. Preserves `debrief_id` link on save. "Debrief linked" notice shown.
+  - Resume auto-parses on card load if `cv_text` exists but `career_timeline` is null (no button press needed).
   - Expected comp blocking modal on stage advance to interviewing/offer/placed when expected_comp is null
 - RoleDetail: kanban pipeline + interview questions + search strings + JD
 - Queue: drafted / approved / sent / held outreach
@@ -260,7 +267,7 @@ If any answer is wrong, redesign or defer.
 - Role activation scans candidate database for existing fits
 - Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
 - Close sequence generator by stage (what needs to happen to get from here to offer)
-- Risk flags: counter-offer risk, thin motivation, stalled hiring manager
+- **Call Prep module** (Wednesday build): one module, used across every "pick up the phone" moment. Zone A stubs for "Prep for next interview", "Lock comp expectations", "Prep for counter offer" will route here.
 
 **What's next (current priorities):**
 - Time-elapsed triggers via Supabase Edge Functions on a schedule
@@ -308,6 +315,13 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Single column beats multi-column for dense content.** If content length is unpredictable, don't put it in a fixed-width column.
 - **Event-based triggers ship first. Time-elapsed triggers later.** Event triggers fire synchronously off user actions, no new infra. Time-elapsed triggers need scheduled jobs (Supabase Edge Functions or cron). Don't build time-elapsed until event triggers are proven in real use.
 - **Full prompt lives in `src/lib/prompts/`.** `api/ai.js` is a passthrough only. No prompts hardcoded server-side. Single source of truth.
+- **CandidateCard is a deal view, not an ATS record.** Top-to-bottom order: what is this deal, what's at risk, what do I do next. Reference material (resume, full debrief list, career signals) lives collapsed below the fold.
+- **Zone A actions are state-based rules, not a prompt call.** Stage + last-interaction age + debrief-on-latest-interaction determines which 3 actions surface. Fast and deterministic. No API call on card load.
+- **Risk pills derive from debrief JSONB, not new capture.** `motivation_signals`, `competitive_signals`, `risk_flags` text is scanned for keywords at render time. Counter offer risk also fires on `career_signals` Long Tenure when passive indicators are present.
+- **Interaction editing preserves debrief link.** Edit modal patches `type` and `body` only. `debrief_id` is never touched. "Debrief linked" note shown in modal.
+- **Resume auto-parses on card load if cv_text exists but no career_timeline.** One-shot via ref guard — fires once per card load, not on every render.
+- **Call Prep module is a stub in Zone A.** "Prep for next interview", "Lock comp expectations", "Prep for counter offer" show a stub message until the Wednesday build replaces them.
+- **Zone B pitch and interview questions render inline below Zone B.** No separate modal needed for results. Copy button available. Dismiss button clears result.
 
 ---
 
@@ -326,3 +340,57 @@ State what you're building. Full context, no re-briefing needed.
 - Update **Current state** if a new capability shipped or priorities shifted
 - Add new architectural decisions to **Decisions log**
 - Log the session in `CHANGELOG.md`
+
+---
+
+## Knowledge Base / V2 Feature Concepts
+
+Sourced from practitioner posts and conversations. These inform future builds but are not V1 scope unless noted.
+
+**BD INTELLIGENCE LAYER (Deal Desk V2):**
+- MPC marketing: one-click generation of most placeable candidate pitches to target client list
+- Job-opening approach: match open roles (client records or scraped JDs) against candidate database, surface pitch suggestions
+- BD signal extraction from candidate calls: capture "where else are you interviewing," "through a recruiter or direct," "who did you speak with," "what triggered the hire"
+- Company record auto-creation when candidates name hiring companies
+- Pre-call prep briefs: "I know / I heard / I saw" intelligence before BD calls
+
+**NETWORK INTELLIGENCE (V2):**
+- Network check-in queue: randomly surface contacts not touched in 30/60/90 days with a human check-in message
+- Last contacted aging on every record, visible as a signal
+- Warm over cold: Wren biases suggestions toward existing network first
+
+**ROLE QUALITY SCORING (V2):**
+- Score roles at intake on fee potential, fill probability, exclusivity, HM access, process clarity
+- Surface role health score in pipeline view
+- "What problem is this hire meant to solve?" as anchor question at role intake
+
+**GOOD CLIENT SCORING (V2):**
+Five binary criteria per client record:
+- Fee at or above 20%, no refund
+- 2+ of the same req open
+- Interview cadence active (one in last 7 days, one scheduled next 7)
+- 3 or fewer interview stages, offers through recruiter
+- Phone reachable within 24 hours
+
+Wren scores 0–5. 5/5 = Good Client. Visible on client record and daily brief.
+
+**BD VS RECRUIT DIRECTIVE (V2):**
+Daily brief opens with BD vs recruit guidance based on reqs and Good Client count. Removes guesswork.
+- Weekly formula: 0–5 reqs BD daily, 6–10 BD 3 days, 11–15 BD 1 day, 16+ pure recruit
+- Daily formula (split-desk): 5+ Good Clients = no BD. Full-desk: 3+ Good Clients = no BD.
+
+**RISK AND QUALIFYING SIGNALS:**
+- Counter-offer risk (expand V1 logic with tenure + comp delta + reasons for leaving)
+- Role stall patterns: submittals without interviews, slow feedback, rescheduling
+- Time in stage triggers for disqualification
+
+**DAILY DISCIPLINE:**
+- BD activity counter: 10 suggested touches a day, ranked by conversion likelihood
+
+**DEFERRED THIS SESSION:**
+- Role page redesign (next session)
+- Network page sorting (separate cleanup)
+- Fit score vs tier debate (product decision, not a build)
+- Off topic fallback (backlog)
+- Call Prep module full build (Wednesday session)
+- Any V2 feature from the Knowledge Base section

@@ -13,6 +13,7 @@ import { buildScorecardMessages } from '../lib/prompts/candidateScorecard'
 import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmail'
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
 import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
+import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
 import { urgencyClass } from '../lib/urgency'
 import { useAgent } from '../context/AgentContext'
 
@@ -366,7 +367,7 @@ function PipelineEntry({ entry, onAdvance, advancing, onRemove }) {
   )
 }
 
-function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief }) {
+function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief, onEdit }) {
   const [confirm, setConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -383,14 +384,17 @@ function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief }) {
   }
 
   return (
-    <div className="interaction-entry">
+    <div
+      className="interaction-entry interaction-entry--clickable"
+      onClick={() => onEdit && onEdit(interaction)}
+    >
       <div className="interaction-meta">
         <span className="interaction-type">{TYPE_LABELS[interaction.type] ?? interaction.type}</span>
         {interaction.direction && (
           <span className="interaction-direction">{interaction.direction}</span>
         )}
         <span className="interaction-date">{formatDateShort(interaction.occurred_at)}</span>
-        <button className="btn-row-remove" onClick={() => setConfirm(true)} title="Delete">×</button>
+        <button className="btn-row-remove" onClick={e => { e.stopPropagation(); setConfirm(true) }} title="Delete">×</button>
       </div>
       {interaction.subject && (
         <p className="interaction-subject">{interaction.subject}</p>
@@ -401,7 +405,7 @@ function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief }) {
       {onDebrief && !hasDebrief && (
         <button
           className="btn-ghost btn-sm debrief-btn"
-          onClick={() => onDebrief(interaction.id)}
+          onClick={e => { e.stopPropagation(); onDebrief(interaction.id) }}
         >
           + Debrief
         </button>
@@ -410,7 +414,7 @@ function InteractionEntry({ interaction, onDelete, hasDebrief, onDebrief }) {
         <span className="debrief-logged-badge">Debriefed</span>
       )}
       {confirm && (
-        <div className="inline-confirm">
+        <div className="inline-confirm" onClick={e => e.stopPropagation()}>
           <span>Delete this interaction?</span>
           <button className="btn-confirm-yes" onClick={handleDelete} disabled={deleting}>
             {deleting ? 'Deleting…' : 'Yes, delete'}
@@ -877,6 +881,328 @@ function DebriefSignalPanel({ debriefs, onOpenDebrief }) {
   )
 }
 
+// ── New helpers ───────────────────────────────────────────
+
+function daysSince(isoDate) {
+  if (!isoDate) return null
+  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 86400000)
+}
+
+function computeRiskPills(debriefs, candidate) {
+  const pills = []
+  const allRisk       = debriefs.flatMap(d => d.risk_flags ?? []).join(' ').toLowerCase()
+  const allMotivation = debriefs.flatMap(d => d.motivation_signals ?? []).join(' ').toLowerCase()
+  const allCompetitive= debriefs.flatMap(d => d.competitive_signals ?? []).join(' ').toLowerCase()
+  const allHM         = debriefs.flatMap(d => d.hiring_manager_signals ?? []).join(' ').toLowerCase()
+  const allText       = [allRisk, allMotivation, allCompetitive, allHM].join(' ')
+
+  if (/comp.gap|salary.gap|underpaid|below.market|comp.concern|comp.mismatch/.test(allText)) {
+    pills.push({ label: 'Comp gap', variant: 'amber' })
+  }
+
+  const highTenure = (candidate?.career_signals ?? []).includes('Long Tenure')
+  const counterSignals = /counter.offer|counter-offer|underpaid|below.market|passive.search|not actively/.test(allText)
+  if (counterSignals || (highTenure && /passive|not looking|not actively/.test(allText))) {
+    pills.push({ label: 'Counter offer risk', variant: 'red' })
+  }
+
+  if (/thin motivation|low motivation|unclear motivation|not motivated|unmotivated/.test(allMotivation + ' ' + allRisk)) {
+    pills.push({ label: 'Thin motivation', variant: 'amber' })
+  }
+
+  if (/slow|no feedback|delayed|not responsive|feedback.late/.test(allHM + ' ' + allRisk)) {
+    pills.push({ label: 'Slow HM', variant: 'amber' })
+  }
+
+  if (/stall|no progress|stuck/.test(allRisk)) {
+    pills.push({ label: 'Stalled', variant: 'gray' })
+  }
+
+  return pills
+}
+
+function computeZoneAActions({ pipelines, interactions, debriefs }) {
+  const actions = []
+  const primary = pipelines[0]
+
+  if (!primary) {
+    actions.push({ id: 'add_to_role', label: 'Add to a role' })
+    return actions
+  }
+
+  const stage = primary.current_stage?.toLowerCase() ?? ''
+  const latest = interactions[0]
+  const latestHasDebrief = latest
+    ? debriefs.some(d => d.interaction_id === latest.id)
+    : false
+  const daysSinceContact = latest ? daysSince(latest.occurred_at) : null
+
+  if (latest && !latestHasDebrief && (latest.type === 'call' || latest.type === 'meeting')) {
+    actions.push({ id: 'log_debrief', label: 'Log debrief' })
+  }
+
+  if (!latest || daysSinceContact === null || daysSinceContact > 7) {
+    actions.push({ id: 'log_interaction', label: 'Log interaction' })
+  }
+
+  if (stage === 'screening') {
+    actions.push({ id: 'screen_role', label: 'Screen against role' })
+  }
+
+  if (['shortlisted', 'interviewing'].includes(stage)) {
+    actions.push({ id: 'prep_interview', label: 'Prep for next interview', stub: true })
+  }
+
+  if (stage === 'offer') {
+    actions.push({ id: 'lock_comp', label: 'Lock comp expectations', stub: true })
+    actions.push({ id: 'prep_counter', label: 'Prep for counter offer', stub: true })
+  }
+
+  return actions.slice(0, 3)
+}
+
+// ── Deal Status Bar ───────────────────────────────────────
+
+function DealStatusBar({ candidate, pipelines, debriefs, interactions, onOpenComp, onOpenPicker, onSetCompInline }) {
+  const fullName = `${candidate.first_name} ${candidate.last_name}`
+  const primary = pipelines[0] ?? null
+  const riskPills = computeRiskPills(debriefs, candidate)
+
+  const aiScore = primary?.fit_score != null ? Math.round(primary.fit_score) : null
+  const recruiterScore = primary?.recruiter_score ?? null
+  const aiScoreClass = aiScore == null ? '' : aiScore >= 70 ? 'cc-sticky-score--green' : aiScore >= 40 ? 'cc-sticky-score--amber' : 'cc-sticky-score--red'
+
+  const daysInStage = primary?.updated_at ? daysSince(primary.updated_at) : null
+  const stageParts = [
+    primary?.current_stage,
+    daysInStage != null ? `${daysInStage}d` : null,
+  ].filter(Boolean)
+
+  const hasPipeline = pipelines.length > 0
+  const lastTouch = interactions[0]?.occurred_at
+  const lastTouchDays = lastTouch ? daysSince(lastTouch) : null
+
+  return (
+    <div className="deal-status-bar">
+      {/* Row 1: identity + role + stage + scores + risk pills */}
+      <div className="dsb-row dsb-row--main">
+        <div className="dsb-identity">
+          <span className="dsb-name">{fullName}</span>
+          {(candidate.current_title || candidate.current_company) && (
+            <span className="dsb-subtitle">
+              {[candidate.current_title, candidate.current_company].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </div>
+
+        {hasPipeline && primary?.roles && (
+          <Link className="dsb-role-link" to={`/roles/${primary.role_id}`}>
+            {primary.roles.title}{primary.roles.clients?.name ? ` · ${primary.roles.clients.name}` : ''}
+          </Link>
+        )}
+
+        {hasPipeline && primary?.current_stage && (
+          <span className="dsb-stage-badge">{stageParts.join(' · ')}</span>
+        )}
+
+        {hasPipeline && (aiScore != null || recruiterScore != null) && (
+          <div className="cc-sticky-scores">
+            {aiScore != null && (
+              <span className={`cc-sticky-score ${aiScoreClass}`}>AI {aiScore}</span>
+            )}
+            {recruiterScore != null && (
+              <span className="cc-sticky-score cc-sticky-score--recruiter">You {recruiterScore}</span>
+            )}
+          </div>
+        )}
+
+        {riskPills.length > 0 && (
+          <div className="risk-pills">
+            {riskPills.map(p => (
+              <span key={p.label} className={`risk-pill risk-pill--${p.variant}`}>{p.label}</span>
+            ))}
+          </div>
+        )}
+
+        {!hasPipeline && (
+          <>
+            {lastTouchDays != null && (
+              <span className="dsb-last-touch">Last touch: {lastTouchDays}d ago</span>
+            )}
+            <button className="btn-primary btn-sm" onClick={onOpenPicker}>Add to a role</button>
+          </>
+        )}
+      </div>
+
+      {/* Row 2: next action + comp */}
+      {hasPipeline && (
+        <div className="dsb-row dsb-row--sub">
+          {primary?.next_action ? (
+            <span className="dsb-next-action">{primary.next_action}</span>
+          ) : (
+            <span className="dsb-next-action dsb-next-action--empty">No next action</span>
+          )}
+          <div className="dsb-comp">
+            {primary?.expected_comp != null ? (
+              <span className="dsb-comp-value">${primary.expected_comp.toLocaleString()}</span>
+            ) : (
+              <button className="dsb-set-comp-chip" onClick={() => onOpenComp(primary)}>
+                Set comp
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Latest debrief summary card ───────────────────────────
+
+function LatestDebriefSummaryCard({ debrief, onExpand, onNewDebrief }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const outcomeClass = {
+    advance: 'debrief-outcome--advance',
+    reject:  'debrief-outcome--reject',
+    hold:    'debrief-outcome--hold',
+    neutral: 'debrief-outcome--neutral',
+  }[debrief.outcome] ?? ''
+
+  return (
+    <div className="debrief-summary-card">
+      <div className="dsc-header">
+        <span className={`debrief-outcome-badge ${outcomeClass}`}>{debrief.outcome}</span>
+        <span className="dsc-date">{formatDateShort(debrief.captured_at)}</span>
+        <button className="btn-ghost btn-sm dsc-expand-btn" onClick={() => setExpanded(v => !v)}>
+          {expanded ? 'Collapse' : 'Expand'}
+        </button>
+        <button className="btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={onNewDebrief}>
+          + New debrief
+        </button>
+      </div>
+      {debrief.summary && (
+        <p className="dsc-summary">{debrief.summary}</p>
+      )}
+      {expanded && onExpand && (
+        <button className="btn-ghost btn-sm dsc-full-link" onClick={onExpand}>
+          View full signal breakdown ↓
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Collapsible section ───────────────────────────────────
+
+function CollapsibleSection({ title, collapsed, onToggle, badge, children }) {
+  return (
+    <section className="candidate-section collapsible-section">
+      <button className="collapsible-header" onClick={onToggle}>
+        <span className="section-heading collapsible-title">{title}</span>
+        {badge && <span className="collapsible-badge">{badge}</span>}
+        <span className="collapsible-chevron">{collapsed ? '›' : '‹'}</span>
+      </button>
+      {!collapsed && (
+        <div className="collapsible-content">{children}</div>
+      )}
+    </section>
+  )
+}
+
+// ── Interaction edit modal ────────────────────────────────
+
+function InteractionEditModal({ modal, onSave, onClose }) {
+  const [type, setType]   = useState(modal.interaction?.type ?? 'call')
+  const [notes, setNotes] = useState(modal.interaction?.body ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState(null)
+
+  const hasDebrief = modal.linkedDebriefId != null
+
+  async function handleSave() {
+    if (!notes.trim()) { setError('Notes are required.'); return }
+    setSaving(true)
+    setError(null)
+    await onSave(modal.interaction.id, { type, body: notes.trim() })
+    setSaving(false)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Edit Interaction</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="log-form-row" style={{ marginBottom: 12 }}>
+          <select className="log-select" value={type} onChange={e => setType(e.target.value)}>
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="note">Note</option>
+            <option value="meeting">Meeting</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="text">Text</option>
+          </select>
+        </div>
+        <textarea
+          className="log-textarea"
+          placeholder="Notes…"
+          rows={4}
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          autoFocus
+        />
+        {hasDebrief && (
+          <p className="debrief-linked-note">Debrief linked to this interaction — link preserved on save.</p>
+        )}
+        {error && <p className="error" style={{ marginTop: 4 }}>{error}</p>}
+        <div className="modal-actions">
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Zone C popover ────────────────────────────────────────
+
+function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipeline, onMarkPlaced, onClose }) {
+  const navigate = useNavigate()
+  const menuRef  = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  const hasPipeline = pipelines.length > 0
+  const stage = pipelines[0]?.current_stage?.toLowerCase()
+
+  return (
+    <div className="zone-c-popover" ref={menuRef}>
+      <button className="zone-c-item" onClick={() => { onCallMode(); onClose() }}>Call Mode</button>
+      <button className="zone-c-item" onClick={() => { onEdit(); onClose() }}>Edit candidate</button>
+      {hasPipeline && (
+        <button className="zone-c-item" onClick={() => { onRemoveFromPipeline(); onClose() }}>
+          Remove from pipeline
+        </button>
+      )}
+      {hasPipeline && stage !== 'placed' && (
+        <button className="zone-c-item" onClick={() => { onMarkPlaced(); onClose() }}>
+          Mark as placed
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 export default function CandidateCard() {
@@ -977,6 +1303,28 @@ export default function CandidateCard() {
   const [careerError, setCareerError] = useState(null)
   const [clearCareerConfirm, setClearCareerConfirm] = useState(false)
   const [clearingCareer, setClearingCareer] = useState(false)
+
+  // New layout state
+  const autoParseFiredRef = useRef(false)
+  const [showAllInteractions, setShowAllInteractions] = useState(false)
+  const [collapseResume, setCollapseResume] = useState(true)
+  const [collapseAllDebriefs, setCollapseAllDebriefs] = useState(true)
+  const [collapseSignals, setCollapseSignals] = useState(true)
+  const [collapsePipeline, setCollapsePipeline] = useState(true)
+  const [collapseScoreHistory, setCollapseScoreHistory] = useState(true)
+  const [collapseDetails, setCollapseDetails] = useState(true)
+  const [stageHistory, setStageHistory] = useState(null)
+  const [stageHistoryLoading, setStageHistoryLoading] = useState(false)
+  const [zoneCOpen, setZoneCOpen] = useState(false)
+  const [zoneAStub, setZoneAStub] = useState(null) // stub message for call-prep actions
+  const [screeningInline, setScreeningInline] = useState(false) // Zone A screen trigger
+
+  // Interaction edit modal
+  const [editInteractionModal, setEditInteractionModal] = useState({ open: false, interaction: null, linkedDebriefId: null })
+
+  // Zone B inline results
+  const [zoneBPitch, setZoneBPitch] = useState({ generating: false, result: null, error: null })
+  const [zoneBIQ, setZoneBIQ] = useState({ generating: false, result: null, error: null })
 
   // Submission draft modal
   const [subModal, setSubModal] = useState({
@@ -1111,6 +1459,17 @@ export default function CandidateCard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelines])
+
+  // Auto-parse career timeline on load if cv_text exists but no timeline yet
+  useEffect(() => {
+    if (!candidate) return
+    if (autoParseFiredRef.current) return
+    if ((candidate.career_timeline?.length ?? 0) > 0) return
+    if (!candidate.cv_text) return
+    autoParseFiredRef.current = true
+    handleParseCareer()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidate?.id])
 
   async function handleGenerateNextAction() {
     if (!candidate) return
@@ -1772,6 +2131,133 @@ export default function CandidateCard() {
     setSubSaving(false)
   }
 
+  // ── New handlers ────────────────────────────────────────
+
+  async function handleEditInteractionSave(interactionId, updates) {
+    const { error } = await supabase
+      .from('interactions')
+      .update(updates)
+      .eq('id', interactionId)
+    if (error) return error
+    setInteractions(prev => prev.map(i => i.id === interactionId ? { ...i, ...updates } : i))
+    setEditInteractionModal({ open: false, interaction: null, linkedDebriefId: null })
+    return null
+  }
+
+  function handleOpenEditInteraction(interaction) {
+    const linkedDebriefId = debriefs.find(d => d.interaction_id === interaction.id)?.id ?? null
+    setEditInteractionModal({ open: true, interaction, linkedDebriefId })
+  }
+
+  async function handleScreenForRole(roleId) {
+    const role = openRoles?.find(r => r.id === roleId)
+    if (!role || !candidate) return
+    setScreenerRoleId(roleId)
+    setScreenResult(null)
+    setScreenError(null)
+    setScreeningInline(true)
+    setScreening(true)
+    try {
+      const messages = buildScreenerMessages(candidate, role)
+      const raw = await generateText({ messages, maxTokens: 2048 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const result = JSON.parse(cleaned)
+      setScreenResult(result)
+
+      const { data: savedResult, error: srErr } = await supabase
+        .from('screener_results')
+        .insert({ recruiter_id: recruiter.id, candidate_id: id, role_id: roleId, result })
+        .select().single()
+      if (!srErr) setScreenerHistory(prev => [savedResult, ...prev])
+
+      const { data: freshEntry } = await supabase
+        .from('pipeline').select('id').eq('candidate_id', id).eq('role_id', roleId).maybeSingle()
+      if (freshEntry && result.match_score != null) {
+        const fitScore = result.match_score * 10
+        const rationale = result.recommendation_reason ?? null
+        await supabase.from('pipeline').update({ fit_score: fitScore, fit_score_rationale: rationale, screener_result: result }).eq('id', freshEntry.id)
+        setPipelines(prev => prev.map(p => p.id === freshEntry.id ? { ...p, fit_score: fitScore, fit_score_rationale: rationale } : p))
+      }
+    } catch (err) {
+      setScreenError(err.message ?? 'Screening failed.')
+    } finally {
+      setScreening(false)
+    }
+  }
+
+  async function handleZoneBPitch() {
+    const primaryRole = openRoles?.find(r => r.id === pipelines[0]?.role_id)
+    if (!primaryRole || !candidate) return
+    setZoneBPitch({ generating: true, result: null, error: null })
+    try {
+      const text = await generateText({ messages: buildCandidatePitchMessages(candidate, primaryRole), maxTokens: 1024 })
+      setZoneBPitch({ generating: false, result: text, error: null })
+    } catch (err) {
+      setZoneBPitch({ generating: false, result: null, error: err.message ?? 'Failed.' })
+    }
+  }
+
+  async function handleZoneBInterviewQuestions() {
+    const primary = pipelines[0]
+    const primaryRole = openRoles?.find(r => r.id === primary?.role_id)
+    if (!primaryRole) return
+    const latestScreenResult = screenerHistory.find(s => s.role_id === primaryRole.id)?.result ?? null
+    setZoneBIQ({ generating: true, result: null, error: null })
+    try {
+      const text = await generateText({ messages: buildInterviewQuestionMessages(primaryRole, latestScreenResult), maxTokens: 1024 })
+      setZoneBIQ({ generating: false, result: text, error: null })
+    } catch (err) {
+      setZoneBIQ({ generating: false, result: null, error: err.message ?? 'Failed.' })
+    }
+  }
+
+  async function handleExpandPipelineHistory() {
+    setCollapsePipeline(false)
+    if (stageHistory !== null) return
+    setStageHistoryLoading(true)
+    const pipelineIds = pipelines.map(p => p.id)
+    if (!pipelineIds.length) { setStageHistory([]); setStageHistoryLoading(false); return }
+    const { data } = await supabase
+      .from('pipeline_stage_history')
+      .select('*')
+      .in('pipeline_id', pipelineIds)
+      .order('created_at', { ascending: true })
+    setStageHistory(data ?? [])
+    setStageHistoryLoading(false)
+  }
+
+  function handleZoneAAction(action) {
+    if (action.stub) {
+      const msgs = {
+        prep_interview: 'Call Prep module coming soon. Pick up the phone and walk through the interview process, expected questions, and candidate prep areas.',
+        lock_comp:      'Call Prep module coming soon. Get on the phone to lock comp: current base, target, competing offers, and what it takes to accept.',
+        prep_counter:   'Call Prep module coming soon. Before offer stage: confirm comp expectations, competing offers, and counter-offer scenario.',
+      }
+      setZoneAStub(msgs[action.id] ?? 'Coming soon.')
+      return
+    }
+    setZoneAStub(null)
+    if (action.id === 'log_debrief')    handleOpenDebrief(null)
+    if (action.id === 'log_interaction') handleLogOpen()
+    if (action.id === 'add_to_role')    handleOpenPicker()
+    if (action.id === 'screen_role') {
+      const roleId = pipelines[0]?.role_id
+      if (roleId) handleScreenForRole(roleId)
+    }
+  }
+
+  async function handleMarkPlaced() {
+    const primary = pipelines[0]
+    if (!primary) return
+    const placed = PIPELINE_STAGES[PIPELINE_STAGES.length - 1]
+    if (primary.current_stage?.toLowerCase() === placed) return
+    // Advance to placed directly
+    const currentIdx = PIPELINE_STAGES.indexOf(primary.current_stage?.toLowerCase())
+    if (currentIdx < 0) return
+    // Advance through stages to placed
+    await handleAdvanceStage({ ...primary, current_stage: PIPELINE_STAGES[PIPELINE_STAGES.length - 2] })
+  }
+
   // ── Render states ────────────────────────────────────────
 
   if (loading) {
@@ -1802,185 +2288,53 @@ export default function CandidateCard() {
   return (
     <AppLayout>
 
-        {/* Page header */}
+        {/* Page header — back + Zone C only */}
         <div className="page-header">
           <div className="page-header-left">
             <button className="btn-back" onClick={() => navigate('/candidates')}>← Back</button>
-            <div>
-              <h1 className="page-title">{fullName}</h1>
-              {candidate.current_title && candidate.current_company && (
-                <p className="page-subtitle">{candidate.current_title} · {candidate.current_company}</p>
-              )}
-            </div>
           </div>
-          <div className="page-header-actions">
-            <button className="btn-ghost" onClick={openSubModal}>Draft Submission</button>
-            <button className="btn-primary" onClick={handleGenerateNextAction} disabled={generating}>
-              {generating ? 'Generating…' : 'Next Action'}
-            </button>
-            <button className="btn-ghost" onClick={openOutreachModal}>Outreach</button>
-            <button className="btn-ghost" onClick={openLinkedinModal}>LinkedIn</button>
-            <Link className="btn-ghost" to={`/candidates/${id}/edit`}>Edit</Link>
-            <Link className="btn-ghost" to={`/candidates/${id}/call`}>Call Mode</Link>
-            <button className="btn-ghost btn-danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          </div>
-        </div>
-
-        {/* Sticky context bar */}
-        <div className="cc-sticky-bar">
-          <div className="cc-sticky-identity">
-            <span className="cc-sticky-name">{fullName}</span>
-            {(candidate.current_title || candidate.current_company) && (
-              <span className="cc-sticky-meta">
-                {[candidate.current_title, candidate.current_company].filter(Boolean).join(' · ')}
-              </span>
+          <div className="page-header-actions" style={{ position: 'relative' }}>
+            <button className="btn-ghost btn-sm" onClick={() => setZoneCOpen(v => !v)}>⋯ More</button>
+            {zoneCOpen && (
+              <ZoneCMenu
+                candidate={candidate}
+                pipelines={pipelines}
+                onEdit={() => navigate(`/candidates/${id}/edit`)}
+                onCallMode={() => navigate(`/candidates/${id}/call`)}
+                onRemoveFromPipeline={() => {
+                  const primary = pipelines[0]
+                  if (primary) handleRemovePipeline(primary.id)
+                }}
+                onMarkPlaced={handleMarkPlaced}
+                onClose={() => setZoneCOpen(false)}
+              />
             )}
           </div>
-          {topPipelineEntry && (topPipelineEntry.fit_score != null || topPipelineEntry.recruiter_score != null) && (
-            <div className="cc-sticky-scores">
-              {topPipelineEntry.fit_score != null && (
-                <span className={`cc-sticky-score ${topPipelineEntry.fit_score >= 70 ? 'cc-sticky-score--green' : topPipelineEntry.fit_score >= 40 ? 'cc-sticky-score--amber' : 'cc-sticky-score--red'}`}>
-                  AI {Math.round(topPipelineEntry.fit_score)}
-                </span>
-              )}
-              {topPipelineEntry.recruiter_score != null && (
-                <span className="cc-sticky-score cc-sticky-score--recruiter">
-                  You {topPipelineEntry.recruiter_score}
-                </span>
-              )}
-            </div>
-          )}
-          <div className="cc-sticky-next-action">
-            {savedNextAction
-              ? <span className="cc-sticky-next-action-text">{savedNextAction}</span>
-              : <span className="cc-sticky-next-action-empty">No next action set</span>
-            }
-          </div>
-          {debriefs[0]?.summary && (
-            <div className="cc-sticky-debrief">
-              <span className="cc-sticky-debrief-label">Last debrief</span>
-              <span className="cc-sticky-debrief-summary">{debriefs[0].summary}</span>
-            </div>
-          )}
         </div>
 
-        {/* Next action edit form — shown inline when editing */}
-        {nextActionEditing && (
-          <div className="ai-card" style={{ marginTop: 16 }}>
-            <p className="ai-card-eyebrow">Next Action</p>
-            <textarea
-              className="sub-draft-textarea"
-              rows={2}
-              style={{ marginTop: 8 }}
-              value={nextActionDraft}
-              onChange={e => setNextActionDraft(e.target.value)}
-              placeholder="What needs to happen next with this candidate?"
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button
-                className="btn-primary btn-sm"
-                disabled={nextActionSaving}
-                onClick={async () => {
-                  setNextActionSaving(true)
-                  const text = nextActionDraft.trim() || null
-                  const { error } = await supabase.from('candidates').update({
-                    enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: text },
-                  }).eq('id', candidate.id)
-                  if (!error) { setSavedNextAction(text); setNextActionEditing(false) }
-                  setNextActionSaving(false)
-                }}
-              >
-                {nextActionSaving ? 'Saving…' : 'Save'}
-              </button>
-              <button className="btn-ghost btn-sm" onClick={() => setNextActionEditing(false)}>Cancel</button>
-              {savedNextAction && (
-                <button
-                  className="btn-ghost btn-sm"
-                  style={{ marginLeft: 'auto' }}
-                  onClick={async () => {
-                    await supabase.from('candidates').update({
-                      enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: null },
-                    }).eq('id', candidate.id)
-                    setSavedNextAction(null)
-                    setNextActionEditing(false)
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* AI suggestion */}
-        {(generating || suggestion || genError) && !savedNextAction && (
-          <div className={`ai-card ${genError ? 'ai-card--error' : ''}`} style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p className="ai-card-eyebrow">{genError ? 'Error' : 'Suggested Next Action'}</p>
-              {!generating && !genError && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn-ghost btn-sm"
-                    onClick={async () => {
-                      setNextActionSaving(true)
-                      const { error } = await supabase.from('candidates').update({
-                        enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: suggestion },
-                      }).eq('id', candidate.id)
-                      if (!error) setSavedNextAction(suggestion)
-                      setNextActionSaving(false)
-                    }}
-                  >
-                    Set as my action
-                  </button>
-                  <button className="btn-ghost btn-sm" onClick={handleGenerateNextAction}>Regenerate</button>
-                </div>
-              )}
-            </div>
-            {generating
-              ? <div className="modal-generating"><div className="spinner spinner--sm" />Thinking…</div>
-              : <p className="ai-card-body">{genError ? 'Couldn\'t generate a suggestion. Try again.' : suggestion}</p>
-            }
-          </div>
-        )}
+        {/* Deal Status Bar */}
+        <DealStatusBar
+          candidate={candidate}
+          pipelines={pipelines}
+          debriefs={debriefs}
+          interactions={interactions}
+          onOpenComp={entry => setCompModal({ open: true, entry, nextStage: entry.current_stage, comp: '', saving: false })}
+          onOpenPicker={handleOpenPicker}
+        />
 
         {/* Single column body */}
         <div className="cc-body">
 
-          {/* Details */}
-          <section className="candidate-section">
-            <h2 className="section-heading">Details</h2>
-            <DetailRow label="Email" value={candidate.email} />
-            <DetailRow label="Phone" value={candidate.phone} />
-            <DetailRow label="Location" value={candidate.location} />
-            {candidate.linkedin_url && (
-              <DetailRow
-                label="LinkedIn"
-                value={<a href={candidate.linkedin_url} target="_blank" rel="noreferrer">Profile ↗</a>}
-              />
-            )}
-            <DetailRow label="Source" value={SOURCE_LABELS[candidate.source] ?? candidate.source} />
-            <div className="detail-row">
-              <span className="detail-label">Skills</span>
-              <SkillTags skills={candidate.skills} />
-            </div>
-            {candidate.notes && (
-              <div className="detail-row detail-row--block">
-                <span className="detail-label">Notes</span>
-                <p className="detail-notes">{candidate.notes}</p>
-              </div>
-            )}
-          </section>
-
-          {/* Signals */}
-          {signals?.length > 0 && (
-            <section className="candidate-section">
-              <SignalBadges signals={signals} />
-            </section>
+          {/* Latest debrief summary */}
+          {debriefs.length > 0 && (
+            <LatestDebriefSummaryCard
+              debrief={debriefs[0]}
+              onNewDebrief={() => handleOpenDebrief(null)}
+              onExpand={() => setCollapseAllDebriefs(false)}
+            />
           )}
 
-          {/* Debrief signals */}
+          {/* Debrief signals panel */}
           {debriefs.length > 0 && (
             <section className="candidate-section">
               <div className="section-heading-row">
@@ -1991,144 +2345,162 @@ export default function CandidateCard() {
             </section>
           )}
 
-          {/* Career Timeline */}
-          <section className="candidate-section">
-            <div className="section-heading-row">
-              <h2 className="section-heading">Career Timeline</h2>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {candidate.cv_text && (
-                  <button className="btn-ghost btn-sm" onClick={handleParseCareer} disabled={parsingCareer}>
-                    {parsingCareer ? 'Parsing…' : timeline ? 'Reparse' : 'Parse from CV'}
+          {/* Actions — Zone A, B, C */}
+          <section className="candidate-section action-zones">
+            {/* Zone A: Work this deal */}
+            <div className="zone-a">
+              <span className="zone-label">Work this deal</span>
+              <div className="zone-a-actions">
+                {computeZoneAActions({ pipelines, interactions, debriefs }).map(action => (
+                  <button
+                    key={action.id}
+                    className="zone-a-btn"
+                    onClick={() => handleZoneAAction(action)}
+                  >
+                    {action.label}
                   </button>
-                )}
-                {timeline && !clearCareerConfirm && (
-                  <button className="btn-ghost btn-sm" onClick={() => setClearCareerConfirm(true)}>Clear</button>
-                )}
-              </div>
-            </div>
-            {clearCareerConfirm && (
-              <div className="inline-confirm">
-                <span>Clear career data?</span>
-                <button className="btn-confirm-yes" onClick={handleClearCareer} disabled={clearingCareer}>
-                  {clearingCareer ? 'Clearing…' : 'Yes, clear'}
-                </button>
-                <button className="btn-confirm-cancel" onClick={() => setClearCareerConfirm(false)}>Cancel</button>
-              </div>
-            )}
-            {parsingCareer && (
-              <div className="modal-generating" style={{ marginTop: 8 }}>
-                <div className="spinner spinner--sm" />Parsing career history…
-              </div>
-            )}
-            {careerError && (
-              <div className="ai-card ai-card--error" style={{ marginTop: 8 }}>
-                <p className="ai-card-eyebrow">Error</p>
-                <p className="ai-card-body">Couldn't parse career history. Try again.</p>
-              </div>
-            )}
-            {!candidate.cv_text && <p className="muted" style={{ marginTop: 8 }}>No CV on file.</p>}
-            {timeline !== null && (
-              <>
-                {(() => { const s = computeTenureSummary(timeline); return s ? <TenureSummary summary={s} /> : null })()}
-                {timeline.length === 0
-                  ? <p className="muted">No career history could be extracted.</p>
-                  : timeline.map((entry, i) => <CareerEntry key={i} entry={entry} />)
-                }
-              </>
-            )}
-          </section>
-
-          {/* Resume Screener */}
-          <section className="candidate-section screener-section">
-            <h2 className="section-heading">Resume Screener</h2>
-            <div className="screener-controls">
-              <select
-                className="field-input screener-role-select"
-                value={screenerRoleId}
-                onChange={e => {
-                  setScreenerRoleId(e.target.value)
-                  setScreenResult(null); setScreenError(null)
-                  setPitchText(null); setPitchError(null)
-                  setScorecard(null); setScorecardError(null)
-                }}
-                disabled={!openRoles}
-              >
-                <option value="">{openRoles === null ? 'Loading roles…' : 'Select a role to screen against…'}</option>
-                {openRoles?.map(r => (
-                  <option key={r.id} value={r.id}>{r.title}{r.clients?.name ? ` — ${r.clients.name}` : ''}</option>
                 ))}
-              </select>
-              <button className="btn-primary" onClick={handleScreen} disabled={!screenerRoleId || screening}>
-                {screening ? 'Screening…' : 'Screen Against Role'}
-              </button>
-              {pipelines.length > 0 && (
-                <button className="btn-ghost" onClick={handleGeneratePitch} disabled={!screenerRoleId || pitchGenerating}>
-                  {pitchGenerating ? 'Generating…' : 'Generate Pitch'}
-                </button>
+              </div>
+              {/* Screening inline result */}
+              {screeningInline && (
+                <div style={{ marginTop: 12 }}>
+                  {screening && <div className="modal-generating"><div className="spinner spinner--sm" />Screening…</div>}
+                  {screenError && <p className="error">{screenError}</p>}
+                  {screenResult && <ScreenerResult result={screenResult} />}
+                </div>
+              )}
+              {/* Zone A stub message */}
+              {zoneAStub && (
+                <div className="zone-a-stub">
+                  <p>{zoneAStub}</p>
+                  <button className="btn-ghost btn-sm" onClick={() => setZoneAStub(null)}>Dismiss</button>
+                </div>
               )}
             </div>
-            {screening && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Screening against role…</div>}
-            {screenError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't screen this candidate. Try again.</p></div>}
-            {screenResult && <ScreenerResult result={screenResult} />}
-            {candidate.cv_text && screenerRoleId && pipelines.some(p => p.role_id === screenerRoleId) && (
-              <div style={{ marginTop: 16 }}>
-                <button className="btn-ghost" onClick={handleGenerateScorecard} disabled={scorecardGenerating}>
-                  {scorecardGenerating ? 'Generating…' : scorecard ? 'Regenerate Scorecard' : 'Full Scorecard'}
+
+            {/* Zone B: Generate */}
+            <div className="zone-b">
+              <span className="zone-label">Generate</span>
+              <div className="zone-b-actions">
+                <button className="btn-ghost btn-sm" onClick={openSubModal}>Draft submission</button>
+                <button className="btn-ghost btn-sm" onClick={openOutreachModal}>Draft outreach</button>
+                <button className="btn-ghost btn-sm" onClick={openLinkedinModal}>Draft LinkedIn</button>
+                <button
+                  className="btn-ghost btn-sm"
+                  disabled={!pipelines.length || zoneBPitch.generating}
+                  onClick={handleZoneBPitch}
+                >
+                  {zoneBPitch.generating ? 'Generating…' : 'Generate pitch'}
+                </button>
+                <button
+                  className="btn-ghost btn-sm"
+                  disabled={!pipelines.length || zoneBIQ.generating}
+                  onClick={handleZoneBInterviewQuestions}
+                >
+                  {zoneBIQ.generating ? 'Generating…' : 'Interview questions'}
                 </button>
               </div>
-            )}
-            {scorecardGenerating && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Building scorecard…</div>}
-            {scorecardError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't generate scorecard. Try again.</p></div>}
-            {scorecard && <ScorecardResult result={scorecard} />}
-            {pitchGenerating && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Generating pitch…</div>}
-            {pitchError && <div className="ai-card ai-card--error" style={{ marginTop: 16 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't generate pitch. Try again.</p></div>}
-            {pitchText && (
-              <div className="pitch-result" style={{ marginTop: 16 }}>
-                <div className="pitch-result-header">
-                  <p className="screener-block-label">Candidate Pitch</p>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(pitchText)}>Copy</button>
-                    <button className="btn-ghost btn-sm" onClick={handleSavePitch} disabled={pitchSaving || pitchSaved}>
-                      {pitchSaving ? 'Saving…' : pitchSaved ? 'Saved ✓' : 'Save Pitch'}
-                    </button>
+              {zoneBPitch.result && (
+                <div className="zone-b-result">
+                  <div className="zone-b-result-header">
+                    <span className="screener-block-label">Pitch</span>
+                    <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(zoneBPitch.result)}>Copy</button>
+                    <button className="btn-ghost btn-sm" onClick={() => setZoneBPitch(s => ({ ...s, result: null }))}>✕</button>
                   </div>
+                  <p className="pitch-body">{zoneBPitch.result}</p>
                 </div>
-                <p className="pitch-body">{pitchText}</p>
-              </div>
-            )}
+              )}
+              {zoneBIQ.result && (
+                <div className="zone-b-result">
+                  <div className="zone-b-result-header">
+                    <span className="screener-block-label">Interview Questions</span>
+                    <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(zoneBIQ.result)}>Copy</button>
+                    <button className="btn-ghost btn-sm" onClick={() => setZoneBIQ(s => ({ ...s, result: null }))}>✕</button>
+                  </div>
+                  <p className="pitch-body" style={{ whiteSpace: 'pre-wrap' }}>{zoneBIQ.result}</p>
+                </div>
+              )}
+            </div>
           </section>
 
-          {/* Scores History */}
-          <section className="candidate-section">
-            <h2 className="section-heading">Scores History</h2>
-            {screenerHistory.length === 0 ? (
-              <p className="muted" style={{ marginTop: 4 }}>No screener results yet.</p>
-            ) : (
-              <div className="scores-history">
-                {screenerHistory.map(sr => (
-                  <ScoreHistoryRow key={sr.id} sr={sr} inPipeline={pipelines.some(p => p.role_id === sr.role_id)} onDelete={handleDeleteScreenerResult} />
-                ))}
+          {/* Log interaction form */}
+          {logOpen && (
+            <section className="candidate-section">
+              <div className="log-form">
+                <div className="log-form-row">
+                  <select className="log-select" value={logForm.type} onChange={e => setLogForm(f => ({ ...f, type: e.target.value }))}>
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                    <option value="note">Note</option>
+                    <option value="meeting">Meeting</option>
+                  </select>
+                  {logForm.type !== 'note' && (
+                    <select className="log-select" value={logForm.direction} onChange={e => setLogForm(f => ({ ...f, direction: e.target.value }))}>
+                      <option value="outbound">Outbound</option>
+                      <option value="inbound">Inbound</option>
+                    </select>
+                  )}
+                  <input type="datetime-local" className="log-date" value={logForm.occurred_at} onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))} />
+                </div>
+                <textarea className="log-textarea" placeholder="Notes…" rows={3} value={logForm.body} onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))} />
+                {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
+                <div className="log-form-actions">
+                  <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>{logSaving ? 'Saving…' : 'Save'}</button>
+                  <button className="btn-ghost btn-sm" onClick={() => setLogOpen(false)}>Cancel</button>
+                </div>
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
-          {/* Pipeline */}
+          {/* Interactions log */}
           <section className="candidate-section">
             <div className="section-heading-row">
-              <h2 className="section-heading">Pipeline</h2>
-              <button className="btn-ghost btn-sm" onClick={handleOpenPicker}>
-                {pickerOpen ? 'Cancel' : '+ Add to Role'}
-              </button>
+              <h2 className="section-heading">Interactions</h2>
+              <button className="btn-ghost btn-sm" onClick={handleLogOpen}>+ Log</button>
             </div>
+            {interactions.length === 0 ? (
+              <p className="muted" style={{ marginTop: 4 }}>No interactions logged yet.</p>
+            ) : (
+              <div className="interaction-feed">
+                {(showAllInteractions ? interactions : interactions.slice(0, 3)).map(i => {
+                  const hasDebrief = debriefs.some(d => d.interaction_id === i.id)
+                  return (
+                    <InteractionEntry
+                      key={i.id}
+                      interaction={i}
+                      onDelete={handleDeleteInteraction}
+                      hasDebrief={hasDebrief}
+                      onDebrief={handleOpenDebrief}
+                      onEdit={handleOpenEditInteraction}
+                    />
+                  )
+                })}
+                {interactions.length > 3 && (
+                  <button className="btn-ghost btn-sm interactions-more-btn" onClick={() => setShowAllInteractions(v => !v)}>
+                    {showAllInteractions ? `Show less` : `Show ${interactions.length - 3} more`}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Pipeline context (collapsed) */}
+          <CollapsibleSection
+            title="Pipeline"
+            collapsed={collapsePipeline}
+            badge={pipelines.length > 0 ? `${pipelines.length} role${pipelines.length > 1 ? 's' : ''}` : null}
+            onToggle={handleExpandPipelineHistory}
+          >
+            <button className="btn-ghost btn-sm" onClick={handleOpenPicker} style={{ marginBottom: 12 }}>
+              {pickerOpen ? 'Cancel' : '+ Add to Role'}
+            </button>
             {pickerOpen && (
               <div className="role-picker">
-                {rolesLoading ? (
-                  <p className="muted" style={{ padding: '10px 0' }}>Loading roles…</p>
-                ) : openRoles?.length === 0 ? (
+                {openRoles?.length === 0 ? (
                   <p className="muted" style={{ padding: '10px 0' }}>No open roles.</p>
                 ) : (
                   <ul className="role-picker-list">
-                    {openRoles.map(role => {
+                    {openRoles?.map(role => {
                       const alreadyAdded = pipelines.some(p => p.role_id === role.id)
                       const isAdding = addingRoleId === role.id
                       return (
@@ -2151,71 +2523,159 @@ export default function CandidateCard() {
                 {addError && <p className="error" style={{ marginTop: 8 }}>{addError}</p>}
               </div>
             )}
-            {/* Soft prompt: fill expected comp for interview+ entries missing it */}
             {pipelines.filter(p => ['interviewing','offer','placed'].includes(p.current_stage?.toLowerCase()) && p.expected_comp == null).map(p => (
               <CompPrompt key={p.id + '-comp'} entry={p} onSave={async (val) => {
                 await supabase.from('pipeline').update({ expected_comp: val }).eq('id', p.id)
                 setPipelines(prev => prev.map(pe => pe.id === p.id ? { ...pe, expected_comp: val } : pe))
               }} />
             ))}
-            {pipelines.length === 0 && !pickerOpen ? (
+            {pipelines.length === 0 ? (
               <p className="muted" style={{ marginTop: 8 }}>Not in any pipeline yet.</p>
             ) : (
               pipelines.map(entry => (
                 <PipelineEntry key={entry.id} entry={entry} onAdvance={handleAdvanceStage} advancing={advancingId === entry.id} onRemove={handleRemovePipeline} />
               ))
             )}
-          </section>
+            {stageHistoryLoading && <div className="modal-generating" style={{ marginTop: 12 }}><div className="spinner spinner--sm" />Loading history…</div>}
+            {stageHistory?.length > 0 && (
+              <div className="stage-history-log">
+                <p className="screener-block-label" style={{ marginTop: 16 }}>Stage History</p>
+                {stageHistory.map((sh, i) => (
+                  <div key={sh.id ?? i} className="stage-history-row">
+                    <span className="stage-badge">{sh.stage}</span>
+                    <span className="interaction-date">{formatDateShort(sh.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CollapsibleSection>
 
-          {/* Interactions */}
-          <section className="candidate-section">
-            <div className="section-heading-row">
-              <h2 className="section-heading">Interactions</h2>
-              {!logOpen && <button className="btn-ghost btn-sm" onClick={handleLogOpen}>+ Log</button>}
+          {/* Resume & Career Timeline (collapsed) */}
+          <CollapsibleSection
+            title="Resume & Career Timeline"
+            collapsed={collapseResume}
+            onToggle={() => setCollapseResume(v => !v)}
+          >
+            {parsingCareer && <div className="modal-generating" style={{ marginTop: 8 }}><div className="spinner spinner--sm" />Parsing career history…</div>}
+            {careerError && <div className="ai-card ai-card--error" style={{ marginTop: 8 }}><p className="ai-card-eyebrow">Error</p><p className="ai-card-body">Couldn't parse career history.</p></div>}
+            {!candidate.cv_text && <p className="muted" style={{ marginTop: 8 }}>No CV on file.</p>}
+            {timeline !== null && (
+              <>
+                {(() => { const s = computeTenureSummary(timeline); return s ? <TenureSummary summary={s} /> : null })()}
+                {timeline.length === 0
+                  ? <p className="muted">No career history could be extracted.</p>
+                  : timeline.map((entry, i) => <CareerEntry key={i} entry={entry} />)
+                }
+              </>
+            )}
+            {candidate.cv_text && (
+              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                <button className="btn-ghost btn-sm" onClick={handleParseCareer} disabled={parsingCareer}>
+                  {parsingCareer ? 'Parsing…' : timeline ? 'Reparse timeline' : 'Parse timeline'}
+                </button>
+                {timeline && !clearCareerConfirm && (
+                  <button className="btn-ghost btn-sm" onClick={() => setClearCareerConfirm(true)}>Clear</button>
+                )}
+              </div>
+            )}
+            {clearCareerConfirm && (
+              <div className="inline-confirm">
+                <span>Clear career data?</span>
+                <button className="btn-confirm-yes" onClick={handleClearCareer} disabled={clearingCareer}>
+                  {clearingCareer ? 'Clearing…' : 'Yes, clear'}
+                </button>
+                <button className="btn-confirm-cancel" onClick={() => setClearCareerConfirm(false)}>Cancel</button>
+              </div>
+            )}
+            {candidate.cv_text && (
+              <div className="cv-raw" style={{ marginTop: 16 }}>
+                <p className="screener-block-label">Raw CV</p>
+                <pre className="cv-raw-text">{candidate.cv_text}</pre>
+              </div>
+            )}
+          </CollapsibleSection>
+
+          {/* All debriefs (collapsed) */}
+          {debriefs.length > 0 && (
+            <CollapsibleSection
+              title="All Debriefs"
+              collapsed={collapseAllDebriefs}
+              badge={String(debriefs.length)}
+              onToggle={() => setCollapseAllDebriefs(v => !v)}
+            >
+              {debriefs.map(d => {
+                const cls = { advance: 'debrief-outcome--advance', reject: 'debrief-outcome--reject', hold: 'debrief-outcome--hold', neutral: 'debrief-outcome--neutral' }[d.outcome] ?? ''
+                return (
+                  <div key={d.id} className="debrief-summary-card" style={{ marginBottom: 12 }}>
+                    <div className="dsc-header">
+                      <span className={`debrief-outcome-badge ${cls}`}>{d.outcome}</span>
+                      <span className="dsc-date">{formatDateShort(d.captured_at)}</span>
+                    </div>
+                    {d.summary && <p className="dsc-summary">{d.summary}</p>}
+                    {DEBRIEF_SIGNAL_CATS.map(cat => {
+                      const items = d[cat.key]
+                      if (!items?.length) return null
+                      return (
+                        <div key={cat.key} className="debrief-signal-cat" style={{ marginTop: 8 }}>
+                          <span className={`debrief-signal-cat-label ${cat.cls}`}>{cat.label}</span>
+                          <ul className="debrief-signal-list">{items.map((item, i) => <li key={i}>{item}</li>)}</ul>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </CollapsibleSection>
+          )}
+
+          {/* Career signals (collapsed) */}
+          {signals?.length > 0 && (
+            <CollapsibleSection
+              title="Career Signals"
+              collapsed={collapseSignals}
+              onToggle={() => setCollapseSignals(v => !v)}
+            >
+              <SignalBadges signals={signals} />
+            </CollapsibleSection>
+          )}
+
+          {/* Screener results (collapsed) */}
+          {screenerHistory.length > 0 && (
+            <CollapsibleSection
+              title="Screener Results"
+              collapsed={collapseScoreHistory}
+              badge={String(screenerHistory.length)}
+              onToggle={() => setCollapseScoreHistory(v => !v)}
+            >
+              <div className="scores-history">
+                {screenerHistory.map(sr => (
+                  <ScoreHistoryRow key={sr.id} sr={sr} inPipeline={pipelines.some(p => p.role_id === sr.role_id)} onDelete={handleDeleteScreenerResult} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Edit / Details (collapsed) */}
+          <CollapsibleSection
+            title="Details & Edit"
+            collapsed={collapseDetails}
+            onToggle={() => setCollapseDetails(v => !v)}
+          >
+            <DetailRow label="Email" value={candidate.email} />
+            <DetailRow label="Phone" value={candidate.phone} />
+            <DetailRow label="Location" value={candidate.location} />
+            {candidate.linkedin_url && (
+              <DetailRow label="LinkedIn" value={<a href={candidate.linkedin_url} target="_blank" rel="noreferrer">Profile ↗</a>} />
+            )}
+            <DetailRow label="Source" value={SOURCE_LABELS[candidate.source] ?? candidate.source} />
+            <div className="detail-row"><span className="detail-label">Skills</span><SkillTags skills={candidate.skills} /></div>
+            {candidate.notes && (
+              <div className="detail-row detail-row--block"><span className="detail-label">Notes</span><p className="detail-notes">{candidate.notes}</p></div>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <Link className="btn-ghost btn-sm" to={`/candidates/${id}/edit`}>Edit candidate →</Link>
             </div>
-            {logOpen && (
-              <div className="log-form">
-                <div className="log-form-row">
-                  <select className="log-select" value={logForm.type} onChange={e => setLogForm(f => ({ ...f, type: e.target.value }))}>
-                    <option value="call">Call</option>
-                    <option value="email">Email</option>
-                    <option value="note">Note</option>
-                  </select>
-                  {logForm.type !== 'note' && (
-                    <select className="log-select" value={logForm.direction} onChange={e => setLogForm(f => ({ ...f, direction: e.target.value }))}>
-                      <option value="outbound">Outbound</option>
-                      <option value="inbound">Inbound</option>
-                    </select>
-                  )}
-                  <input type="datetime-local" className="log-date" value={logForm.occurred_at} onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))} />
-                </div>
-                <textarea className="log-textarea" placeholder="Notes…" rows={3} value={logForm.body} onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))} />
-                {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
-                <div className="log-form-actions">
-                  <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>{logSaving ? 'Saving…' : 'Save'}</button>
-                  <button className="btn-ghost btn-sm" onClick={() => setLogOpen(false)}>Cancel</button>
-                </div>
-              </div>
-            )}
-            {interactions.length === 0 ? (
-              <p className="muted" style={{ marginTop: logOpen ? 16 : 4 }}>No interactions logged yet.</p>
-            ) : (
-              <div className="interaction-feed" style={{ marginTop: logOpen ? 16 : 0 }}>
-                {interactions.map(i => {
-                  const hasDebrief = debriefs.some(d => d.interaction_id === i.id)
-                  return (
-                    <InteractionEntry
-                      key={i.id}
-                      interaction={i}
-                      onDelete={handleDeleteInteraction}
-                      hasDebrief={hasDebrief}
-                      onDebrief={handleOpenDebrief}
-                    />
-                  )
-                })}
-              </div>
-            )}
-          </section>
+          </CollapsibleSection>
 
         </div>
 
@@ -2688,6 +3148,15 @@ export default function CandidateCard() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Interaction edit modal */}
+      {editInteractionModal.open && editInteractionModal.interaction && (
+        <InteractionEditModal
+          modal={editInteractionModal}
+          onSave={handleEditInteractionSave}
+          onClose={() => setEditInteractionModal({ open: false, interaction: null, linkedDebriefId: null })}
+        />
       )}
 
     </AppLayout>

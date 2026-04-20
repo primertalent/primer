@@ -6316,3 +6316,365 @@ select.field-input {
   font-size: 13px;
   color: var(--color-muted);
 }
+
+/* ── Deal Status Bar ─────────────────────────────────────── */
+
+.deal-status-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 10;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding: 10px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dsb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dsb-row--sub {
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.dsb-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.dsb-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.dsb-subtitle {
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+.dsb-role-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dsb-role-link:hover { text-decoration: underline; }
+
+.dsb-stage-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.risk-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.risk-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.risk-pill--red    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.risk-pill--amber  { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.risk-pill--gray   { background: var(--color-bg); color: var(--color-muted); border: 1px solid var(--color-border); }
+
+.dsb-next-action {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dsb-next-action--empty {
+  font-weight: 400;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.dsb-comp { flex-shrink: 0; }
+
+.dsb-comp-value {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.dsb-set-comp-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.dsb-set-comp-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+.dsb-last-touch {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* ── Debrief summary card ────────────────────────────────── */
+
+.debrief-summary-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.dsc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dsc-date {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.dsc-expand-btn { margin-left: 4px; }
+
+.dsc-summary {
+  font-size: 13px;
+  color: var(--color-text);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.dsc-full-link { margin-top: 8px; }
+
+/* ── Action zones ────────────────────────────────────────── */
+
+.action-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.zone-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.zone-a { }
+
+.zone-a-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.zone-a-btn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.zone-a-btn:hover { opacity: 0.88; }
+
+.zone-a-stub {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.zone-b {
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.zone-b-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.zone-b-result {
+  margin-top: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.zone-b-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ── Zone C popover ──────────────────────────────────────── */
+
+.zone-c-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 180px;
+  padding: 4px 0;
+}
+
+.zone-c-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.zone-c-item:hover { background: var(--color-bg); }
+
+/* ── Collapsible sections ────────────────────────────────── */
+
+.collapsible-section { }
+
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0;
+  text-align: left;
+}
+.collapsible-header:hover .collapsible-title { color: var(--color-accent); }
+
+.collapsible-title {
+  margin: 0;
+  transition: color 0.1s;
+}
+
+.collapsible-badge {
+  font-size: 11px;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+.collapsible-chevron {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin-left: auto;
+  font-style: normal;
+}
+
+.collapsible-content {
+  margin-top: 12px;
+}
+
+/* ── Interaction editable row ────────────────────────────── */
+
+.interaction-entry--clickable { cursor: pointer; }
+.interaction-entry--clickable:hover { background: var(--color-bg); }
+
+/* ── Interactions show more ──────────────────────────────── */
+
+.interactions-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ── Stage history ───────────────────────────────────────── */
+
+.stage-history-log { }
+
+.stage-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ── Debrief linked note ─────────────────────────────────── */
+
+.debrief-linked-note {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* ── CV raw ──────────────────────────────────────────────── */
+
+.cv-raw-text {
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  margin-top: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
