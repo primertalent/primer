@@ -298,6 +298,7 @@ If any answer is wrong, redesign or defer.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 
 **V3 priority queue (do not build this session — queued for future):**
+- Custom Hiring Process per Role (intake-extracted, user-confirmable, editable, with semantic stage_type categories for pipeline confidence)
 - Wren Actions Tray (replaces Queue)
 - Bulk Import / Onboarding (candidates, clients, roles, agreements)
 - Role activation scans candidate database for existing fits
@@ -406,6 +407,59 @@ Priority: V1 important but not this week. Likely ships before second user is onb
 
 ---
 
+## Custom Hiring Process per Role
+
+Purpose: Every client has a different hiring process. Wren adapts to the recruiter's reality instead of forcing candidates into generic stages. Stage semantics also drive pipeline value confidence.
+
+**How it works:**
+- Each role has its own ordered set of pipeline stages
+- On role creation, Wren runs `processExtractor` prompt against JD + intake notes
+  - High confidence extraction: auto-populate stages, user reviews
+  - Medium or low confidence: flag user to confirm or create
+- Default fallback: generic 6-stage process if user skips
+- Editable anytime without losing candidate stage history
+
+**Data model:**
+- `pipeline_stages` table: `id`, `role_id`, `stage_order`, `stage_name`, `stage_type` (enum), `stage_description`, `is_interview`
+- `pipeline.stage_id` references `pipeline_stages.id`
+- `stage_type` enum preserves semantic meaning across custom names
+
+**Stage type enum and default confidence weights (Paraform-style discipline):**
+
+| stage_type | Weight | Description |
+|---|---|---|
+| `pre_pipeline` | 0.00 | Sourced, in outreach |
+| `first_stage` | 0.00 | Intro call, recruiter screen — too early to count |
+| `middle_stage` | 0.30 | First real client interview through any non-final round |
+| `late_stage` | 0.55 | Final round, panel, team meetings, reference checks |
+| `offer` | 0.80 | Verbal, written, in negotiation |
+| `accepted` | 0.95 | Signed, pre-start |
+| `placed` | 1.00 | Started |
+| `lost` | 0.00 | Withdrawn, rejected, declined |
+
+Pipeline value calculation uses `stage_type` weights, not stage name. A candidate in a stage named "Lunch with team" counts as `middle_stage` or `late_stage` depending on how `processExtractor` tags it.
+
+**Triggers for process definition:**
+- Role creation (automatic via `processExtractor`)
+- Before advancing a candidate to stage 2 on a role with no custom process set (interrupt prompt)
+
+**Surfaces:**
+- Role page: horizontal pipeline view under Role Status Bar showing stages + candidate count per stage
+- CandidateCard: Deal Status Bar shows current stage using custom name; confidence derived from `stage_type`
+- Desk: pipeline value number labeled "Weighted pipeline (from middle stages onward)" so framing is explicit
+- Desk deal rows: per-candidate confidence shown (e.g., "Chad · Offer stage · 80% · $42k weighted")
+- Agent responses reference custom stage names in suggestions
+
+**New prompt: `processExtractor.js`**
+- Input: JD text, intake notes, client context if available
+- Output: structured stages array with custom names + `stage_type` tagging + confidence level + extraction notes
+
+**Override capability:** Weights editable per recruiter in settings when that surface exists. Defaults match Paraform-style discipline.
+
+Priority: V1. Likely builds Friday if Thursday's real use surfaces process-mismatch pain (expected).
+
+---
+
 ## Data Integration Path
 
 **Phase 1 (now):** Manual entry + bulk import covers all data needs. Solo recruiters on Paraform, spreadsheets, and LinkedIn have full Wren value without integrations.
@@ -469,6 +523,10 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **ATS integrations deferred until market signal.** Trigger: 3+ prospects request the same integration, churn citing integration gap, or explicit willingness to pay. Not a user count threshold. Merge.dev considered as Unified API accelerator.
 - **`external_id` and `source` fields added to candidates, roles, clients schema.** Migration A. `source` defaults to `'wren'`. Future imports tag their own source. Intelligence layer data stays separate from source records.
 - **Nav renamed to Desk / Deals / Network.** Home → Desk (`/desk`), Roles → Deals (route stays `/roles` for URL stability), Candidates → Network (`/network`). Old paths redirect. Agent copy and recruiter-facing strings ("role", "candidate") unchanged — only nav-level naming.
+- **Pipeline stages are per-role, not global.** Custom processes extracted from JD/intake notes via `processExtractor` or user-defined. Generic 6-stage fallback if skipped. Editable without losing candidate stage history.
+- **Stage type enum preserves semantic meaning across custom names.** `pre_pipeline`, `first_stage`, `middle_stage`, `late_stage`, `offer`, `accepted`, `placed`, `lost`. Pipeline value confidence derives from `stage_type`, not stage name. "Lunch with team" counts as whatever type `processExtractor` tags it.
+- **Pipeline value confidence weights default to Paraform-style discipline.** `pre_pipeline` and `first_stage` = 0 (don't count early-stage candidates). `middle_stage` = 0.30, `late_stage` = 0.55, `offer` = 0.80, `accepted` = 0.95, `placed` = 1.00. Overridable per recruiter in settings.
+- **Pipeline value UI makes framing explicit.** Label reads "Weighted pipeline (from middle stages onward)" so the recruiter knows what's being counted and why early-stage candidates don't inflate the number.
 
 ---
 
