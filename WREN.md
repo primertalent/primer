@@ -25,6 +25,8 @@ Every build decision should advance one of these four questions.
 
 Primary user: the solo independent recruiter running on LinkedIn Recruiter, spreadsheets, email, and maybe Paraform. No ATS. No coordinator. No team. 5 to 20+ years of recruiting experience. Billing $150k to $1M+ annually, entirely on their own effort.
 
+**Already a competent closer.** Wren scales their existing motion, doesn't replace skill they don't have. The pitch is leverage, not coaching. "You're already good at this. Wren lets you do it ten times instead of three." Bad closers buying Wren as a skill upgrade churn at 60 days because volume doesn't fix the underlying gap. Good closers buying Wren as leverage stay because the floor under their off days and the multiplier on their best days both compound.
+
 This user is underserved by every existing tool. Enterprise ATSes (Bullhorn, Greenhouse, Ashby) are too heavy. Modern ATSes (Crelate, Recruiterflow, Loxo) still require setup, training, data migration. Sourcing tools (Gem, HireEZ) solve the wrong problem. AI recruiting startups target in-house TA teams.
 
 Wren meets them where they are. Paste a resume, paste a JD, paste call notes. Wren does the deal desk work the recruiter doesn't have time for. No migration, no integration, no setup.
@@ -57,6 +59,46 @@ Every build decision defends that thesis. If a feature doesn't help turn a candi
 
 ---
 
+## The secret
+
+Everyone looks at recruiting and thinks sourcing is the problem. AI recruiting startups pitch volume, outreach automation, and candidate discovery. The real problem is knowing what to do with an elite candidate once you have one: how to close them when it's competitive, what signals matter, what steps to take, how to coach the company. That's where deals are won and lost. Wren codifies the closing motion. That's the secret.
+
+---
+
+## Strategic Thesis: build for the world where sourcing is solved
+
+AI is collapsing sourcing cost to zero. LinkedIn scraping, AI outreach, autonomous agents finding candidates while the recruiter sleeps. Within 18 months every recruiter has a firehose of "qualified" candidates. The moat sourcing tools sold for a decade is evaporating.
+
+When everyone has 500 candidates in their pipeline, the bottleneck moves. The recruiter who wins is not the one with the most candidates. It is the one who knows which five to run hard, which fifteen to nurture, and which 480 to drop without guilt. That is a triage problem. It is also a closing problem. It is also a memory and signal problem.
+
+That is Wren.
+
+**Implications for every build decision:**
+- Assume a 10x increase in candidate volume from AI sourcing. Design for overload.
+- Do not build a single feature that competes with sourcing tools. They are sprinting toward their own commoditization cliff.
+- The candidate database is the asset because it is impossible to act on without intelligence on top, not because it is rare.
+- The autonomous overnight agent is not a nice-to-have. It is the only way to operate when a recruiter has 500 active candidates. Every feature should compound toward it.
+
+**Today's recruiter wants more candidates. Tomorrow's recruiter has too many and can't work them.** Wren is the layer that makes a flooded pipeline actionable. Built on time, slightly early, which is the right place to be when the wave is this obvious.
+
+---
+
+## Two-layer messaging (GTM principle)
+
+The buyer is not buying truth. They are buying relief from a pain they already feel.
+
+**Top of funnel — felt pain:** "More deals from the candidates you already have. More closes from the motion you already run. A floor under your worst weeks." Speaks to leverage, sourcing fatigue, deal volume, inconsistency. Gets them in the door.
+
+**Once engaged — real problem:** "The reason you are losing deals is not sourcing, it is what happens after." Reframes the problem. Locks in the value.
+
+Sequencing matters. Felt pain first, real problem second. Lead with the contrarian truth ("everyone sold you sourcing, nobody helped you close") on cold outreach and the message lands abstract. Lead with leverage on cold outreach and the contrarian truth becomes the reframe during the demo.
+
+The headline is leverage. The product is closing intelligence. That gap is where the marketing lives.
+
+For deeper GTM thinking — founder story, objection handling, market analysis, ICP segmentation, positioning experiments — see `POSITIONING.md` in the repo root.
+
+---
+
 ## What Wren is
 
 Wren is an agent that works the desk of a solo independent recruiter.
@@ -75,7 +117,7 @@ The agent is useless without the platform. The platform is just an ATS without t
 
 ## The shift that defines the roadmap
 
-**Today:** Most skills fire on button press. Three are event-driven (see below).
+**Today:** Most skills fire on button press. Four are event-driven (see below).
 **Next:** More skills migrate to event triggers as real-use patterns confirm the right firing conditions.
 **Later:** Wren works overnight. Screens incoming resumes. Drafts submissions. Queues follow-ups. Surfaces what needs action tomorrow.
 
@@ -85,6 +127,7 @@ Every feature should move one step toward the later version. The test on every b
 - Auto-screen when a candidate is added to a role (fires on pipeline insert)
 - Auto-regenerate next action when stage advances (fires on stage change)
 - Auto-generate search strings when a role is created (fires on role create)
+- Auto-debrief prompt on call/meeting interaction logged
 
 **Button-driven today (candidates for future event migration):**
 - Resume screener, scorecard, pitch builder, submission draft, outreach, interview questions, intake — all triggered manually. Migration path: identify the event that makes each one useful (e.g., submission draft fires when stage advances to "Shortlisted").
@@ -115,17 +158,21 @@ Every feature should move one step toward the later version. The test on every b
 
 **Everything persists.** Ephemeral AI output is an antipattern. Every skill result, score, note, and draft is stored.
 
+**Wren raises the bar.** The tool surfaces gaps in intake, motivation, and process. It pushes back honestly when a recruiter is about to skip a step. Not gatekeeping — honesty. "Wren tells you the truth about your pipeline."
+
+**Cost optimization is a V1 discipline.** Every prompt designed with caching in mind. Every call routed to the right model (Haiku for classification, Sonnet for judgment, Opus for high-stakes reasoning). Batch API for overnight work. Target 60%+ gross margin per user from day one.
+
 ---
 
 ## Core loop
 
-**The Brief → work the roles → The Queue.**
+**The Desk → work the Deals → end-of-day review.**
 
-The Brief answers three questions without scrolling: what happened since yesterday, what needs attention now, what does today look like. 90 seconds to read.
+The Desk (home) answers three questions without scrolling: what's my pipeline worth, what needs attention now, what's happened recently. 90 seconds to read.
 
-In the middle, the recruiter works candidates and roles. Single-click advance. Single-click draft. Sticky context bar so the next move is always visible.
+In the middle, the recruiter works candidates and roles. Single-click advance. Single-click draft. Sticky Deal Status Bar so the next move is always visible.
 
-The Queue is the end of the day. Submission drafts waiting. Follow-ups ready. Read, edit, approve, copy, send. Inbox-clear feel.
+End of day is ambient via Actions Tray (future): surfaces what Wren flagged, what's overdue, what's drafted and awaiting send. Clear the tray. Close the laptop.
 
 Everything outside this loop needs a strong case.
 
@@ -142,17 +189,17 @@ Wren's intelligence lives in `src/lib/prompts/`. These are not features. They ar
 | Outreach Email | `candidateOutreachEmail.js` |
 | LinkedIn Message | `linkedinMessageGenerator.js` |
 | Interview Questions | `interviewQuestionGenerator.js` |
-| Boolean Search Builder | `booleanSearchBuilder.js` |
 | Evaluation Scorecard | `candidateScorecard.js` |
 | Job Description Writer | `jobDescriptionWriter.js` |
 | Intake | `intake.js` |
 | Submission Draft | `submissionDraft.js` |
 | Career Timeline Parser | `careerTimeline.js` |
 | Next Action | `nextAction.js` |
-| Daily Brief | `dailyBrief.js` |
 | Multi-Screen | `multiScreen.js` |
 | JD Extractor | `jdExtractor.js` |
 | CV Extraction | `cvExtraction.js` |
+| Debrief Extractor | `debriefExtractor.js` |
+| Agent Response | `agentResponse.js` |
 
 The skills are the moat. Anyone building a competing product has to hire the same recruiters and extract the same logic. Protect them. Extend them. Never dilute them.
 
@@ -167,6 +214,8 @@ Wren is channel-agnostic. It drafts. The recruiter delivers.
 **Outreach** is drafted inside Wren, copied and sent by the recruiter. LinkedIn has no API and blocks automation. Chrome extension is v2.
 
 **Email** is the most automatable channel. Drafting works today. Gmail integration is a future milestone.
+
+**Channel recommendation (planned for agent response layer):** Wren recommends the channel before the content. Hierarchy: Call (high stakes, rapport fragile, offer stage) → Video (first meaningful conversation, pre-close) → Email (formal, documented) → LinkedIn (warm network touch) → Text (existing relationship, time-sensitive). Sometimes the output is "pick up the phone" with prep, no drafted message.
 
 ---
 
@@ -196,17 +245,19 @@ Active tables — all read and written by current code:
 
 | Table | Purpose |
 |---|---|
-| `recruiters` | auth user profile |
-| `candidates` | full record: `cv_text`, `career_timeline` (JSONB), `career_signals` (JSONB), `enrichment_data` (JSONB) |
-| `roles` | open positions: `notes` (JD), `process_steps` (JSONB) |
-| `clients` | companies with contacts |
+| `recruiters` | auth user profile. `default_placement_fee_pct` for role creation defaults. |
+| `candidates` | full record: `cv_text`, `career_timeline` (JSONB), `career_signals` (JSONB), `enrichment_data` (JSONB). `external_id`, `source`. |
+| `roles` | open positions: `notes` (JD), `formatted_jd`, `process_steps` (JSONB), `placement_fee_pct`, `placement_fee_flat`, `target_comp_min`, `target_comp_max`, `openings`, `agreement_id`. `external_id`, `source`. |
+| `clients` | companies with contacts. `default_agreement_id`. `external_id`, `source`. |
 | `client_contacts` | contacts linked to clients |
-| `pipeline` | candidate × role: `current_stage`, `fit_score`, `fit_score_rationale`, `recruiter_score`, `recruiter_note`, `scorecard_result` (JSONB), `screener_result` (JSONB), `next_action`, `next_action_due_at`, `submitted_at`, `last_followup_at` |
+| `pipeline` | candidate × role: `current_stage`, `fit_score`, `fit_score_rationale`, `recruiter_score`, `recruiter_note`, `scorecard_result` (JSONB), `screener_result` (JSONB), `next_action`, `next_action_due_at`, `submitted_at`, `last_followup_at`, `expected_comp` |
 | `pipeline_stage_history` | every stage movement |
 | `interactions` | every touchpoint (call, email, note, meeting) |
 | `screener_results` | standalone screener history, no pipeline dependency |
 | `messages` | drafted / approved / sent / held outreach |
 | `debriefs` | post-interaction signal capture: `outcome`, `feedback_raw`, `summary`, `motivation_signals`, `competitive_signals`, `risk_flags`, `positive_signals`, `hiring_manager_signals`, `next_action`, `questions_to_ask_next`, `updates_to_record` (all JSONB signals) |
+| `agreements` | fee agreements, engagement letters, MSAs, NDAs. Raw PDF in Supabase Storage + structured extracted terms. |
+| `candidate_imports` | tracks bulk import runs (type, status, counts, report) |
 
 **JSONB where structure will evolve.** Career timeline, signals, process steps, screener results, scorecard results. No migrations needed when the shape changes.
 
@@ -223,8 +274,7 @@ Active tables — all read and written by current code:
 | `WrenResponse.jsx` | Sticky bottom agent response bar. Shows after every action: thinking animation → message + suggestion chips. |
 | `AgentContext.jsx` | Global agent state. `fireResponse(action, context)` fires agentResponse prompt. `dispatch(actionId, context)` routes chip actions via page registry then navigation fallback. `registerAction` / `unregisterAction` for page-level handlers. |
 | `CandidateCard.jsx` | Candidate deal view. Deal Status Bar (sticky, replaces old context bar) + three-zone action panel + single-column scroll. Registers `log_debrief`, `log_interaction`, `set_expected_comp` action handlers. |
-| `RoleDetail.jsx` | Role view with kanban, search strings, interview questions, JD. |
-| `Queue.jsx` | End-of-day inbox. Drafts, approved, sent, held. |
+| `RoleDetail.jsx` | **Deals** — Role-level deal cockpit. Role Status Bar with potential deal value, health pills, next action + three-zone action panel + JD auto-format. Route stays `/roles` for URL stability. |
 | `Candidates.jsx` | **Network** — Find past candidates by stage, signal, skill, fit score, recency. Deal history, not inventory. Route: `/network`. |
 | `api/ai.js` | Server-side Anthropic passthrough. |
 | `src/lib/prompts/` | Every skill. |
@@ -234,20 +284,21 @@ Active tables — all read and written by current code:
 ## Build rules
 
 **Before any feature, run this check:**
-- Does it serve the core loop (Brief → work → Queue)?
+- Does it serve the core loop (Desk → work → review)?
 - Does it fire on an event or require a button press? (Event is better.)
 - Can it be done in one motion?
 - Does it compound toward the autonomous agent?
 - Is it channel-agnostic?
+- Does it earn a place on Desk, Deals, or Network, or does it live inside one of those? (No new top-level nav items.)
 
 If any answer is wrong, redesign or defer.
 
 **Standing constraints:**
+- Three top-level surfaces only: Desk, Deals, Network. New functionality lives inside one of them, not in new nav.
 - WrenCommand is the highest-leverage surface. Do not complicate it.
 - Everything persists. Ephemeral AI output is an antipattern.
 - One-click is the bar. More than one motion gets flagged for redesign.
-- New surfaces need a strong case. Too many surfaces is a risk.
-- The Brief and Needs Attention are the prioritization layer. That is the core loop, not a dashboard feature.
+- The Desk's Pipeline Value and Actions Tray are the prioritization layer. That is the core loop, not a dashboard feature.
 - Recruiter score and AI score are separate permanent tracks. Don't collapse them.
 
 ---
@@ -269,26 +320,23 @@ If any answer is wrong, redesign or defer.
   - Interaction editing: click any interaction row → edit modal for type + notes. Preserves `debrief_id` link on save. "Debrief linked" notice shown.
   - Resume auto-parses on card load if `cv_text` exists but `career_timeline` is null (no button press needed).
   - Expected comp blocking modal on stage advance to interviewing/offer/placed when expected_comp is null
-- RoleDetail: kanban pipeline + interview questions + search strings + JD
-- Queue: drafted / approved / sent / held outreach
-- Candidates: network search by stage, signal, skill, fit score, recency
-- Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create, auto-debrief prompt on call/meeting log
-- Recruiter score + AI score as separate permanent tracks on every pipeline entry
-- Debrief capture: paste transcript or brain dump → extract structured signal (motivation, competitive, risk, positive, HM signals, next action, questions to ask, record updates) → save to debriefs table → surface on sticky context bar and debrief signals section
-- Placement fee fields on roles (% of comp or flat fee, defaults from recruiter profile)
-- Schema: `roles.placement_fee_pct`, `roles.placement_fee_flat`, `pipeline.expected_comp`, `recruiters.default_placement_fee_pct`
-- RoleDetail refactored as role-level deal cockpit:
-  - **Role Status Bar** (sticky top): role title + client subtitle | potential deal value (big) + current pipeline value + fee label | days open | health pills (Stalled, Cold client, No interviews, Overdue follow-up, Fee not set, Agreement missing) | next action
+- RoleDetail (Deals) refactored as role-level deal cockpit:
+  - **Role Status Bar** (sticky top): role title + client subtitle | potential deal value (big) + current pipeline value + fee label | days open | health pills (Stalled, Cold client, No interviews, Overdue follow-up, Fee not set, Agreement missing, Agreement expiring) | next action
   - Potential deal value: `target_comp_min/max midpoint × openings × fee_pct`, or `fee_flat × openings`. Falls back to sum of `expected_comp × fee` across active pipeline.
   - Health pills derive from pipeline state, stage history, and interactions — non-blocking secondary fetch.
   - Zone A/B/C structure: Zone A = Edit role link; Zone B = Build search strings, Generate IQ; Zone C = Close role, Delete (overflow popover).
   - Network match suggestions: stubbed, logic deferred to next session.
   - JD auto-format on load: if `notes` exists and `formatted_jd` is null, auto-runs cleaning prompt, stores result in `formatted_jd`. No Format button. Raw JD in collapsible `<details>` below.
-  - Submission draft modal retained (unchanged functionality).
   - Bug fixes: fee fields now fetched on load (visible after EditRole return); candidate row click has `stopPropagation` on action buttons.
+- Candidates (Network): network search by stage, signal, skill, fit score, recency
+- Event triggers: auto-screen on pipeline add, auto-next-action on stage advance, auto-search-strings on role create, auto-debrief prompt on call/meeting log
+- Recruiter score + AI score as separate permanent tracks on every pipeline entry
+- Debrief capture: paste transcript or brain dump → extract structured signal (motivation, competitive, risk, positive, HM signals, next action, questions to ask, record updates) → save to debriefs table → surface on sticky context bar and debrief signals section
+- Placement fee fields on roles (% of comp or flat fee, defaults from recruiter profile)
+- Schema: `roles.placement_fee_pct`, `roles.placement_fee_flat`, `pipeline.expected_comp`, `recruiters.default_placement_fee_pct`, `roles.target_comp_min`, `roles.target_comp_max`, `roles.openings`, `roles.formatted_jd`, `roles.agreement_id`, `clients.default_agreement_id`, `external_id` + `source` on candidates/roles/clients
+- `agreements` table (raw PDF + structured terms) and `candidate_imports` table created
+- Nav renamed to Desk / Deals / Network
 - Queue removed from nav. File preserved, route preserved. Queue deleted when Actions Tray ships.
-- Schema Migration A (pending run in Supabase): `external_id` + `source` on candidates, roles, clients; `target_comp_min`, `target_comp_max`, `openings`, `formatted_jd` on roles.
-- Schema Migration B (pending run in Supabase): `agreements` table, `candidate_imports` table, `roles.agreement_id`, `clients.default_agreement_id`.
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
@@ -296,20 +344,24 @@ If any answer is wrong, redesign or defer.
 - Dashboard ActivityDigest / NeedsAttention / TodayPipeline — replaced by deal desk zones.
 - Daily Brief skill — removed. Redundant with Dashboard.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
+- Queue from nav — removed. File and route preserved until Actions Tray ships.
 
 **V3 priority queue (do not build this session — queued for future):**
+- **Call Prep module** (Wednesday build): one module, used across every "pick up the phone" moment. Zone A stubs for "Prep for next interview", "Lock comp expectations", "Prep for counter offer" will route here.
 - Custom Hiring Process per Role (intake-extracted, user-confirmable, editable, with semantic stage_type categories for pipeline confidence)
+- Recruiter vs AI Confidence (calibration loop)
+- Stage-Gate Agent Flows (triggered at late_stage / offer / accepted moments)
 - Wren Actions Tray (replaces Queue)
 - Bulk Import / Onboarding (candidates, clients, roles, agreements)
 - Role activation scans candidate database for existing fits
 - Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
 - Close sequence generator by stage (what needs to happen to get from here to offer)
-- **Call Prep module** (Wednesday build): one module, used across every "pick up the phone" moment. Zone A stubs for "Prep for next interview", "Lock comp expectations", "Prep for counter offer" will route here.
 
 **What's next (current priorities):**
+- Thursday: Real use day. Work 2-3 live Paraform candidates end-to-end. Take notes. No building.
+- Friday: Fix what Thursday's use surfaces. Top 3 issues only.
 - Time-elapsed triggers via Supabase Edge Functions on a schedule
 - Auto-set `next_action_due_at` when next action fires
-- Wire "Draft Follow-Up" on Needs Attention to actually draft
 
 **Do not build:**
 - Team features, shared pipelines, assignments
@@ -317,6 +369,105 @@ If any answer is wrong, redesign or defer.
 - Gmail integration (v2)
 - New analytics or reporting surfaces
 - Any second recruiter's feature requests
+- New top-level nav items
+
+---
+
+## Call Prep Module (Wednesday build)
+
+Purpose: one module, used across every "pick up the phone" moment. Inputs vary (candidate, client, BD target); format stays consistent. Complements the debrief module — prep before calls, debrief after calls.
+
+**Outputs:**
+- What you know about this person right now
+- What's changed since you last spoke
+- The one thing you need to get out of this call
+- The one thing they probably need to hear
+- Known risks or sensitivities to navigate (vibes off, counter-offer risk, competing offer)
+- A suggested opener. Not a script. One line to get started human.
+
+60 seconds to read. Recruiter picks up the phone prepared, not winging it.
+
+**Routing:**
+- CandidateCard Zone A: "Prep for next interview", "Lock comp expectations", "Prep for counter offer"
+- RoleDetail Zone A: "Prep for next client call"
+- Every BD call, check-in, relationship repair moment
+
+**Design principle:** Wren recommends the right action, not just the right words. Sometimes the output is "pick up the phone" with prep, no drafted message. Good recruiters know when to add value. Great recruiters know when not to.
+
+---
+
+## Recruiter vs AI Confidence (the calibration loop)
+
+Two confidence scores per candidate per role, captured at two moments: before a real interaction and after. Wren's AI score and the recruiter's own rating, stored separately, displayed together.
+
+**Why this matters:**
+- Forces the recruiter to commit a read, not just look at Wren's score
+- Creates a feedback loop where both sides calibrate over time
+- Enables divergence-based pushback ("you said 9, Wren said 5, worth reconciling")
+- Produces the demo moment: "my desk learns my closes"
+
+**Data model:**
+- `pipeline.recruiter_confidence_pre` (integer, nullable)
+- `pipeline.recruiter_confidence_post` (integer, nullable)
+- `pipeline.ai_confidence_pre` (integer, nullable, generated by Wren)
+- `pipeline.ai_confidence_post` (integer, nullable, generated by Wren)
+
+**Capture moments:**
+- Pre-call: when recruiter opens call mode or logs that a call is scheduled, Wren prompts for their confidence score and generates its own
+- Post-call: when debrief is saved, Wren asks recruiter for updated confidence and generates its own based on debrief signals
+
+**Display:**
+- Deal Status Bar shows both post scores side by side
+- CandidateCard has a small "Confidence history" section showing pre/post pairs over time
+- Divergence of 3+ points triggers agent response: "You rated this candidate higher than I did. What am I missing? Or is something about your read worth capturing?"
+
+**Calibration view (V2):**
+- Recruiter settings page shows accuracy trends: "Your confidence scores lead to placement X% of the time. Wren's confidence scores lead to placement Y% of the time."
+- Not built V1, but design data model now so data accumulates from day one
+
+Priority: V1. Small build once core flow is stable.
+
+---
+
+## Stage-Gate Agent Flows
+
+Critical moments in a deal (stage advancements to late stages, offer extended, offer accepted) trigger specific agent responses that surface the right questions and flag missing signals.
+
+Inspired by Paraform's final-round outreach template, but automated and personalized. The recruiter doesn't have to log anything for Wren to know the moment arrived.
+
+**How it works:**
+- On stage advance to a `late_stage`, `offer`, or `accepted` type stage, `agentResponse` fires with a stage-specific action
+- Context includes all prior debrief signals and checks which critical signals for that stage are missing or thin
+- Message congratulates or acknowledges, affirms strength, names gaps
+- Suggestion chips address each gap specifically
+
+**Critical signals per stage type:**
+
+`first_interview_complete`:
+- Motivation read
+- Hiring manager impression
+- Candidate energy on the role
+
+`late_stage` (final round or equivalent):
+- Competing offers (active and at what stage)
+- Comp and equity expectations
+- Decision timeline
+
+`offer`:
+- Competing offer status
+- Timeline of competing processes
+- Counter offer risk from current employer
+- References arranged
+- Start date realistic
+
+`accepted`:
+- Resignation conversation prepped
+- Counter offer from current employer expected
+- Onboarding logistics on both sides
+
+Each flow uses existing `agentResponse.js` architecture with new action types. No new infrastructure.
+
+Priority: V1, likely bundles with Call Prep build.
 
 ---
 
@@ -385,10 +536,10 @@ Scope: candidates, clients, roles, and agreements.
 - Agreement informs fee calculations, pipeline value, and Wren pushback on missing/expired contracts
 
 **Data model additions:**
-- `candidate_imports` table tracks import runs
-- `agreements` table (raw PDF + parsed terms JSONB + structured core fields)
-- `roles.agreement_id` as optional link
-- `clients.default_agreement_id` as fallback
+- `candidate_imports` table tracks import runs (built)
+- `agreements` table (built; raw PDF + parsed terms JSONB + structured core fields)
+- `roles.agreement_id` as optional link (built)
+- `clients.default_agreement_id` as fallback (built)
 
 **Pipeline per import:**
 - File to Supabase Storage
@@ -398,7 +549,7 @@ Scope: candidates, clients, roles, and agreements.
 
 **Surfaces:**
 - Onboarding: "Bring your history into Wren" flow after account creation
-- Ongoing: Import button on Your Network, Roles, and Settings
+- Ongoing: Import button on Network, Deals, and Settings
 - Agreement review: dedicated review screen after parsing
 
 **Why agreements matter:** Every deal desk move that touches money references a contract. Parsed terms mean pipeline value is grounded in reality, not manual input. Wren surfaces expiring agreements, missing agreements on active roles, terms relevant to stalled deals. Most recruiting tools ignore agreements entirely. Real differentiator.
@@ -477,6 +628,33 @@ Not a user count threshold. A market signal threshold.
 
 ---
 
+## Positioning and Objection Handling
+
+**Founder story:**
+"I spent 15 years as a solo recruiter running on LinkedIn and spreadsheets. I was good at the start of the funnel. I was average at the close. I kept losing candidates I should have won. Wren is what I wish I'd had."
+
+**Core objection handling:**
+
+*"I do this already and my process is good."*
+"Perfect. Upload it. Wren turns your process into the floor, not the ceiling. You stay the closer. Wren makes sure every candidate gets your A game, not your Thursday afternoon game."
+
+*"I already use [ATS / Gem / Paraform]."*
+"Keep using it. Wren sits on top. Your ATS stores the record. Wren runs the deal."
+
+*"AI in recruiting is all hype."*
+"Most of it is. Wren isn't doing sourcing or outreach automation. Wren does the deal work between the calls you make. If you're losing closes you should be winning, that's what we fix."
+
+*"I don't have time to learn another tool."*
+"You paste your candidate, your notes, your JD. Wren does the rest. If it takes more than one motion it's broken. That's the bar."
+
+*"What about data security?"*
+"Everything is yours. Your candidates, your notes, your data. We don't sell data, don't share across users, don't train on your records."
+
+*"I'm a solo recruiter, I don't need enterprise tooling."*
+"Right. Wren is built for you specifically. No team features, no admin panels. One operator, one desk, one tool that respects your time."
+
+---
+
 ## Decisions log
 
 Architectural and product decisions that stand. Behavior here overrides intuition.
@@ -522,11 +700,21 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Bulk import scoped for candidates, clients, roles, and agreements.** Agreements parsed via Claude — fee %, refund clauses, exclusivity, expiration. Raw PDF stored in Supabase Storage alongside structured extracted terms. User confirms before source of truth.
 - **ATS integrations deferred until market signal.** Trigger: 3+ prospects request the same integration, churn citing integration gap, or explicit willingness to pay. Not a user count threshold. Merge.dev considered as Unified API accelerator.
 - **`external_id` and `source` fields added to candidates, roles, clients schema.** Migration A. `source` defaults to `'wren'`. Future imports tag their own source. Intelligence layer data stays separate from source records.
-- **Nav renamed to Desk / Deals / Network.** Home → Desk (`/desk`), Roles → Deals (route stays `/roles` for URL stability), Candidates → Network (`/network`). Old paths redirect. Agent copy and recruiter-facing strings ("role", "candidate") unchanged — only nav-level naming.
+- **Nav renamed to Desk / Deals / Network.** Home → Desk (`/desk`), Roles → Deals (route stays `/roles` for URL stability), Candidates → Network (`/network`). Old paths redirect. Agent copy and recruiter-facing strings ("role", "candidate") unchanged — only nav-level naming. Three surfaces, each with one job. No new top-level nav items.
 - **Pipeline stages are per-role, not global.** Custom processes extracted from JD/intake notes via `processExtractor` or user-defined. Generic 6-stage fallback if skipped. Editable without losing candidate stage history.
 - **Stage type enum preserves semantic meaning across custom names.** `pre_pipeline`, `first_stage`, `middle_stage`, `late_stage`, `offer`, `accepted`, `placed`, `lost`. Pipeline value confidence derives from `stage_type`, not stage name. "Lunch with team" counts as whatever type `processExtractor` tags it.
 - **Pipeline value confidence weights default to Paraform-style discipline.** `pre_pipeline` and `first_stage` = 0 (don't count early-stage candidates). `middle_stage` = 0.30, `late_stage` = 0.55, `offer` = 0.80, `accepted` = 0.95, `placed` = 1.00. Overridable per recruiter in settings.
 - **Pipeline value UI makes framing explicit.** Label reads "Weighted pipeline (from middle stages onward)" so the recruiter knows what's being counted and why early-stage candidates don't inflate the number.
+- **Recruiter vs AI confidence is a V1 feature.** Two scores per pipeline row at two capture moments (pre-call and post-call). Stored separately. Displayed together. Divergence triggers agent pushback. Calibration view is V2 but data accumulates from day one.
+- **Stage-gate agent flows trigger automatically.** `late_stage`, `offer`, and `accepted` advancements fire stage-specific agentResponse flows that check critical signals and surface gaps. Inspired by Paraform's final-round template, but automated.
+- **Channel recommendation precedes content generation.** Wren recommends call / video / email / LinkedIn / text before drafting anything. Sometimes the right output is "pick up the phone" with prep, no drafted message.
+- **Wren raises the bar is a product principle.** The tool surfaces gaps in intake, motivation, and process. Pushes back when a recruiter is about to skip a step. Not gatekeeping — honesty.
+- **Cost optimization is a V1 discipline, not a V2 problem.** Prompt caching, model routing (Haiku/Sonnet/Opus by task stakes), Batch API for overnight work. Target 60%+ gross margin per user from day one.
+- **Founder-market fit is the bet.** 15 years as the exact ICP. The founder story leads with struggle, not expertise. Credibility comes from "I lost closes I should have won" more than from "I'm a recruiter."
+- **ICP refinement: the buyer is the good closer.** Solo recruiter, 5-20+ years, billing $150k-$1M+, already runs a process and knows their close rate. Wren is leverage, not coaching. Pitch is "do it ten times instead of three." Bad closers buying as a skill upgrade churn at 60 days because volume doesn't fix skill gap. Good closers stay because the floor under off days and the multiplier on best days both compound.
+- **Strategic thesis: build for the world where sourcing is solved.** AI commoditizes sourcing within 18 months. When recruiters have 500 candidates instead of 50, the bottleneck moves from finding to working. Wren is the layer that makes flooded pipelines actionable. Every feature assumes 10x candidate volume. Do not build features that compete with sourcing tools.
+- **Two-layer messaging is the GTM principle.** Top of funnel: felt pain (leverage, more deals, floor under bad weeks). Once engaged: contrarian truth (closing is the bottleneck, not sourcing). Sequence matters. Lead with leverage on cold outreach. Reframe to closing during the demo. The headline is leverage. The product is closing intelligence.
+- **POSITIONING.md is the GTM source of truth.** Founder story, objection handling, market analysis, messaging tests, and ICP segmentation live in `POSITIONING.md` at repo root. WREN.md stays focused on product and codebase context.
 
 ---
 
@@ -592,9 +780,19 @@ Daily brief opens with BD vs recruit guidance based on reqs and Good Client coun
 **DAILY DISCIPLINE:**
 - BD activity counter: 10 suggested touches a day, ranked by conversion likelihood
 
-**DEFERRED THIS SESSION:**
-- Network page sorting (separate cleanup)
-- Fit score vs tier debate (product decision, not a build)
-- Off topic fallback (backlog)
-- Call Prep module full build (Wednesday session)
-- Any V2 feature from the Knowledge Base section
+**PERSPECTIVE FLIP QUESTIONS (V2 intake enhancement):**
+Two questions to bake into intake and screening templates:
+- To client at role intake: "If you were me and 100% commission-based, would you stop everything to recruit on this role?" Answer informs role health score.
+- To candidate at screening: "If you were me and wanted to put you to work for [client], how would you close you?" Answer captured as close risk note.
+
+**OFF-TOPIC FALLBACK (backlog):**
+If a user's WrenCommand input doesn't parse as recruiting intent, Wren answers briefly (max 2 sentences) and redirects to real desk state. Three-strike escalation: friendly → sharper → "Wren's here to run your desk. What do you need?"
+
+**CALIBRATION VIEW (V2):**
+Recruiter settings page shows accuracy trends for recruiter_confidence vs ai_confidence over time. Data accumulates from V1 build of the calibration loop.
+
+**WREN DESIGN PRINCIPLE:**
+"Good recruiters know when they add value. Great recruiters know when they don't." Wren recommends the right action, not just the right words. AI in the middle does not mean AI does all the talking. Sometimes the best move is human.
+
+**KNOWLEDGE TENSION TO RESOLVE LATER:**
+Niche depth vs demand following. Both approaches work for different recruiters. Wren should serve the recruiter's strategy, not pick a side. Future setting: weight niche depth or demand signals in role scoring.
