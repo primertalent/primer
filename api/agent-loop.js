@@ -61,7 +61,7 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
     .select(`
       id, current_stage, fit_score, next_action, next_action_due_at,
       expected_comp, submitted_at, last_followup_at,
-      candidates ( id, name, current_title, current_company, career_signals ),
+      candidates ( id, first_name, last_name, current_title, current_company, career_signals ),
       roles (
         id, title, status, placement_fee_pct, placement_fee_flat,
         target_comp_min, target_comp_max, openings, agreement_status,
@@ -123,7 +123,7 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
 
     return {
       id:                 p.id,
-      candidate_name:     p.candidates?.name,
+      candidate_name:     [p.candidates?.first_name, p.candidates?.last_name].filter(Boolean).join(' ') || null,
       candidate_title:    p.candidates?.current_title,
       candidate_company:  p.candidates?.current_company,
       career_signals:     p.candidates?.career_signals,
