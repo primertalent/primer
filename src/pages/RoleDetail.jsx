@@ -51,7 +51,7 @@ function formatFeeLabel(role) {
     const k = Math.round(role.placement_fee_flat / 1000)
     return k > 0 ? `$${k}k flat` : `$${role.placement_fee_flat} flat`
   }
-  if (role.placement_fee_pct) return `${Math.round(role.placement_fee_pct * 100)}% fee`
+  if (role.placement_fee_pct) return `${parseFloat((role.placement_fee_pct * 100).toFixed(4))}% fee`
   return null
 }
 
@@ -1014,6 +1014,104 @@ export default function RoleDetail() {
               {interviewGenerating ? 'Generating…' : interviewQuestions ? 'Regenerate IQ' : 'Interview questions'}
             </button>
           </div>
+
+          {/* Search strings — inline result */}
+          {(searchGenerating || searchError || searchStrings) && (
+            <div style={{ marginTop: 12 }}>
+              {searchGenerating && (
+                <div className="modal-generating"><div className="spinner spinner--sm" />Building search strings…</div>
+              )}
+              {searchError && <p className="error" style={{ marginTop: 8 }}>Couldn't build search strings. Try again.</p>}
+              {searchStrings && !searchGenerating && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    {clearSearchConfirm ? (
+                      <div className="inline-confirm">
+                        <span>Clear search strings?</span>
+                        <button className="btn-confirm-yes" onClick={handleClearSearchStrings}>Yes, clear</button>
+                        <button className="btn-confirm-cancel" onClick={() => setClearSearchConfirm(false)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <button className="btn-ghost btn-sm" onClick={() => setClearSearchConfirm(true)}>Clear</button>
+                    )}
+                  </div>
+                  <div className="search-strings">
+                    {[
+                      { key: 'linkedin', label: 'LinkedIn' },
+                      { key: 'google',   label: 'Google X-Ray' },
+                      { key: 'github',   label: 'GitHub' },
+                    ].map(({ key, label }) => searchStrings[key] ? (
+                      <div key={key} className="search-string-block">
+                        <div className="search-string-header">
+                          <p className="search-string-label">{label}</p>
+                          <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(searchStrings[key])}>Copy</button>
+                        </div>
+                        <p className="search-string-value">{searchStrings[key]}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Interview questions — inline result */}
+          {(interviewGenerating || interviewError || interviewQuestions) && (
+            <div style={{ marginTop: 12 }}>
+              {interviewGenerating && (
+                <div className="modal-generating"><div className="spinner spinner--sm" />Generating questions…</div>
+              )}
+              {interviewError && <p className="error" style={{ marginTop: 8 }}>Couldn't generate questions. Try again.</p>}
+              {interviewQuestions && !interviewGenerating && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    {clearInterviewConfirm ? (
+                      <div className="inline-confirm">
+                        <span>Clear interview questions?</span>
+                        <button className="btn-confirm-yes" onClick={handleClearInterviewQuestions}>Yes, clear</button>
+                        <button className="btn-confirm-cancel" onClick={() => setClearInterviewConfirm(false)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <>
+                        <button className="btn-ghost btn-sm" onClick={() => setClearInterviewConfirm(true)}>Clear</button>
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={handleSaveInterviewGuide}
+                          disabled={interviewGuideSaving || interviewGuideSaved}
+                        >
+                          {interviewGuideSaving ? 'Saving…' : interviewGuideSaved ? 'Saved ✓' : 'Save Guide'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="interview-questions">
+                    <div className="interview-section">
+                      <h3 className="interview-section-heading">Behavioral</h3>
+                      <ol className="interview-list">
+                        {interviewQuestions.behavioral?.map((q, i) => (
+                          <li key={i} className="interview-item">
+                            <p className="interview-question">{q.question}</p>
+                            <p className="interview-signal">{q.signal}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                    <div className="interview-section">
+                      <h3 className="interview-section-heading">Technical / Role-Specific</h3>
+                      <ol className="interview-list">
+                        {interviewQuestions.technical?.map((q, i) => (
+                          <li key={i} className="interview-item">
+                            <p className="interview-question">{q.question}</p>
+                            <p className="interview-signal">{q.signal}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1058,127 +1156,6 @@ export default function RoleDetail() {
 
       {/* Network match suggestions (stub) */}
       <NetworkMatchStub />
-
-      {/* Boolean Search Strings */}
-      <section className="candidate-section" style={{ marginTop: 32 }}>
-        <div className="section-heading-row">
-          <h2 className="section-heading">Search Strings</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {searchStrings && !clearSearchConfirm && (
-              <button className="btn-ghost btn-sm" onClick={() => setClearSearchConfirm(true)}>Clear</button>
-            )}
-            <button
-              className="btn-ghost btn-sm"
-              onClick={handleBuildSearchStrings}
-              disabled={searchGenerating}
-            >
-              {searchGenerating ? 'Building…' : searchStrings ? 'Rebuild' : 'Build Search Strings'}
-            </button>
-          </div>
-        </div>
-
-        {clearSearchConfirm && (
-          <div className="inline-confirm">
-            <span>Clear search strings?</span>
-            <button className="btn-confirm-yes" onClick={handleClearSearchStrings}>Yes, clear</button>
-            <button className="btn-confirm-cancel" onClick={() => setClearSearchConfirm(false)}>Cancel</button>
-          </div>
-        )}
-        {searchGenerating && (
-          <div className="modal-generating"><div className="spinner spinner--sm" />Building search strings…</div>
-        )}
-        {searchError && (
-          <p className="error" style={{ marginTop: 8 }}>Couldn't build search strings. Try again.</p>
-        )}
-        {searchStrings && (
-          <div className="search-strings">
-            {[
-              { key: 'linkedin', label: 'LinkedIn' },
-              { key: 'google',   label: 'Google X-Ray' },
-              { key: 'github',   label: 'GitHub' },
-            ].map(({ key, label }) => searchStrings[key] ? (
-              <div key={key} className="search-string-block">
-                <div className="search-string-header">
-                  <p className="search-string-label">{label}</p>
-                  <button
-                    className="btn-ghost btn-sm"
-                    onClick={() => navigator.clipboard.writeText(searchStrings[key])}
-                  >Copy</button>
-                </div>
-                <p className="search-string-value">{searchStrings[key]}</p>
-              </div>
-            ) : null)}
-          </div>
-        )}
-      </section>
-
-      {/* Interview Questions */}
-      <section className="candidate-section" style={{ marginTop: 32 }}>
-        <div className="section-heading-row">
-          <h2 className="section-heading">Interview Questions</h2>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {interviewQuestions && !clearInterviewConfirm && (
-              <>
-                <button className="btn-ghost btn-sm" onClick={() => setClearInterviewConfirm(true)}>Clear</button>
-                <button
-                  className="btn-ghost btn-sm"
-                  onClick={handleSaveInterviewGuide}
-                  disabled={interviewGuideSaving || interviewGuideSaved}
-                >
-                  {interviewGuideSaving ? 'Saving…' : interviewGuideSaved ? 'Saved ✓' : 'Save Guide'}
-                </button>
-              </>
-            )}
-            <button
-              className="btn-ghost btn-sm"
-              onClick={handleGenerateInterviewQuestions}
-              disabled={interviewGenerating}
-            >
-              {interviewGenerating ? 'Generating…' : interviewQuestions ? 'Regenerate' : 'Generate'}
-            </button>
-          </div>
-        </div>
-
-        {clearInterviewConfirm && (
-          <div className="inline-confirm">
-            <span>Clear interview questions?</span>
-            <button className="btn-confirm-yes" onClick={handleClearInterviewQuestions}>Yes, clear</button>
-            <button className="btn-confirm-cancel" onClick={() => setClearInterviewConfirm(false)}>Cancel</button>
-          </div>
-        )}
-        {interviewGenerating && (
-          <div className="modal-generating"><div className="spinner spinner--sm" />Generating questions…</div>
-        )}
-        {interviewError && (
-          <p className="error" style={{ marginTop: 8 }}>Couldn't generate questions. Try again.</p>
-        )}
-        {interviewQuestions && (
-          <div className="interview-questions">
-            <div className="interview-section">
-              <h3 className="interview-section-heading">Behavioral</h3>
-              <ol className="interview-list">
-                {interviewQuestions.behavioral?.map((q, i) => (
-                  <li key={i} className="interview-item">
-                    <p className="interview-question">{q.question}</p>
-                    <p className="interview-signal">{q.signal}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <div className="interview-section">
-              <h3 className="interview-section-heading">Technical / Role-Specific</h3>
-              <ol className="interview-list">
-                {interviewQuestions.technical?.map((q, i) => (
-                  <li key={i} className="interview-item">
-                    <p className="interview-question">{q.question}</p>
-                    <p className="interview-signal">{q.signal}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* Job Description */}
       {(rawJd || jdToShow) && (

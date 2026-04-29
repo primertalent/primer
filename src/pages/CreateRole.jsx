@@ -349,6 +349,8 @@ export default function CreateRole() {
         title:              title.trim(),
         comp_min:           compMin ? Number(compMin) : null,
         comp_max:           compMax ? Number(compMax) : null,
+        target_comp_min:    compMin ? Number(compMin) : null,
+        target_comp_max:    compMax ? Number(compMax) : null,
         comp_currency:      'USD',
         comp_type:          compType || null,
         process_steps:      steps.filter(s => s.trim()),
