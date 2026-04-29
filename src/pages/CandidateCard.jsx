@@ -1170,7 +1170,7 @@ function InteractionEditModal({ modal, onSave, onClose }) {
 
 // ── Zone C popover ────────────────────────────────────────
 
-function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipeline, onMarkPlaced, onClose }) {
+function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipeline, onMarkPlaced, onDeleteCandidate, onClose }) {
   const navigate = useNavigate()
   const menuRef  = useRef(null)
 
@@ -1199,6 +1199,9 @@ function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipel
           Mark as placed
         </button>
       )}
+      <button className="zone-c-item zone-c-item--danger" onClick={() => { onDeleteCandidate(); onClose() }}>
+        Delete candidate
+      </button>
     </div>
   )
 }
@@ -1294,7 +1297,9 @@ export default function CandidateCard() {
   const [compModal, setCompModal] = useState({ open: false, entry: null, nextStage: '', comp: '', saving: false })
 
   // Delete
-  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+  const [deleteError, setDeleteError]     = useState(null)
 
   // Career timeline
   const [timeline, setTimeline] = useState(null)
@@ -1693,10 +1698,23 @@ export default function CandidateCard() {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Delete ${candidate.first_name} ${candidate.last_name}? This cannot be undone.`)) return
     setDeleting(true)
-    await supabase.from('candidates').delete().eq('id', id)
-    navigate('/network')
+    setDeleteError(null)
+    try {
+      await Promise.all([
+        supabase.from('pipeline').delete().eq('candidate_id', id),
+        supabase.from('interactions').delete().eq('candidate_id', id),
+        supabase.from('debriefs').delete().eq('candidate_id', id),
+        supabase.from('screener_results').delete().eq('candidate_id', id),
+        supabase.from('messages').delete().eq('candidate_id', id),
+      ])
+      const { error } = await supabase.from('candidates').delete().eq('id', id)
+      if (error) throw error
+      navigate('/network')
+    } catch {
+      setDeleteError('Delete failed. Try again.')
+      setDeleting(false)
+    }
   }
 
   async function handleParseCareer() {
@@ -2305,11 +2323,26 @@ export default function CandidateCard() {
                   if (primary) handleRemovePipeline(primary.id)
                 }}
                 onMarkPlaced={handleMarkPlaced}
+                onDeleteCandidate={() => setConfirmDelete(true)}
                 onClose={() => setZoneCOpen(false)}
               />
             )}
           </div>
         </div>
+
+        {/* Delete candidate inline confirm */}
+        {confirmDelete && (
+          <div className="inline-confirm" style={{ marginBottom: 12 }}>
+            <span>Delete {candidate.first_name} {candidate.last_name}? This cannot be undone.</span>
+            <button className="btn-confirm-yes" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting…' : 'Yes, delete'}
+            </button>
+            <button className="btn-confirm-cancel" onClick={() => { setConfirmDelete(false); setDeleteError(null) }}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {deleteError && <p className="inline-error" style={{ marginBottom: 12 }}>{deleteError}</p>}
 
         {/* Deal Status Bar */}
         <DealStatusBar
