@@ -235,9 +235,8 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
     }
   }
 
-  const hasBullets     = pitch?.bullets?.length > 0
-  const hasNextActions = next_actions?.length > 0
-  const concerns       = c?.signals?.red_flags ?? []
+  const hasBullets = pitch?.bullets?.length > 0
+  const concerns   = c?.signals?.red_flags ?? []
 
   return (
     <div className="intake-result">
@@ -294,14 +293,6 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
           <ul className="intake-packet-list intake-packet-list--concerns">
             {concerns.slice(0, 2).map((f, i) => <li key={i}>{f}</li>)}
           </ul>
-        </div>
-      )}
-
-      {/* Next action — prominent */}
-      {hasNextActions && (
-        <div className="intake-next-action-block">
-          <p className="intake-next-action-label">Next Action</p>
-          <p className="intake-next-action-text">{next_actions[0]}</p>
         </div>
       )}
 
