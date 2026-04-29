@@ -395,7 +395,7 @@ export default function RoleDetail() {
   const { id }          = useParams()
   const navigate        = useNavigate()
   const { recruiter }   = useRecruiter()
-  const { fireResponse } = useAgent()
+  const { fireResponse, registerAction, unregisterAction } = useAgent()
 
   const [role, setRole]           = useState(null)
   const [pipeline, setPipeline]   = useState([])
@@ -573,6 +573,12 @@ export default function RoleDetail() {
       .catch(err => console.warn('JD auto-format failed silently:', err.message))
       .finally(() => setJdAutoFormatting(false))
   }, [role?.id])
+
+  // Register page-level action handlers so suggestion chips work while on this page
+  useEffect(() => {
+    registerAction('add_fee', () => setActivePill('fee_not_set'))
+    return () => unregisterAction('add_fee')
+  }, [registerAction, unregisterAction])
 
   // ── Pill panel handlers ──────────────────────────────────
 
