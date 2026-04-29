@@ -73,9 +73,9 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
 
   if (pErr) throw pErr
 
-  // Filter to roles that are active (PostgREST doesn't support nested WHERE cleanly)
-  const activePipelines = (pipelines || []).filter(p => p.roles?.status === 'active')
-  if (!activePipelines.length) return { recruiter_id: recruiterId, actions_written: 0 }
+  // Exclude pipelines where the role is explicitly closed; keep everything else
+  const activePipelines = (pipelines || []).filter(p => p.roles?.status !== 'closed')
+  if (!activePipelines.length) return { recruiter_id: recruiterId, pipelines_found: 0, actions_written: 0 }
 
   const pipelineIds = activePipelines.map(p => p.id)
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -207,5 +207,5 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
     }
   }
 
-  return { recruiter_id: recruiterId, actions_written: written }
+  return { recruiter_id: recruiterId, pipelines_found: activePipelines.length, actions_generated: allActions.length, actions_written: written }
 }
