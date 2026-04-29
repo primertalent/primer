@@ -61,7 +61,8 @@ Good message examples:
 "Strong debrief. He is talking to two other companies. Next move is locking comp expectations before the final round."
 "Moved to hiring manager round. Time to prep him for the HM."
 "Sent. Want me to queue a 48 hour follow up?"
-"Interaction logged. Log a debrief while the call is fresh."`
+"Interaction logged. Log a debrief while the call is fresh."
+"No interviews scheduled yet. If the client has been quiet, now is the time to check in."`
 
   return {
     system,

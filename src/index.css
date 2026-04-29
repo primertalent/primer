@@ -6403,6 +6403,31 @@ select.field-input {
 .risk-pill--red    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 .risk-pill--amber  { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .risk-pill--gray   { background: var(--color-bg); color: var(--color-muted); border: 1px solid var(--color-border); }
+.risk-pill--green  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.risk-pill--clickable { cursor: pointer; }
+.risk-pill--clickable:hover { filter: brightness(0.95); }
+
+.pill-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 8px;
+}
+.pill-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 10px 0;
+}
+.inline-input {
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
 
 .dsb-next-action {
   flex: 1;

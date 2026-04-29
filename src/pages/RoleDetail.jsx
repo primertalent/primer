@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -8,6 +8,7 @@ import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
 import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
 import { buildBooleanSearchMessages } from '../lib/prompts/booleanSearchBuilder'
 import { urgencyClass } from '../lib/urgency'
+import { useAgent } from '../context/AgentContext'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -88,14 +89,21 @@ function calcCurrentValue(pipeline, role) {
 function computeHealthPills(role, pipeline, lastStageMoveDays, lastInteractionDays) {
   const pills = []
   if (!role.placement_fee_pct && !role.placement_fee_flat) {
-    pills.push({ label: 'Fee not set', variant: 'amber' })
+    pills.push({ label: 'Fee not set', variant: 'amber', key: 'fee_not_set', clickable: true })
   }
-  if (!role.agreement_id) {
-    pills.push({ label: 'Agreement missing', variant: 'gray' })
+  const agreementStatus = role.agreement_status ?? 'missing'
+  if (agreementStatus === 'missing') {
+    pills.push({ label: 'Agreement missing', variant: 'gray', key: 'agreement_missing', clickable: true })
+  } else if (agreementStatus === 'uploaded') {
+    pills.push({ label: 'Agreement: uploaded', variant: 'green', key: 'agreement_uploaded', clickable: false })
+  } else if (agreementStatus === 'external') {
+    const extLabel = role.agreement_external_label || 'external'
+    pills.push({ label: `Agreement: ${extLabel}`, variant: 'green', key: 'agreement_external', clickable: false })
   }
+  // 'not_applicable' → pill hidden
   if (pipeline.length > 0) {
     const hasInterview = pipeline.some(e => e.current_stage?.toLowerCase().includes('interview'))
-    if (!hasInterview) pills.push({ label: 'No interviews', variant: 'amber' })
+    if (!hasInterview) pills.push({ label: 'No interviews', variant: 'amber', key: 'no_interviews', clickable: true })
     const hasOverdue = pipeline.some(e =>
       e.next_action_due_at && new Date(e.next_action_due_at) < new Date()
     )
@@ -112,7 +120,7 @@ function computeHealthPills(role, pipeline, lastStageMoveDays, lastInteractionDa
 
 // ── Role Status Bar ───────────────────────────────────────
 
-function RoleStatusBar({ role, pipeline, onBack, healthPills, nextAction }) {
+function RoleStatusBar({ role, pipeline, onBack, healthPills, nextAction, onPillClick }) {
   const potential    = calcPotentialValue(role)
   const current      = calcCurrentValue(pipeline, role)
   const feeLabel     = formatFeeLabel(role)
@@ -165,7 +173,13 @@ function RoleStatusBar({ role, pipeline, onBack, healthPills, nextAction }) {
         {healthPills.length > 0 && (
           <div className="risk-pills">
             {healthPills.map(p => (
-              <span key={p.label} className={`risk-pill risk-pill--${p.variant}`}>{p.label}</span>
+              p.clickable
+                ? <button
+                    key={p.key ?? p.label}
+                    className={`risk-pill risk-pill--${p.variant} risk-pill--clickable`}
+                    onClick={() => onPillClick?.(p.key)}
+                  >{p.label}</button>
+                : <span key={p.key ?? p.label} className={`risk-pill risk-pill--${p.variant}`}>{p.label}</span>
             ))}
           </div>
         )}
@@ -378,9 +392,10 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
 // ── Main page ─────────────────────────────────────────────
 
 export default function RoleDetail() {
-  const { id }        = useParams()
-  const navigate      = useNavigate()
-  const { recruiter } = useRecruiter()
+  const { id }          = useParams()
+  const navigate        = useNavigate()
+  const { recruiter }   = useRecruiter()
+  const { fireResponse } = useAgent()
 
   const [role, setRole]           = useState(null)
   const [pipeline, setPipeline]   = useState([])
@@ -391,6 +406,19 @@ export default function RoleDetail() {
   // Health signal state (secondary fetch)
   const [lastStageMoveDays, setLastStageMoveDays]         = useState(null)
   const [lastInteractionDays, setLastInteractionDays]     = useState(null)
+
+  // Pill panels
+  const [activePill, setActivePill]           = useState(null) // 'fee_not_set' | 'agreement_missing' | 'no_interviews'
+  const [feePanelType, setFeePanelType]       = useState('pct')
+  const [feePanelValue, setFeePanelValue]     = useState('')
+  const [feePanelSaving, setFeePanelSaving]   = useState(false)
+  const [feePanelError, setFeePanelError]     = useState(null)
+  const [agmtOption, setAgmtOption]           = useState('upload') // 'upload' | 'external' | 'not_applicable'
+  const [agmtFile, setAgmtFile]               = useState(null)
+  const [agmtLabel, setAgmtLabel]             = useState('')
+  const [agmtUrl, setAgmtUrl]                 = useState('')
+  const [agmtSaving, setAgmtSaving]           = useState(false)
+  const [agmtError, setAgmtError]             = useState(null)
 
   // Role actions
   const [confirmClose, setConfirmClose] = useState(false)
@@ -442,7 +470,8 @@ export default function RoleDetail() {
             process_steps, notes, formatted_jd, search_strings, interview_guide,
             placement_fee_pct, placement_fee_flat,
             target_comp_min, target_comp_max, openings,
-            agreement_id, client_id, created_at,
+            agreement_id, agreement_status, agreement_external_label, agreement_external_url,
+            client_id, created_at,
             clients(name, id)
           `)
           .eq('id', id)
@@ -541,6 +570,78 @@ export default function RoleDetail() {
       .catch(err => console.warn('JD auto-format failed silently:', err.message))
       .finally(() => setJdAutoFormatting(false))
   }, [role?.id])
+
+  // ── Pill panel handlers ──────────────────────────────────
+
+  function handlePillClick(pillKey) {
+    setActivePill(prev => prev === pillKey ? null : pillKey)
+    setFeePanelError(null)
+    setAgmtError(null)
+    if (pillKey === 'no_interviews') {
+      setActivePill(null)
+      fireResponse('no_interviews_scheduled', {
+        role: { id, title: role.title, company: role.clients?.name },
+        pipeline_count: pipeline.length,
+      })
+    }
+  }
+
+  async function handleFeeSave() {
+    if (!feePanelValue) return
+    setFeePanelSaving(true)
+    setFeePanelError(null)
+    try {
+      const update = feePanelType === 'pct'
+        ? { placement_fee_pct: Number(feePanelValue) / 100, placement_fee_flat: null }
+        : { placement_fee_flat: Number(feePanelValue), placement_fee_pct: null }
+      const { error } = await supabase.from('roles').update(update).eq('id', id)
+      if (error) throw error
+      setRole(prev => ({ ...prev, ...update }))
+      setActivePill(null)
+      setFeePanelValue('')
+    } catch {
+      setFeePanelError('Save failed. Try again.')
+    } finally {
+      setFeePanelSaving(false)
+    }
+  }
+
+  async function handleAgreementSave() {
+    setAgmtSaving(true)
+    setAgmtError(null)
+    try {
+      let update = {}
+      if (agmtOption === 'not_applicable') {
+        update = { agreement_status: 'not_applicable' }
+      } else if (agmtOption === 'external') {
+        if (!agmtLabel.trim()) { setAgmtError('Label is required.'); setAgmtSaving(false); return }
+        update = {
+          agreement_status: 'external',
+          agreement_external_label: agmtLabel.trim(),
+          agreement_external_url: agmtUrl.trim() || null,
+        }
+      } else if (agmtOption === 'upload') {
+        if (!agmtFile) { setAgmtError('Select a file to upload.'); setAgmtSaving(false); return }
+        const filePath = `agreements/${recruiter.id}/${id}/${agmtFile.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('agreements')
+          .upload(filePath, agmtFile, { upsert: true })
+        if (uploadError) throw uploadError
+        update = { agreement_status: 'uploaded' }
+      }
+      const { error } = await supabase.from('roles').update(update).eq('id', id)
+      if (error) throw error
+      setRole(prev => ({ ...prev, ...update }))
+      setActivePill(null)
+      setAgmtFile(null)
+      setAgmtLabel('')
+      setAgmtUrl('')
+    } catch (err) {
+      setAgmtError(err.message ?? 'Save failed. Try again.')
+    } finally {
+      setAgmtSaving(false)
+    }
+  }
 
   // ── Handlers ────────────────────────────────────────────
 
@@ -771,7 +872,94 @@ export default function RoleDetail() {
         onBack={() => navigate('/roles')}
         healthPills={healthPills}
         nextAction={nextAction}
+        onPillClick={handlePillClick}
       />
+
+      {/* Pill panels — inline, below status bar */}
+      {activePill === 'fee_not_set' && (
+        <div className="pill-panel" style={{ marginBottom: 16 }}>
+          <p className="pill-panel-title">Set fee</p>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="radio" name="fee-type" value="pct" checked={feePanelType === 'pct'} onChange={() => setFeePanelType('pct')} />
+              % of comp
+            </label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="radio" name="fee-type" value="flat" checked={feePanelType === 'flat'} onChange={() => setFeePanelType('flat')} />
+              Flat fee ($)
+            </label>
+            <input
+              className="inline-input"
+              type="number"
+              placeholder={feePanelType === 'pct' ? '20' : '25000'}
+              value={feePanelValue}
+              onChange={e => setFeePanelValue(e.target.value)}
+              style={{ width: 100 }}
+            />
+            {feePanelType === 'pct' && <span style={{ color: 'var(--color-muted)', fontSize: 13 }}>%</span>}
+            <button className="btn-primary btn-sm" onClick={handleFeeSave} disabled={feePanelSaving || !feePanelValue}>
+              {feePanelSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button className="btn-ghost btn-sm" onClick={() => setActivePill(null)}>Cancel</button>
+          </div>
+          {feePanelError && <p className="inline-error" style={{ marginTop: 6 }}>{feePanelError}</p>}
+        </div>
+      )}
+
+      {activePill === 'agreement_missing' && (
+        <div className="pill-panel" style={{ marginBottom: 16 }}>
+          <p className="pill-panel-title">Agreement</p>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+            {[
+              { value: 'upload',         label: 'Upload PDF' },
+              { value: 'external',       label: 'Hosted elsewhere' },
+              { value: 'not_applicable', label: 'Not applicable' },
+            ].map(opt => (
+              <label key={opt.value} style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                <input type="radio" name="agmt-option" value={opt.value} checked={agmtOption === opt.value} onChange={() => setAgmtOption(opt.value)} />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          {agmtOption === 'upload' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="file" accept=".pdf" onChange={e => setAgmtFile(e.target.files[0] ?? null)} />
+            </div>
+          )}
+          {agmtOption === 'external' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                className="inline-input"
+                type="text"
+                placeholder="Label (e.g. Paraform)"
+                value={agmtLabel}
+                onChange={e => setAgmtLabel(e.target.value)}
+                style={{ width: 180 }}
+              />
+              <input
+                className="inline-input"
+                type="url"
+                placeholder="URL (optional)"
+                value={agmtUrl}
+                onChange={e => setAgmtUrl(e.target.value)}
+                style={{ width: 220 }}
+              />
+            </div>
+          )}
+          {agmtOption === 'not_applicable' && (
+            <p style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 8 }}>
+              The agreement pill will be hidden for this role.
+            </p>
+          )}
+          {agmtError && <p className="inline-error" style={{ marginTop: 6 }}>{agmtError}</p>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button className="btn-primary btn-sm" onClick={handleAgreementSave} disabled={agmtSaving}>
+              {agmtSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button className="btn-ghost btn-sm" onClick={() => setActivePill(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Action zones */}
       <div style={{ marginTop: 24, marginBottom: 24 }}>
