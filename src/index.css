@@ -3623,6 +3623,8 @@ select.field-input {
 .wren-chip--notes      { background: #f4f4f5; border-color: #d4d4d8; color: #52525b; }
 .wren-chip--url        { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
 .wren-chip--error      { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.wren-chip--hint       { background: var(--color-surface); border-color: var(--color-border); color: var(--color-accent); cursor: pointer; }
+.wren-chip--hint:hover { background: var(--color-bg); }
 
 .wren-chip-icon {
   font-size: 11px;

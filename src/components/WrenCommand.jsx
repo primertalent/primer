@@ -776,6 +776,7 @@ export default function WrenCommand() {
   const { recruiter }       = useRecruiter()
   const { fireResponse }    = useAgent()
   const fileInputRef        = useRef(null)
+  const textareaRef         = useRef(null)
   const fileHashRef         = useRef(new Map()) // key: "name:size" → { type, label, content }
   const autoSubmitRef       = useRef(false)
   const [chips, setChips]   = useState([])
@@ -888,6 +889,17 @@ export default function WrenCommand() {
         let text = ''
 
         if (file.type === 'application/pdf') {
+          if (file.size > 10 * 1024 * 1024) {
+            const hintId = Date.now() + Math.random()
+            setChips(prev => [
+              ...prev.map(c => c.id === id
+                ? { ...c, loading: false, error: true, label: `${file.name} — too large` }
+                : c
+              ),
+              { id: hintId, type: 'hint', label: 'Paste the text instead', loading: false },
+            ])
+            continue
+          }
           const base64 = await fileToBase64(file)
           const raw = await generateText({ messages: buildCvPdfMessages(base64), maxTokens: 4096 })
           const parsed = parseJson(raw)
@@ -908,10 +920,14 @@ export default function WrenCommand() {
         }
       } catch (err) {
         console.error('File extraction failed:', err)
-        setChips(prev => prev.map(c => c.id === id
-          ? { ...c, loading: false, error: true, label: `${file.name} — couldn't read` }
-          : c
-        ))
+        const hintId = Date.now() + Math.random()
+        setChips(prev => [
+          ...prev.map(c => c.id === id
+            ? { ...c, loading: false, error: true, label: `${file.name} — couldn't read` }
+            : c
+          ),
+          { id: hintId, type: 'hint', label: 'Paste the text instead', loading: false },
+        ])
       }
     }
   }
@@ -997,27 +1013,37 @@ export default function WrenCommand() {
       {chips.length > 0 && (
         <div className="wren-chips">
           {chips.map(chip => (
-            <span
-              key={chip.id}
-              className={`wren-chip ${chip.loading ? 'wren-chip--loading' : chip.error ? 'wren-chip--error' : `wren-chip--${chip.type}`}`}
-            >
-              {!chip.loading && <span className="wren-chip-icon">{chip.error ? '⚠' : (CHIP_ICONS[chip.type] ?? '📄')}</span>}
-              <span className="wren-chip-label">{chip.label}</span>
-              <button
-                className="wren-chip-remove"
-                onClick={() => removeChip(chip.id)}
-                title="Remove"
-                aria-label="Remove document"
-              >
-                ×
-              </button>
-            </span>
+            chip.type === 'hint'
+              ? <button
+                  key={chip.id}
+                  className="wren-chip wren-chip--hint"
+                  onClick={() => { removeChip(chip.id); textareaRef.current?.focus() }}
+                >
+                  <span className="wren-chip-icon">↓</span>
+                  <span className="wren-chip-label">{chip.label}</span>
+                </button>
+              : <span
+                  key={chip.id}
+                  className={`wren-chip ${chip.loading ? 'wren-chip--loading' : chip.error ? 'wren-chip--error' : `wren-chip--${chip.type}`}`}
+                >
+                  {!chip.loading && <span className="wren-chip-icon">{chip.error ? '⚠' : (CHIP_ICONS[chip.type] ?? '📄')}</span>}
+                  <span className="wren-chip-label">{chip.label}</span>
+                  <button
+                    className="wren-chip-remove"
+                    onClick={() => removeChip(chip.id)}
+                    title="Remove"
+                    aria-label="Remove document"
+                  >
+                    ×
+                  </button>
+                </span>
           ))}
         </div>
       )}
 
       {/* Textarea */}
       <textarea
+        ref={textareaRef}
         className="wren-command-textarea"
         placeholder="Drop anything. Resume, JD, call notes, a question. Wren handles it."
         value={freeform}
