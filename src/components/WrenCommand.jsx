@@ -908,7 +908,10 @@ export default function WrenCommand() {
         }
       } catch (err) {
         console.error('File extraction failed:', err)
-        setChips(prev => prev.filter(c => c.id !== id))
+        setChips(prev => prev.map(c => c.id === id
+          ? { ...c, loading: false, error: true, label: `${file.name} — couldn't read` }
+          : c
+        ))
       }
     }
   }
@@ -996,9 +999,9 @@ export default function WrenCommand() {
           {chips.map(chip => (
             <span
               key={chip.id}
-              className={`wren-chip ${chip.loading ? 'wren-chip--loading' : `wren-chip--${chip.type}`}`}
+              className={`wren-chip ${chip.loading ? 'wren-chip--loading' : chip.error ? 'wren-chip--error' : `wren-chip--${chip.type}`}`}
             >
-              {!chip.loading && <span className="wren-chip-icon">{CHIP_ICONS[chip.type] ?? '📄'}</span>}
+              {!chip.loading && <span className="wren-chip-icon">{chip.error ? '⚠' : (CHIP_ICONS[chip.type] ?? '📄')}</span>}
               <span className="wren-chip-label">{chip.label}</span>
               <button
                 className="wren-chip-remove"

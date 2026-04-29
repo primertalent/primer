@@ -3622,6 +3622,7 @@ select.field-input {
 .wren-chip--transcript { background: #faf5ff; border-color: #e9d5ff; color: #6b21a8; }
 .wren-chip--notes      { background: #f4f4f5; border-color: #d4d4d8; color: #52525b; }
 .wren-chip--url        { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.wren-chip--error      { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
 
 .wren-chip-icon {
   font-size: 11px;
