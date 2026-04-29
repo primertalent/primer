@@ -56,10 +56,10 @@ function PipelineValue({ recruiter }) {
 
       supabase
         .from('pipeline_stage_history')
-        .select('id, to_stage, created_at, candidates(first_name, last_name)')
+        .select('id, stage, entered_at')
         .eq('recruiter_id', recruiter.id)
-        .in('to_stage', ['interviewing', 'offer', 'placed'])
-        .order('created_at', { ascending: false })
+        .in('stage', ['interviewing', 'offer', 'placed'])
+        .order('entered_at', { ascending: false })
         .limit(5),
     ])
 
@@ -120,7 +120,7 @@ function PipelineValue({ recruiter }) {
             <div className="pv-movement">
               {movement.map(m => (
                 <span key={m.id} className="pv-move-item">
-                  {m.candidates?.first_name} → {m.to_stage}
+                  → {m.stage}
                 </span>
               ))}
             </div>

@@ -516,13 +516,16 @@ export default function RoleDetail() {
   }, [id, recruiter?.id])
 
   async function fetchHealthSignals(pipeData) {
+    const pipelineIds = pipeData.map(e => e.id).filter(Boolean)
     const promises = [
-      supabase
-        .from('pipeline_stage_history')
-        .select('created_at')
-        .eq('role_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1),
+      pipelineIds.length > 0
+        ? supabase
+            .from('pipeline_stage_history')
+            .select('entered_at')
+            .in('pipeline_id', pipelineIds)
+            .order('entered_at', { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [] }),
     ]
 
     const candidateIds = pipeData.map(e => e.candidate_id).filter(Boolean)
@@ -540,7 +543,7 @@ export default function RoleDetail() {
     const [histRes, intRes] = await Promise.allSettled(promises)
 
     if (histRes.status === 'fulfilled' && histRes.value.data?.[0]) {
-      const days = Math.floor((Date.now() - new Date(histRes.value.data[0].created_at)) / 86_400_000)
+      const days = Math.floor((Date.now() - new Date(histRes.value.data[0].entered_at)) / 86_400_000)
       setLastStageMoveDays(days)
     }
     if (intRes?.status === 'fulfilled' && intRes.value.data?.[0]) {

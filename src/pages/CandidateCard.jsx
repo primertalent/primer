@@ -2238,7 +2238,7 @@ export default function CandidateCard() {
       .from('pipeline_stage_history')
       .select('*')
       .in('pipeline_id', pipelineIds)
-      .order('created_at', { ascending: true })
+      .order('entered_at', { ascending: true })
     setStageHistory(data ?? [])
     setStageHistoryLoading(false)
   }
