@@ -1,0 +1,19 @@
+name: Wren Agent Loop
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-loop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger agent loop
+        run: |
+          curl -X POST https://hirewren.com/api/agent-loop \
+            -H "Authorization: Bearer ${{ secrets.AGENT_LOOP_SECRET }}" \
+            --fail-with-body \
+            --max-time 30 \
+            --silent \
+            --show-error
