@@ -69,9 +69,14 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
   const [savedRoleId, setSavedRoleId]  = useState(null)
   const [saveError, setSaveError]      = useState(null)
   const [copied, setCopied]            = useState(null)
+  const hasSavedRef                    = useRef(false)
 
-  // Auto-save on mount
-  useEffect(() => { handleSaveAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-save on mount — ref guard prevents React Strict Mode double-fire
+  useEffect(() => {
+    if (hasSavedRef.current) return
+    hasSavedRef.current = true
+    handleSaveAll()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { candidate_present, candidate: c, role: r, screening: s, pitch, call_log, next_actions, freeform_answer } = result
   // Treat as candidate-present if the field is missing (older prompt responses) or explicitly true
@@ -344,9 +349,14 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear, onSaved }
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
   const [saveError, setSaveError]      = useState(null)
+  const hasSavedRef                    = useRef(false)
 
-  // Auto-save on mount
-  useEffect(() => { handleSaveAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-save on mount — ref guard prevents React Strict Mode double-fire
+  useEffect(() => {
+    if (hasSavedRef.current) return
+    hasSavedRef.current = true
+    handleSaveAll()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Per-role pitch state: { [rank]: { phase, email, bullets, emailCopied, bulletsCopied, emailSaved, bulletsSaved } }
   const [pitches, setPitches] = useState({})
