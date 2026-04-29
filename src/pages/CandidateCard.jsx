@@ -2298,8 +2298,8 @@ export default function CandidateCard() {
               <ZoneCMenu
                 candidate={candidate}
                 pipelines={pipelines}
-                onEdit={() => navigate(`/candidates/${id}/edit`)}
-                onCallMode={() => navigate(`/candidates/${id}/call`)}
+                onEdit={() => navigate(`/network/${id}/edit`)}
+                onCallMode={() => navigate(`/network/${id}/call`)}
                 onRemoveFromPipeline={() => {
                   const primary = pipelines[0]
                   if (primary) handleRemovePipeline(primary.id)
@@ -2656,7 +2656,7 @@ export default function CandidateCard() {
 
           {/* Edit candidate link */}
           <section className="candidate-section">
-            <Link className="btn-ghost btn-sm" to={`/candidates/${id}/edit`}>Edit candidate →</Link>
+            <Link className="btn-ghost btn-sm" to={`/network/${id}/edit`}>Edit candidate →</Link>
           </section>
 
         </div>

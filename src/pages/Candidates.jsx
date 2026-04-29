@@ -428,7 +428,7 @@ export default function Candidates() {
                 return (
                   <tr key={c.id} className="candidates-tr">
                     <td className="candidates-td candidates-td--name">
-                      <Link to={`/candidates/${c.id}`} className="candidate-table-name">
+                      <Link to={`/network/${c.id}`} className="candidate-table-name">
                         {urgency && <span className={`urgency-dot ${urgency}`} />}
                         {c.first_name} {c.last_name}
                       </Link>

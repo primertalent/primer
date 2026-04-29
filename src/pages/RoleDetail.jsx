@@ -260,7 +260,7 @@ function PipelineCandidate({ entry, onAdvance, onGoBack, onDraftSubmission, onRe
 
   return (
     <div className="pipeline-candidate-card">
-      <Link to={`/candidates/${entry.candidate_id}`} className="pipeline-candidate-info">
+      <Link to={`/network/${entry.candidate_id}`} className="pipeline-candidate-info">
         <span className="pipeline-candidate-name">
           {entry.candidates.first_name} {entry.candidates.last_name}
         </span>

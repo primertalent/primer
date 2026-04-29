@@ -300,7 +300,7 @@ export default function CreateCandidate() {
         },
         role: selectedRole ? { id: selectedRole.id, title: selectedRole.title } : null,
       })
-      navigate(`/candidates/${candidate.id}`)
+      navigate(`/network/${candidate.id}`)
     } catch (err) {
       setFormError(err.message)
       setSaving(false)

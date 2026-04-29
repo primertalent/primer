@@ -34,6 +34,8 @@ export default function App() {
           <Route path="/network/:id/call" element={<ProtectedRoute><CallMode /></ProtectedRoute>} />
           <Route path="/candidates" element={<Navigate to="/network" replace />} />
           <Route path="/candidates/new" element={<Navigate to="/network/new" replace />} />
+          <Route path="/candidates/:id" element={<Navigate to="/network/:id" replace />} />
+          <Route path="/candidates/:id/edit" element={<Navigate to="/network/:id/edit" replace />} />
           <Route path="/queue" element={<ProtectedRoute><Queue /></ProtectedRoute>} />
           <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
           <Route path="/roles/:id" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />

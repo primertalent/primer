@@ -67,7 +67,7 @@ export default function CallMode() {
   }
 
   function handleDone() {
-    navigate(`/candidates/${id}`)
+    navigate(`/network/${id}`)
   }
 
   if (loading) {

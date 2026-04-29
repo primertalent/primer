@@ -144,7 +144,7 @@ export default function EditCandidate() {
       setError(updateErr.message)
       setSaving(false)
     } else {
-      navigate(`/candidates/${id}`)
+      navigate(`/network/${id}`)
     }
   }
 
@@ -162,7 +162,7 @@ export default function EditCandidate() {
   return (
     <AppLayout>
       <div className="form-page-header">
-        <button className="btn-back" onClick={() => navigate(`/candidates/${id}`)}>← Back</button>
+        <button className="btn-back" onClick={() => navigate(`/network/${id}`)}>← Back</button>
         <h1 className="page-title">Edit Candidate</h1>
       </div>
 
@@ -246,7 +246,7 @@ export default function EditCandidate() {
           <button type="submit" className="btn-primary" disabled={saving}>
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => navigate(`/candidates/${id}`)}>
+          <button type="button" className="btn-ghost" onClick={() => navigate(`/network/${id}`)}>
             Cancel
           </button>
         </div>

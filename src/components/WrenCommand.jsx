@@ -235,8 +235,8 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
             {c?.name || 'Unknown Candidate'}
             {saved && savedCandidateId && (
               <span className="intake-saved-links">
-                <Link to={`/candidates/${savedCandidateId}`} className="intake-saved-link">View</Link>
-                <Link to={`/candidates/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
+                <Link to={`/network/${savedCandidateId}`} className="intake-saved-link">View</Link>
+                <Link to={`/network/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
               </span>
             )}
           </p>
@@ -307,7 +307,7 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
             <>
               <span className="saved-label">Saved ✓</span>
               {savedCandidateId && (
-                <Link to={`/candidates/${savedCandidateId}`} className="btn-ghost btn-sm">View Candidate →</Link>
+                <Link to={`/network/${savedCandidateId}`} className="btn-ghost btn-sm">View Candidate →</Link>
               )}
             </>
           )}
@@ -566,8 +566,8 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear, onSaved }
             {c?.name || 'Unknown Candidate'}
             {saved && savedCandidateId && (
               <span className="intake-saved-links">
-                <Link to={`/candidates/${savedCandidateId}`} className="intake-saved-link">View</Link>
-                <Link to={`/candidates/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
+                <Link to={`/network/${savedCandidateId}`} className="intake-saved-link">View</Link>
+                <Link to={`/network/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
               </span>
             )}
           </div>

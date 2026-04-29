@@ -149,7 +149,7 @@ function DeskRow({ entry, today }) {
   }
 
   return (
-    <Link to={`/candidates/${candidate?.id}`} className={`desk-row desk-row--${urgency}`}>
+    <Link to={`/network/${candidate?.id}`} className={`desk-row desk-row--${urgency}`}>
       <div className="desk-row-main">
         <span className="desk-name">{name}</span>
         <span className="desk-role">{entry.roles?.title ?? '—'}</span>
