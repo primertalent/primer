@@ -5,6 +5,7 @@ Detect what's in the input and return this exact structure:
 
 {
   "detected": ["resume", "jd", "transcript", "question", "notes"],
+  "candidate_present": true,
   "candidate": {
     "name": "",
     "email": "",
@@ -50,6 +51,7 @@ Detect what's in the input and return this exact structure:
 
 Rules:
 - Never refuse because data is incomplete. Extract what exists, leave the rest null.
+- Set candidate_present to false when the input contains only a job description or role requirements with no person's information (no name, no resume, no call transcript about a specific person). Set it to true whenever any candidate-specific content is present.
 - If you detect a question, answer it in freeform_answer using context from the input.
 - Score is 1-10. score_label is one of: Strong Pass, Pass, Borderline, Weak, No Match.
 - one_liner is under 140 characters.

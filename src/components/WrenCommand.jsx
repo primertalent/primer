@@ -66,13 +66,16 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
   const [saving, setSaving]            = useState(false)
   const [saved, setSaved]              = useState(false)
   const [savedCandidateId, setSavedId] = useState(null)
+  const [savedRoleId, setSavedRoleId]  = useState(null)
   const [saveError, setSaveError]      = useState(null)
   const [copied, setCopied]            = useState(null)
 
   // Auto-save on mount
   useEffect(() => { handleSaveAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { candidate: c, role: r, screening: s, pitch, call_log, next_actions, freeform_answer } = result
+  const { candidate_present, candidate: c, role: r, screening: s, pitch, call_log, next_actions, freeform_answer } = result
+  // Treat as candidate-present if the field is missing (older prompt responses) or explicitly true
+  const hasCandidate = candidate_present !== false && !!(c?.name || c?.email || c?.cv_text)
 
   async function handleCopy(type) {
     if (type === 'pitch')   await copyText(pitch?.one_liner || '')
@@ -87,56 +90,60 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
     setSaveError(null)
 
     try {
-      const { first_name, last_name } = parseName(c?.name)
-      let existing = null
+      let candidateId = null
 
-      if (c?.email) {
-        const { data } = await supabase
-          .from('candidates').select('id, enrichment_data')
-          .eq('recruiter_id', recruiter.id).eq('email', c.email)
-          .maybeSingle()
-        existing = data
-      }
-      if (!existing && c?.name) {
-        const { data } = await supabase
-          .from('candidates').select('id, enrichment_data')
-          .eq('recruiter_id', recruiter.id)
-          .eq('first_name', first_name).eq('last_name', last_name)
-          .maybeSingle()
-        existing = data
+      if (hasCandidate) {
+        const { first_name, last_name } = parseName(c?.name)
+        let existing = null
+
+        if (c?.email) {
+          const { data } = await supabase
+            .from('candidates').select('id, enrichment_data')
+            .eq('recruiter_id', recruiter.id).eq('email', c.email)
+            .maybeSingle()
+          existing = data
+        }
+        if (!existing && c?.name) {
+          const { data } = await supabase
+            .from('candidates').select('id, enrichment_data')
+            .eq('recruiter_id', recruiter.id)
+            .eq('first_name', first_name).eq('last_name', last_name)
+            .maybeSingle()
+          existing = data
+        }
+
+        const mergedEnrichment = {
+          ...(existing?.enrichment_data || {}),
+          ...(c?.signals        && { signals: c.signals }),
+          ...(c?.career_summary && { career_summary: c.career_summary }),
+          ...(pitch?.one_liner  && { intake_pitch: pitch.one_liner }),
+          ...(pitch?.bullets?.length && { intake_bullets: pitch.bullets }),
+        }
+
+        const candidatePayload = {
+          recruiter_id: recruiter.id,
+          first_name,
+          last_name,
+          ...(c?.email           && { email: c.email }),
+          ...(c?.current_title   && { current_title: c.current_title }),
+          ...(c?.current_company && { current_company: c.current_company }),
+          ...(c?.cv_text         && { cv_text: c.cv_text }),
+          enrichment_data: mergedEnrichment,
+        }
+
+        if (existing) {
+          await supabase.from('candidates').update(candidatePayload).eq('id', existing.id)
+          candidateId = existing.id
+        } else {
+          const { data, error } = await supabase
+            .from('candidates').insert(candidatePayload).select('id').single()
+          if (error) throw error
+          candidateId = data.id
+        }
       }
 
-      const mergedEnrichment = {
-        ...(existing?.enrichment_data || {}),
-        ...(c?.signals        && { signals: c.signals }),
-        ...(c?.career_summary && { career_summary: c.career_summary }),
-        ...(pitch?.one_liner  && { intake_pitch: pitch.one_liner }),
-        ...(pitch?.bullets?.length && { intake_bullets: pitch.bullets }),
-      }
-
-      const candidatePayload = {
-        recruiter_id: recruiter.id,
-        first_name,
-        last_name,
-        ...(c?.email           && { email: c.email }),
-        ...(c?.current_title   && { current_title: c.current_title }),
-        ...(c?.current_company && { current_company: c.current_company }),
-        ...(c?.cv_text         && { cv_text: c.cv_text }),
-        enrichment_data: mergedEnrichment,
-      }
-
-      let candidateId
-      if (existing) {
-        await supabase.from('candidates').update(candidatePayload).eq('id', existing.id)
-        candidateId = existing.id
-      } else {
-        const { data, error } = await supabase
-          .from('candidates').insert(candidatePayload).select('id').single()
-        if (error) throw error
-        candidateId = data.id
-      }
-
-      if (r?.title && r?.company && candidateId) {
+      let savedRoleId = null
+      if (r?.title && r?.company) {
         let clientId
         const { data: existingClient } = await supabase
           .from('clients').select('id')
@@ -154,9 +161,8 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
           clientId = data.id
         }
 
-        let roleId
         if (r.role_id) {
-          roleId = r.role_id
+          savedRoleId = r.role_id
         } else {
           const { data: existingRole } = await supabase
             .from('roles').select('id')
@@ -164,7 +170,7 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
             .maybeSingle()
 
           if (existingRole) {
-            roleId = existingRole.id
+            savedRoleId = existingRole.id
           } else {
             const jdText = jdChips[0]?.content ?? null
             const { data, error } = await supabase
@@ -179,24 +185,26 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
               })
               .select('id').single()
             if (error) throw error
-            roleId = data.id
+            savedRoleId = data.id
           }
         }
 
-        const fitScore = s?.score ? Math.min(100, Math.round(s.score * 10)) : null
-        const { error: pipeErr } = await supabase.from('pipeline').upsert(
-          {
-            recruiter_id: recruiter.id,
-            candidate_id: candidateId,
-            role_id: roleId,
-            current_stage: 'Sourced',
-            status: 'active',
-            ...(fitScore != null && { fit_score: fitScore }),
-            ...(s?.reasoning    && { fit_score_rationale: s.reasoning }),
-          },
-          { onConflict: 'candidate_id,role_id' }
-        )
-        if (pipeErr) throw pipeErr
+        if (candidateId) {
+          const fitScore = s?.score ? Math.min(100, Math.round(s.score * 10)) : null
+          const { error: pipeErr } = await supabase.from('pipeline').upsert(
+            {
+              recruiter_id: recruiter.id,
+              candidate_id: candidateId,
+              role_id: savedRoleId,
+              current_stage: 'Sourced',
+              status: 'active',
+              ...(fitScore != null && { fit_score: fitScore }),
+              ...(s?.reasoning    && { fit_score_rationale: s.reasoning }),
+            },
+            { onConflict: 'candidate_id,role_id' }
+          )
+          if (pipeErr) throw pipeErr
+        }
       }
 
       if (call_log?.summary && candidateId) {
@@ -212,7 +220,8 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
 
       setSaved(true)
       setSavedId(candidateId)
-      onSaved?.({ candidateId, candidate: c, role: r, screening: s })
+      setSavedRoleId(savedRoleId)
+      onSaved?.({ candidateId, roleId: savedRoleId, candidate: c, role: r, screening: s })
     } catch (err) {
       console.error('Save All failed:', err)
       setSaveError('Save failed. Check console.')
@@ -232,11 +241,16 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
       <div className="intake-hero">
         <div className="intake-hero-left">
           <p className="intake-hero-name">
-            {c?.name || 'Unknown Candidate'}
+            {hasCandidate ? (c?.name || 'Unknown Candidate') : (r?.title ? `${r.title}${r.company ? ` · ${r.company}` : ''}` : 'Role saved')}
             {saved && savedCandidateId && (
               <span className="intake-saved-links">
                 <Link to={`/network/${savedCandidateId}`} className="intake-saved-link">View</Link>
                 <Link to={`/network/${savedCandidateId}/edit`} className="intake-saved-link">Edit</Link>
+              </span>
+            )}
+            {saved && !savedCandidateId && savedRoleId && (
+              <span className="intake-saved-links">
+                <Link to={`/roles/${savedRoleId}`} className="intake-saved-link">View role</Link>
               </span>
             )}
           </p>
@@ -308,6 +322,9 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
               <span className="saved-label">Saved ✓</span>
               {savedCandidateId && (
                 <Link to={`/network/${savedCandidateId}`} className="btn-ghost btn-sm">View Candidate →</Link>
+              )}
+              {!savedCandidateId && savedRoleId && (
+                <Link to={`/roles/${savedRoleId}`} className="btn-ghost btn-sm">View Role →</Link>
               )}
             </>
           )}
@@ -1067,16 +1084,23 @@ export default function WrenCommand() {
           recruiter={recruiter}
           jdChips={jdChips}
           onClear={() => setResult(null)}
-          onSaved={({ candidate, role, screening }) => {
-            fireResponse('candidate_created', {
-              candidate: {
-                name:            candidate?.name,
-                current_title:   candidate?.current_title,
-                current_company: candidate?.current_company,
-              },
-              role:     role ? { title: role.title, company: role.company } : null,
-              screening: screening ? { score: screening.score } : null,
-            })
+          onSaved={({ candidateId, candidate, role, screening }) => {
+            if (candidateId) {
+              fireResponse('candidate_created', {
+                candidate: {
+                  name:            candidate?.name,
+                  current_title:   candidate?.current_title,
+                  current_company: candidate?.current_company,
+                },
+                role:     role ? { title: role.title, company: role.company } : null,
+                screening: screening ? { score: screening.score } : null,
+              })
+            } else {
+              fireResponse('role_saved', {
+                candidate_present: false,
+                role: role ? { title: role.title, company: role.company } : null,
+              })
+            }
           }}
         />
       )}
