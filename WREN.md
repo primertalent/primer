@@ -99,6 +99,91 @@ For deeper GTM thinking — founder story, objection handling, market analysis, 
 
 ---
 
+## When Wren engages
+
+Wren is a deal desk. Deal desks engage when there's a deal.
+
+**The trigger:** A candidate enters an active role's pipeline. That's the moment Wren wakes up on that candidate. Before that, Wren is dormant.
+
+Pre-pipeline activities (sourcing, intake, evaluating fit, deciding whether to pursue): the recruiter's work. Wren stores data and offers light intelligence (career timeline parsing, JD extraction, Network search, network match suggestions) but does not run deal desk logic.
+
+Post-pipeline activation: Wren engages fully. The agent loop monitors. Stage-gate flows fire. Risk surfaces. Actions queue. The deal desk runs alongside the deal until placed or lost.
+
+**Network match suggestions are the bridge.** When a candidate is added or a role is created, Wren surfaces:
+- "This candidate fits your active Inworld AE role. Start a pipeline?"
+- "5 people in your network match this new role. Add any to the pipeline?"
+
+The recruiter decides yes or no. If yes, the deal starts and Wren engages. If no, the candidate stays in Network and Wren goes quiet on them. Wren never forces deal desk logic on contacts that aren't committed to a deal.
+
+**Why this matters.** Wren feels off when used pre-deal. There's no deal to pressure-test, no close to run, no risk to surface. The product has nothing to do. Defining the trigger cleanly removes the pre-deal friction and lets every Wren surface assume "this is an active deal" by default.
+
+**Implication for build:** every Desk surface, every agent action, every risk flag operates on active pipeline rows only. Network candidates are searchable and matchable but not subject to deal desk logic. Roles without pipeline activity are stored but not actively monitored.
+
+---
+
+## The three foundations
+
+Wren is a SaaS shell with agent ambitions. The shape has to invert before the product feels like what it's supposed to be. Three foundations carry the inversion. Build in this order.
+
+**Foundation 1: Engine.** The agent loop runs continuously, not on user action.
+
+A scheduled background job runs every few hours. Reads every active pipeline row, every role, every recent interaction, every recent debrief. Generates a structured assessment of the desk: what's progressing, what's stalled, what's at risk, what's hot, what's cold. Identifies the top actions the recruiter should take next, ranked by urgency. Writes them to an `actions` table.
+
+This runs whether the user is in the app or not. When the user opens Wren, they see what the agent generated since they were last there. That's the inversion: agent initiates, user responds.
+
+**Foundation 2: Ingestion.** Data flows in from where work actually happens.
+
+Manual paste-in is a bridge. It cannot be the destination. Solo recruiters work in LinkedIn, Gmail, calendar, Zoom calls, text messages. Wren has to read from those sources to feel like an agent.
+
+Order:
+- Email (Gmail OAuth, parse incoming candidate and client replies, draft responses inline, write structured interactions)
+- Calendar (link interviews to candidates, surface upcoming calls, generate pre-call prep automatically)
+- Call tools (Granola or Fathom transcripts flowing into debriefs without paste)
+- LinkedIn (browser extension, candidate to pipeline in one click)
+
+Each integration removes a manual step. The product gets less cumbersome as more data flows in automatically.
+
+**Foundation 3: Onboarding.** Active recruiters with active books are productive on day one.
+
+The user we want is the active closer with deals in motion right now. Onboarding has to bridge from zero data to enough data to be useful in under 60 minutes, or they bounce.
+
+Three paths in order of leverage:
+
+1. **Pipeline paste:** recruiter describes their active book in free text, Wren parses into structured pipeline rows, candidates, roles, clients. 10 minutes. Day one minimum viable.
+
+2. **Bulk file ingestion:** CSVs, resume folders, fee agreements, exported ATS data. Recruiter drops files, Wren routes and structures asynchronously. Reduces weeks of manual capture to one async job.
+
+3. **Live integrations with backfill:** Gmail backfills 90 days, calendar backfills 30 days, Paraform syncs active roles. Removes manual feeding entirely.
+
+**Wren coaches itself smarter.** The agent loop continuously evaluates its own data poverty and surfaces specific data asks tied to specific deals or moments. Examples:
+- "I'd give a stronger read on counter offer risk if I'd seen 2-3 of your past offer-stage deals. Want to add some?"
+- "Log a debrief on Sarah's last call, even from memory. Helps me read the deal."
+- "Upload your standard fee agreement so I can flag terms when deals hit offer."
+
+These appear as actions on the Desk same as deal actions. Each ask is contextual, tied to a specific payoff. Replaces traditional onboarding forms.
+
+---
+
+## Agent shape vs SaaS shape
+
+Wren is currently SaaS-shaped: the user navigates, configures, clicks, feeds. The agent runs only on user action.
+
+Wren is becoming agent-shaped: the user arrives, sees what the agent did, approves or redirects. The agent runs continuously.
+
+The five tests of agent shape:
+
+1. **The agent has been working.** When the user arrives, there's already output from work done in the background.
+2. **The interaction model is approve, edit, override, redirect.** Not search, filter, configure.
+3. **The agent has a voice.** First-person or implied first-person. Has takes. Pushes back honestly.
+4. **Time is asymmetric.** The agent works while the user doesn't.
+5. **The user does less. The product does more.**
+
+Wren has pieces of agent shape today (WrenResponse, debrief extraction, pushback). Wren is mostly SaaS-shaped today (navigation between pages, manual paste, work happens on user click).
+
+Every build decision should move toward agent shape. The test on every session: did Wren get more agent-shaped, or just prettier?
+
+---
+
 ## What Wren is
 
 Wren is an agent that works the desk of a solo independent recruiter.
@@ -337,6 +422,15 @@ If any answer is wrong, redesign or defer.
 - `agreements` table (raw PDF + structured terms) and `candidate_imports` table created
 - Nav renamed to Desk / Deals / Network
 - Queue removed from nav. File preserved, route preserved. Queue deleted when Actions Tray ships.
+- **Agent Loop infrastructure shipped (Phase 1 foundation):**
+  - `actions` table with idempotency hash, RLS, dismissal/snooze/acted_on fields (migration 20260429000001)
+  - `api/agent-loop` endpoint at `/api/agent-loop`, validates `Authorization: Bearer` against `AGENT_LOOP_SECRET` env var
+  - GitHub Actions cron at `.github/workflows/agent-loop.yml` runs every 4 hours, POSTs to the endpoint
+  - `src/lib/prompts/agentLoop.js` produces two output categories: active actions and sharpening_ask data requests
+  - Reads only active pipeline rows (`current_stage NOT IN (placed, lost)`), joins candidate/role/client/recent interactions/debriefs/stage history
+  - Writes prioritized actions to `actions` table with `source_run_id` grouping each cron run
+  - Verified working: first run generated a `sharpening_ask` on a Sourced-stage candidate, correctly identified missing interaction data as the highest-leverage gap
+  - Hobby tier note: 10s function timeout. Sonnet typically fits in 5–8s. If timeouts recur, swap `claude-sonnet-4-6` for `claude-haiku-4-5-20251001` in `api/agent-loop.js`
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
@@ -346,30 +440,114 @@ If any answer is wrong, redesign or defer.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 - Queue from nav — removed. File and route preserved until Actions Tray ships.
 
-**V3 priority queue (do not build this session — queued for future):**
-- **Call Prep module** (Wednesday build): one module, used across every "pick up the phone" moment. Zone A stubs for "Prep for next interview", "Lock comp expectations", "Prep for counter offer" will route here.
-- Custom Hiring Process per Role (intake-extracted, user-confirmable, editable, with semantic stage_type categories for pipeline confidence)
-- Recruiter vs AI Confidence (calibration loop)
-- Stage-Gate Agent Flows (triggered at late_stage / offer / accepted moments)
-- Wren Actions Tray (replaces Queue)
-- Bulk Import / Onboarding (candidates, clients, roles, agreements)
-- Role activation scans candidate database for existing fits
-- Deal scorecard per candidate in pipeline (closeability: motivation, comp alignment, competing offers, HM readiness)
-- Close sequence generator by stage (what needs to happen to get from here to offer)
+**Build plan (organized around the three foundations):**
 
-**What's next (current priorities):**
-- Thursday: Real use day. Work 2-3 live Paraform candidates end-to-end. Take notes. No building.
-- Friday: Fix what Thursday's use surfaces. Top 3 issues only.
-- Time-elapsed triggers via Supabase Edge Functions on a schedule
-- Auto-set `next_action_due_at` when next action fires
+The pivot from SaaS shape to agent shape happens through three foundations, built in order. Each foundation makes the next one possible.
+
+**Phase 1 — Engine (mostly shipped):**
+- ✅ Agent loop infrastructure: GitHub Actions cron, `api/agent-loop` endpoint, `agentLoop.js` prompt, `actions` table
+- ✅ Loop reads only active pipeline rows (per "When Wren engages" trigger)
+- ✅ Loop output: prioritized actions + sharpening data asks, both writing to `actions` table
+- ⬜ Stage-Gate Agent Flows wired into the loop (late_stage, offer, accepted triggers)
+- ⬜ Custom Hiring Process per Role (loop needs accurate stages to reason about deals correctly)
+- ⬜ Recruiter vs AI Confidence (data accumulates from day one even before UI ships)
+
+**Phase 2 — Surface (2-3 weeks):**
+- Actions Tray as the Desk's home: loop output rendered as primary surface, replaces deal-list-as-Desk
+- CandidateCard collapses into a side panel that opens within the Desk, not a separate page
+- RoleDetail collapses similarly
+- Mobile experience (mobile web first, native later): single column, action cards, swipe-to-act, no nav
+- Push notifications for high-urgency actions
+- Soccer-game test: open Wren on phone, see top 3 actions, act on one in under 10 seconds
+
+**Phase 3 — Ingestion (3-4 weeks):**
+- Onboarding flow: pipeline paste first (free-text describe active book, Wren parses)
+- Bulk file ingestion: CSVs, resume folders, fee agreements
+- Gmail integration: OAuth, parse incoming, draft responses inline, structure interactions automatically
+- Calendar integration: link interviews, generate pre-call prep automatically
+- Granola or Fathom call transcript integration
+
+**Phase 4 — Polish and depth (4 weeks):**
+- Beautiful UI matching engine intelligence (single working surface, restrained design, fast)
+- MCP marketing prompt at stage advancement (human-in-the-loop)
+- Deal scorecard per candidate
+- Close sequence generator by stage
+- Role activation scans Network for fits
+- Calibration view (recruiter vs AI confidence over time)
+
+**What's next (immediate):**
+- Phase 1 remaining: Stage-Gate Agent Flows, Custom Hiring Process per Role, Recruiter vs AI Confidence
+- Phase 2 (Surface): Actions Tray as Desk's home (loop output as primary surface), CandidateCard and RoleDetail collapse into side panels, mobile experience, push notifications
+- Phase 3 (Ingestion): Onboarding pipeline paste, bulk file ingestion, Gmail integration, calendar, call tools
+- Phase 4 (Polish): Beautiful UI, deal scorecard, close sequence generator, calibration view
 
 **Do not build:**
 - Team features, shared pipelines, assignments
-- Chrome extension (v2)
-- Gmail integration (v2)
 - New analytics or reporting surfaces
 - Any second recruiter's feature requests
 - New top-level nav items
+- Anything that requires the user to navigate to it instead of having it surface to them
+
+---
+
+## Agent Loop (Phase 1 foundation)
+
+The agent loop is the engine that makes Wren agent-shaped instead of SaaS-shaped. It runs continuously whether the user is in the app or not.
+
+**Architecture:**
+- Scheduled job (Supabase Edge Function on cron, or Vercel cron) runs every 4 hours
+- Reads only active pipeline rows (per "When Wren engages" trigger): pipeline rows where `current_stage` is not `placed` or `lost` and the role is active
+- Joined context: candidate record, role record, client record, last 7 days of interactions, all debriefs, stage history, role health flags, agreement status
+- Calls a single agent loop prompt with full desk state
+- Writes structured output to `actions` table
+
+**`actions` table schema:**
+```sql
+CREATE TABLE actions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recruiter_id uuid NOT NULL REFERENCES recruiters(id),
+  action_type text NOT NULL,
+  -- enum-ish: follow_up_overdue, risk_flag, missing_data, opportunity,
+  -- stage_check, relationship_warm, sharpening_ask, mcp_opportunity
+  linked_entity_id uuid,
+  linked_entity_type text,
+  -- 'pipeline', 'candidate', 'role', 'client', 'recruiter'
+  urgency text NOT NULL DEFAULT 'this_week',
+  -- 'now', 'today', 'this_week'
+  why text,
+  suggested_next_step text,
+  confidence text,
+  -- 'high', 'medium', 'low'
+  context jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  dismissed_at timestamptz,
+  snoozed_until timestamptz,
+  acted_on_at timestamptz,
+  source_run_id uuid
+  -- groups actions generated by the same loop run
+);
+```
+
+**Agent loop prompt outputs two categories:**
+
+1. **Active actions:** things to do on current deals
+   - Follow up overdue with Sarah
+   - Lock comp expectations with Chad before final round
+   - Inworld has gone cold on Mike's submission, draft check-in
+   - Counter offer risk on Jordan, surface mitigation
+
+2. **Sharpening asks:** data inputs that would improve future actions
+   - "Add 5 recent placements so I can compare patterns"
+   - "Log a debrief on Sarah's last call, even from memory"
+   - "Upload your fee agreement to flag offer-stage terms"
+
+Both write to the same `actions` table. The Desk surfaces them sorted by urgency.
+
+**Prompt design principle:** the loop reasons like a senior recruiter scanning the desk. Not rule-based ("days in stage > 7 = stalled"). Pattern-aware ("Sarah's stage advances slowed but interactions stayed warm — likely a process issue, not interest issue, suggest checking with HM"). The codified deal desk logic from the existing prompts compounded at the system level.
+
+**Graceful degradation:** the loop produces useful output even on thin data. Day-one user with 3 pasted pipelines still gets stage-aware suggestions. Month-three user with rich debriefs gets pattern-aware suggestions. Same prompt, more context, sharper output.
+
+**Cost discipline:** loop runs every 4 hours, not continuously. Uses prompt caching aggressively on candidate/role/client records that don't change. Sonnet for the reasoning. Haiku for any pre-classification of which pipelines need full analysis vs light check.
 
 ---
 
@@ -715,6 +893,19 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Strategic thesis: build for the world where sourcing is solved.** AI commoditizes sourcing within 18 months. When recruiters have 500 candidates instead of 50, the bottleneck moves from finding to working. Wren is the layer that makes flooded pipelines actionable. Every feature assumes 10x candidate volume. Do not build features that compete with sourcing tools.
 - **Two-layer messaging is the GTM principle.** Top of funnel: felt pain (leverage, more deals, floor under bad weeks). Once engaged: contrarian truth (closing is the bottleneck, not sourcing). Sequence matters. Lead with leverage on cold outreach. Reframe to closing during the demo. The headline is leverage. The product is closing intelligence.
 - **POSITIONING.md is the GTM source of truth.** Founder story, objection handling, market analysis, messaging tests, and ICP segmentation live in `POSITIONING.md` at repo root. WREN.md stays focused on product and codebase context.
+- **When Wren engages: active candidate in active role.** That's the trigger. Pre-deal (sourcing, intake, evaluating fit) is the recruiter's work. Wren is dormant for that candidate until they enter an active role's pipeline. Network match suggestions bridge the gap: Wren can surface "this person fits an active role" at moments of new candidate or new role, but the recruiter decides whether to start a deal. Wren never forces deal desk logic on contacts that aren't committed to a deal.
+- **Three foundations replace the V1 priority queue framing.** Engine (continuous agent loop), Ingestion (data flowing in from where work happens), Onboarding (active recruiters productive in under 60 minutes). Build phases organized around these foundations, not feature lists. Each foundation makes the next one possible.
+- **Agent shape is the bar.** Every build decision tested against five criteria: agent has been working, interaction model is approve/edit/override, agent has a voice, time is asymmetric, user does less and product does more. Wren is currently SaaS-shaped with agent pieces. Goal is full agent shape over the next 8-12 weeks.
+- **Agent loop runs continuously, not on user action.** Scheduled job every 4 hours. Reads only active pipeline rows. Generates prioritized actions and sharpening data asks. Writes to `actions` table. The Desk surfaces agent output as the primary surface, replacing deal-list-as-Desk. This is the inversion from SaaS to agent.
+- **Wren coaches itself smarter.** Agent loop evaluates its own data poverty and surfaces specific data asks tied to specific deals or moments. Each ask is contextual with a felt payoff. Replaces traditional onboarding forms. The recruiter never asks "why am I doing this." Wren told them.
+- **Onboarding is three paths in order of leverage.** Pipeline paste (free-text describe active book, Wren parses) day one. Bulk file ingestion (CSVs, resumes, agreements) phase 3. Live integrations (Gmail, calendar, Granola/Fathom, Paraform) phase 3+. Active recruiter with active book gets to populated, useful Wren in under 60 minutes or they bounce.
+- **Manual feel comes from manual feeding, not bad UI.** Wren feels off because the recruiter pastes everything and Wren has no signal until then. UI polish doesn't fix this. Ingestion does. Email integration first, calendar second, call tools third. Each removes a manual step.
+- **Don't restart from scratch.** Codebase pivot debt is light. Prompts, schema, agent layer, debrief extraction, provider-agnostic AI all carry forward. Architecture inversion is additive (build the loop, build mobile, build ingestion) not destructive. Refactor frontend after the engine runs, not before.
+- **Agent loop ships before any UI changes.** Engine first, surface second. Phase 1 is the foundation that makes Phase 2 (Actions Tray as Desk) possible. Do not build Actions Tray until the loop is producing reliable output.
+- **Cron runs on GitHub Actions, not Vercel cron.** Vercel Hobby tier doesn't support custom cron schedules. GitHub Actions is free and identical in behavior: scheduled workflow POSTs to `/api/agent-loop` with a shared secret. Switch to Vercel cron if/when on Pro.
+- **Service role key uses the new `sb_secret_xxx` format.** Stored in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. Bypasses RLS for the agent loop's cross-recruiter scan. Never expose this key client-side.
+- **Actions table is idempotent via content hash.** Hash is `sha256(recruiter_id:linked_entity_id:action_type:suggested_next_step)`. Cron retries and overlapping runs don't duplicate undismissed actions. `source_run_id` groups all actions from a single loop run.
+- **Agent loop prompt designed for graceful degradation.** Day-one user with one Sourced-stage candidate gets a useful `sharpening_ask`. Rich-data user gets pattern-aware actions. Same prompt scales with available context — no separate thin-data path needed.
 
 ---
 
