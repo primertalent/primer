@@ -577,7 +577,12 @@ export default function RoleDetail() {
   // Register page-level action handlers so suggestion chips work while on this page
   useEffect(() => {
     registerAction('add_fee', () => setActivePill('fee_not_set'))
-    return () => unregisterAction('add_fee')
+    registerAction('build_search_strings', handleBuildSearchStrings)
+    return () => {
+      unregisterAction('add_fee')
+      unregisterAction('build_search_strings')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registerAction, unregisterAction])
 
   // ── Pill panel handlers ──────────────────────────────────

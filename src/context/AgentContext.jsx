@@ -102,6 +102,9 @@ export function AgentProvider({ children }) {
       case 'draft_outreach':
         if (cid) navigate(`/candidates/${cid}`)
         break
+      case 'build_search_strings':
+        if (rid) navigate(`/roles/${rid}`)
+        break
       case 'find_network_fits':
         navigate(rid ? `/candidates?role=${rid}` : '/candidates')
         break
