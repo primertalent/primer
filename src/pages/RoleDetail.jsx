@@ -102,7 +102,8 @@ function computeHealthPills(role, pipeline, lastStageMoveDays, lastInteractionDa
   }
   // 'not_applicable' → pill hidden
   if (pipeline.length > 0) {
-    const hasInterview = pipeline.some(e => e.current_stage?.toLowerCase().includes('interview'))
+    const INTERVIEWED_STAGES = new Set(['interviewing', 'offer', 'placed'])
+    const hasInterview = pipeline.some(e => INTERVIEWED_STAGES.has(e.current_stage?.toLowerCase()))
     if (!hasInterview) pills.push({ label: 'No interviews', variant: 'amber', key: 'no_interviews', clickable: true })
     const hasOverdue = pipeline.some(e =>
       e.next_action_due_at && new Date(e.next_action_due_at) < new Date()

@@ -14,6 +14,7 @@ import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmai
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
 import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
 import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
+import { buildCallPrepMessages } from '../lib/prompts/callPrep'
 import { urgencyClass } from '../lib/urgency'
 import { useAgent } from '../context/AgentContext'
 
@@ -950,12 +951,12 @@ function computeZoneAActions({ pipelines, interactions, debriefs }) {
   }
 
   if (['shortlisted', 'interviewing'].includes(stage)) {
-    actions.push({ id: 'prep_interview', label: 'Prep for next interview', stub: true })
+    actions.push({ id: 'prep_interview', label: 'Prep for next interview' })
   }
 
   if (stage === 'offer') {
-    actions.push({ id: 'lock_comp', label: 'Lock comp expectations', stub: true })
-    actions.push({ id: 'prep_counter', label: 'Prep for counter offer', stub: true })
+    actions.push({ id: 'lock_comp', label: 'Lock comp expectations' })
+    actions.push({ id: 'prep_counter', label: 'Prep for counter offer' })
   }
 
   return actions.slice(0, 3)
@@ -1320,7 +1321,8 @@ export default function CandidateCard() {
   const [stageHistory, setStageHistory] = useState(null)
   const [stageHistoryLoading, setStageHistoryLoading] = useState(false)
   const [zoneCOpen, setZoneCOpen] = useState(false)
-  const [zoneAStub, setZoneAStub] = useState(null) // stub message for call-prep actions
+  const [zoneAStub, setZoneAStub] = useState(null)
+  const [callPrepResult, setCallPrepResult] = useState({ type: null, loading: false, result: null, error: null })
   const [screeningInline, setScreeningInline] = useState(false) // Zone A screen trigger
 
   // Interaction edit modal
@@ -1348,12 +1350,6 @@ export default function CandidateCard() {
     if (!id || !recruiter?.id) return
 
     async function fetchAll() {
-      // Log auth state and recruiter context for debugging
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      console.debug('[CandidateCard] auth user id:', authUser?.id)
-      console.debug('[CandidateCard] recruiter row:', recruiter)
-      console.debug('[CandidateCard] fetching candidate id:', id)
-
       const settled = await Promise.allSettled([
         supabase
           .from('candidates')
@@ -1401,22 +1397,6 @@ export default function CandidateCard() {
         r.status === 'fulfilled' ? r.value : { data: null, error: { message: 'Request failed' } }
       )
 
-      console.debug('[CandidateCard] candidate result:', {
-        data: candidateRes.data,
-        error: candidateRes.error,
-        // PGRST116 = no rows returned (RLS filtered it out or ID doesn't exist)
-        errorCode: candidateRes.error?.code,
-        errorMessage: candidateRes.error?.message,
-      })
-      console.debug('[CandidateCard] pipeline result:', {
-        count: pipelineRes.data?.length,
-        error: pipelineRes.error,
-      })
-      console.debug('[CandidateCard] interactions result:', {
-        count: interactionRes.data?.length,
-        error: interactionRes.error,
-      })
-
       if (candidateRes.error || !candidateRes.data) {
         console.warn(
           '[CandidateCard] candidate not accessible — likely RLS mismatch.\n' +
@@ -1456,10 +1436,12 @@ export default function CandidateCard() {
       const entry = pipelines.find(p => p.id === ctx?.pipeline_id) ?? pipelines[0]
       if (entry) setCompModal({ open: true, entry, nextStage: entry.current_stage, comp: '', saving: false })
     })
+    registerAction('prep_call', (ctx) => handleCallPrep(ctx?.prep_type ?? 'prep_interview'))
     return () => {
       unregisterAction('log_debrief')
       unregisterAction('log_interaction')
       unregisterAction('set_expected_comp')
+      unregisterAction('prep_call')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelines])
@@ -1591,20 +1573,47 @@ export default function CandidateCard() {
       // Roll back
       setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, current_stage: entry.current_stage } : p))
     } else {
-      fireResponse('stage_advanced', {
+      const allMotiv = debriefs.flatMap(d => Array.isArray(d.motivation_signals) ? d.motivation_signals : [])
+      const allComp  = debriefs.flatMap(d => Array.isArray(d.competitive_signals) ? d.competitive_signals : [])
+      const allRisk  = debriefs.flatMap(d => Array.isArray(d.risk_flags) ? d.risk_flags : [])
+      const allHM    = debriefs.flatMap(d => Array.isArray(d.hiring_manager_signals) ? d.hiring_manager_signals : [])
+      const allPos   = debriefs.flatMap(d => Array.isArray(d.positive_signals) ? d.positive_signals : [])
+
+      const STAGE_GATE_ACTIONS = { interviewing: 'stage_gate_first_interview', offer: 'stage_gate_offer', placed: 'stage_gate_placed' }
+      const stageGateAction = STAGE_GATE_ACTIONS[nextStage]
+
+      let missingSignals = []
+      if (nextStage === 'interviewing') {
+        if (!allMotiv.length) missingSignals.push('motivation_read')
+        if (!allHM.length)    missingSignals.push('hm_impression')
+        if (!allPos.length && !allMotiv.length) missingSignals.push('candidate_energy')
+      } else if (nextStage === 'offer') {
+        if (!entry.expected_comp) missingSignals.push('comp_not_locked')
+        if (!allComp.length)      missingSignals.push('competing_offers_unknown')
+        const hasCounterCheck = allRisk.some(r => typeof r === 'string' && r.toLowerCase().includes('counter'))
+        if (!hasCounterCheck)     missingSignals.push('counter_offer_risk_unassessed')
+      } else if (nextStage === 'placed') {
+        missingSignals.push('confirm_resignation_prep')
+        if (allRisk.some(r => typeof r === 'string' && r.toLowerCase().includes('counter'))) {
+          missingSignals.push('counter_offer_risk_active')
+        }
+      }
+
+      fireResponse(stageGateAction ?? 'stage_advanced', {
         candidate: {
-          id:              candidate?.id,
-          name:            candidate ? `${candidate.first_name} ${candidate.last_name}` : null,
-          current_title:   candidate?.current_title,
+          id:            candidate?.id,
+          name:          candidate ? `${candidate.first_name} ${candidate.last_name}` : null,
+          current_title: candidate?.current_title,
         },
         from_stage:    entry.current_stage,
         to_stage:      nextStage,
         expected_comp: entry.expected_comp,
         role_title:    entry.roles?.title,
         has_debriefs:  debriefs.length > 0,
-        risk_flags:    debriefs.flatMap(d => d.risk_flags ?? []).slice(0, 3),
-        motivation_signals: debriefs.flatMap(d => d.motivation_signals ?? []).slice(0, 2),
+        risk_flags:    allRisk.slice(0, 3),
+        motivation_signals: allMotiv.slice(0, 2),
         interactions_at_stage: interactions.filter(i => i.pipeline_id === entry.id).length,
+        ...(stageGateAction ? { missing_signals: missingSignals } : {}),
       })
       // Auto-regenerate next action in background — no await, never blocks UI
       ;(async () => {
@@ -2243,16 +2252,26 @@ export default function CandidateCard() {
     setStageHistoryLoading(false)
   }
 
-  function handleZoneAAction(action) {
-    if (action.stub) {
-      const msgs = {
-        prep_interview: 'Call Prep module coming soon. Pick up the phone and walk through the interview process, expected questions, and candidate prep areas.',
-        lock_comp:      'Call Prep module coming soon. Get on the phone to lock comp: current base, target, competing offers, and what it takes to accept.',
-        prep_counter:   'Call Prep module coming soon. Before offer stage: confirm comp expectations, competing offers, and counter-offer scenario.',
-      }
-      setZoneAStub(msgs[action.id] ?? 'Coming soon.')
-      return
+  async function handleCallPrep(prepType) {
+    setCallPrepResult({ type: prepType, loading: true, result: null, error: null })
+    try {
+      const { system, messages, maxTokens } = buildCallPrepMessages(prepType, {
+        candidate,
+        pipelineEntry: pipelines[0] ?? null,
+        debriefs,
+        interactions,
+      })
+      const text = await generateText({ system, messages, maxTokens })
+      setCallPrepResult({ type: prepType, loading: false, result: text.trim(), error: null })
+    } catch {
+      setCallPrepResult({ type: prepType, loading: false, result: null, error: 'Couldn\'t generate call prep. Try again.' })
     }
+  }
+
+  function handleZoneAAction(action) {
+    if (action.id === 'prep_interview') { handleCallPrep('prep_interview'); return }
+    if (action.id === 'lock_comp')      { handleCallPrep('lock_comp'); return }
+    if (action.id === 'prep_counter')   { handleCallPrep('prep_counter'); return }
     setZoneAStub(null)
     if (action.id === 'log_debrief')    handleOpenDebrief(null)
     if (action.id === 'log_interaction') handleLogOpen()
@@ -2401,11 +2420,27 @@ export default function CandidateCard() {
                   {screenResult && <ScreenerResult result={screenResult} />}
                 </div>
               )}
-              {/* Zone A stub message */}
-              {zoneAStub && (
-                <div className="zone-a-stub">
-                  <p>{zoneAStub}</p>
-                  <button className="btn-ghost btn-sm" onClick={() => setZoneAStub(null)}>Dismiss</button>
+              {/* Call prep result */}
+              {callPrepResult.type && (
+                <div className="zone-b-result" style={{ marginTop: 12 }}>
+                  <div className="zone-b-result-header">
+                    <span className="screener-block-label">
+                      {callPrepResult.type === 'prep_interview' ? 'Interview Prep'
+                        : callPrepResult.type === 'lock_comp' ? 'Comp Lock Prep'
+                        : 'Counter Offer Prep'}
+                    </span>
+                    {callPrepResult.result && (
+                      <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(callPrepResult.result)}>Copy</button>
+                    )}
+                    <button className="btn-ghost btn-sm" onClick={() => setCallPrepResult({ type: null, loading: false, result: null, error: null })}>✕</button>
+                  </div>
+                  {callPrepResult.loading && (
+                    <div className="modal-generating"><div className="spinner spinner--sm" />Generating call prep…</div>
+                  )}
+                  {callPrepResult.error && <p className="error">{callPrepResult.error}</p>}
+                  {callPrepResult.result && (
+                    <p className="pitch-body" style={{ whiteSpace: 'pre-wrap' }}>{callPrepResult.result}</p>
+                  )}
                 </div>
               )}
             </div>

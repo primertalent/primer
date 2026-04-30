@@ -14,6 +14,6 @@ jobs:
           curl -X POST https://hirewren.com/api/agent-loop \
             -H "Authorization: Bearer ${{ secrets.AGENT_LOOP_SECRET }}" \
             --fail-with-body \
-            --max-time 30 \
+            --max-time 15 \
             --silent \
             --show-error

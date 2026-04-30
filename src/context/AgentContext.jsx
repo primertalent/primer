@@ -99,6 +99,9 @@ export function AgentProvider({ children }) {
       case 'prep_for_interview':
         if (cid) navigate(`/candidates/${cid}`)
         break
+      case 'prep_call':
+        if (cid) navigate(`/network/${cid}`)
+        break
       case 'draft_outreach':
         if (cid) navigate(`/candidates/${cid}`)
         break

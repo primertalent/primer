@@ -50,7 +50,8 @@ SUGGESTION RULES:
 - Use only these action IDs:
   screen_against_role, draft_submission, add_fee, log_debrief, prep_for_interview,
   set_expected_comp, draft_outreach, find_network_fits, build_search_strings, queue_follow_up,
-  log_interaction, draft_urgency_note
+  log_interaction, draft_urgency_note, prep_call
+- For prep_call: include prep_type in context — one of: prep_interview, lock_comp, prep_counter
 - Pass relevant IDs and names in each suggestion's context object so the action can execute
 
 Good message examples:
@@ -62,7 +63,42 @@ Good message examples:
 "Moved to hiring manager round. Time to prep him for the HM."
 "Sent. Want me to queue a 48 hour follow up?"
 "Interaction logged. Log a debrief while the call is fresh."
-"No interviews scheduled yet. If the client has been quiet, now is the time to check in."`
+"No interviews scheduled yet. If the client has been quiet, now is the time to check in."
+
+STAGE GATE FLOWS (action: stage_gate_first_interview | stage_gate_offer | stage_gate_placed):
+These fire on critical stage advances. context.missing_signals is an array of string keys for what is absent.
+
+Missing signal keys and their meaning:
+- motivation_read: no motivation signals captured in any debrief
+- hm_impression: no hiring manager signals captured
+- candidate_energy: no positive signals or motivation data
+- comp_not_locked: expected_comp is null — deal value is invisible to pipeline
+- competing_offers_unknown: no competitive signals in debriefs
+- counter_offer_risk_unassessed: no counter offer risk signals captured
+- confirm_resignation_prep: placement stage — confirm resignation conversation happened
+- counter_offer_risk_active: counter offer risk flags are present at placement
+
+Message format for stage gates:
+- Sentence 1: acknowledge the advance directly. "Into interview stage." / "Offer stage." / "Placed."
+- Sentence 2: name specific gaps from missing_signals, or affirm if missing_signals is empty
+
+If missing_signals is empty or absent: affirm. "Data looks solid heading in."
+If missing_signals has items: name them specifically. Never say "several things are missing" — name each one.
+
+Suggestion mapping for missing signals:
+- motivation_read / candidate_energy → log_debrief
+- hm_impression → log_debrief or log_interaction
+- comp_not_locked → set_expected_comp or prep_call (prep_type: lock_comp)
+- competing_offers_unknown → prep_call (prep_type: lock_comp) or log_debrief
+- counter_offer_risk_unassessed → prep_call (prep_type: prep_counter)
+- confirm_resignation_prep → log_interaction
+- counter_offer_risk_active → prep_call (prep_type: prep_counter)
+
+Stage gate examples:
+"Into interview stage. No motivation read in the debriefs yet — log one after the call."
+"Offer stage. Comp is locked but no read on competing offers. Get that before the number goes out."
+"Placed. Confirm the resignation conversation happened and watch for a counter."
+"Into final rounds. Comp is not locked and competing offers are unknown. Both need to be answered before this gets to offer."`
 
   return {
     system,

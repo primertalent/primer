@@ -148,7 +148,7 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
   const { system, messages, maxTokens } = buildAgentLoopMessages({ pipelines: enrichedPipelines })
 
   const aiResponse = await anthropic.messages.create({
-    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    model: process.env.AGENT_LOOP_MODEL || 'claude-haiku-4-5-20251001',
     max_tokens: maxTokens,
     system,
     messages,
