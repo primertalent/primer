@@ -3,27 +3,44 @@
 
 ---
 
-## V3 Product Framing
+## Product Framing (locked)
 
-**Wren is the deal desk for solo recruiters.**
+**Wren is the entry-level recruiter you can't hire.**
 
-It pressure-tests candidates, runs closes, and surfaces signals and risk. At every decision point in a live deal — intake, screen, submission, follow-up, debrief, offer — Wren tells the recruiter what the situation is and what to do next.
+It thinks like the recruiter, speaks like them, has 15 years of their judgment built in. It handles the operational work of running a solo recruiting desk so the recruiter can focus on judgment calls and relationships. Not a tool the recruiter operates. An employee they direct.
 
-Not an OS. Not a co-pilot. Not a chatbot. A deal desk agent with recruiter logic.
+Domain: hirewren.com. Pitch: "Hire Wren."
 
-The questions Wren answers:
+Internal architecture description: Wren is the deal desk for solo recruiters. The deal desk is the wedge into a broader operational coverage layer. The agent runs continuously, handles communication and routine operations, and surfaces judgment moments to the recruiter.
+
+For the founder vision document, see `VISION.md`. For GTM, founder story, objection handling, and messaging, see `POSITIONING.md`. This file (`WREN.md`) is the codebase context.
+
+The questions Wren answers for every active deal:
 - Is this candidate closeable?
 - What are the gaps — motivation, comp, competing offers, hiring manager readiness?
 - What's the next move to advance or protect this deal?
 - Where is this deal at risk?
 
-Every build decision should advance one of these four questions.
+Beyond the deal desk, Wren handles:
+- Inbound communication (read, draft, route, log)
+- Outbound prep (interview prep, candidate updates, client check-ins)
+- Memory and continuity (no dropped follow-ups, no lost context)
+- Coverage (routine work happens whether the recruiter is online or not)
+- Pipeline awareness (what's hot, what's at risk, what's worth attention)
+
+Every build decision either advances closing intelligence (the moat) or expands operational coverage (the felt-pain layer that drives adoption).
+
+Proof point: Alex from Super Recruiter built a 7-figure staffing firm by automating operational work with AI for himself. Wren puts that capability in the hands of solo independents. Market is validated.
 
 ---
 
 ## ICP
 
-Primary user: the solo independent recruiter running on LinkedIn Recruiter, spreadsheets, email, and maybe Paraform. No ATS. No coordinator. No team. 5 to 20+ years of recruiting experience. Billing $150k to $1M+ annually, entirely on their own effort.
+Primary buyer: the capacity-constrained solo biller doing $500k-$1M annually. They're leaving money on the table because they can't scale further without help. They'd hire a junior recruiter if the economics worked. They will pay $499/month tomorrow if Wren actually works.
+
+Secondary: solo recruiters billing $200k-$500k. Stretched but making it work. Buy after their peers do.
+
+Profile: solo independent recruiter running on LinkedIn, spreadsheets, email, Google Workspace, and maybe Paraform. No ATS. No coordinator. No team. 5 to 20+ years of recruiting experience.
 
 **Already a competent closer.** Wren scales their existing motion, doesn't replace skill they don't have. The pitch is leverage, not coaching. "You're already good at this. Wren lets you do it ten times instead of three." Bad closers buying Wren as a skill upgrade churn at 60 days because volume doesn't fix the underlying gap. Good closers buying Wren as leverage stay because the floor under their off days and the multiplier on their best days both compound.
 
@@ -133,13 +150,17 @@ This runs whether the user is in the app or not. When the user opens Wren, they 
 
 **Foundation 2: Ingestion.** Data flows in from where work actually happens.
 
-Manual paste-in is a bridge. It cannot be the destination. Solo recruiters work in LinkedIn, Gmail, calendar, Zoom calls, text messages. Wren has to read from those sources to feel like an agent.
+Manual paste-in is a bridge. It cannot be the destination. Solo recruiters work in Gmail, Google Calendar, Google Meet, LinkedIn, text messages, phone calls. Wren has to read from those sources to feel like an agent.
+
+**Google Workspace is the highest-leverage integration target.** Most ICP recruiters live in Gmail + Google Calendar + Google Meet. One OAuth flow covers all three. Solo recruiter primary intake surface is Google Meet (not phone), and Meet auto-generates transcripts via Gemini if Workspace is enabled — which means transcript ingestion is essentially free once Drive access is granted.
 
 Order:
-- Email (Gmail OAuth, parse incoming candidate and client replies, draft responses inline, write structured interactions)
-- Calendar (link interviews to candidates, surface upcoming calls, generate pre-call prep automatically)
-- Call tools (Granola or Fathom transcripts flowing into debriefs without paste)
-- LinkedIn (browser extension, candidate to pipeline in one click)
+1. **Gmail** (OAuth, parse incoming candidate and client replies, draft responses inline, write structured interactions). Highest volume of communication.
+2. **Google Calendar** (link interviews to candidates, surface upcoming calls, generate pre-call prep automatically).
+3. **Google Meet transcripts via Drive** (intake calls, candidate calls — transcript already exists if Gemini is on, just need to read it).
+4. **Granola or Fathom** for non-Google calls (phone, side calls, when Gemini isn't capturing).
+5. **Texts** (last because technically harder; Android easier than iPhone; forwarding-to-Wren as fallback).
+6. **LinkedIn** (browser extension, candidate to pipeline in one click — deferred until LinkedIn API or browser ext story matures).
 
 Each integration removes a manual step. The product gets less cumbersome as more data flows in automatically.
 
@@ -181,6 +202,34 @@ The five tests of agent shape:
 Wren has pieces of agent shape today (WrenResponse, debrief extraction, pushback). Wren is mostly SaaS-shaped today (navigation between pages, manual paste, work happens on user click).
 
 Every build decision should move toward agent shape. The test on every session: did Wren get more agent-shaped, or just prettier?
+
+---
+
+## Surfaces: phone-first, browser-as-dashboard
+
+**Phone (PWA) is the operational layer.** Where the recruiter lives 80% of the time. Push notifications, voice in, voice out, swipe-to-act. Soccer game test: see top action, act on one in under 10 seconds, close the app.
+
+Voice is the primary interaction. "Wren, Joan just texted me. Send her prep for her Acme call tomorrow." "Wren, log a call with Mike. He passed because of comp." "Wren, who needs me right now?"
+
+**Browser is the dashboard.** Where the recruiter goes for onboarding, configuration, deep review, history. The 20% of time when they have desk intent.
+
+**The agent loop runs in the cloud.** Both surfaces read from the same agent. The phone is just a different lens on the same engine.
+
+PWA, not native. Faster path, runs on the same React/Vite stack, service worker for push, Web Speech API for voice. Native app is a 6+ month decision.
+
+---
+
+## The 30/60/90 execution arc (locked)
+
+**Days 1-30: Browser strip down.** Phase 2 ships. Actions Tray as Desk home. Side panels. Single working surface. Founder uses Wren on every Paraform candidate daily. By day 30: "I can't run my desk without Wren now."
+
+**Days 30-60: Phone PWA.** Push notifications, voice input, voice output, swipe-to-act. Wren lives in the recruiter's pocket. Mobile-first.
+
+**Days 60-90: First paying users.** 5-10 solo recruiters from network. Beta at $199/month. Real money, real feedback, real testimonials.
+
+**Days 90-180: Scale to 50-100 paying users.** Founder content on LinkedIn, Paraform community, word of mouth. By month 6: $30k-$70k MRR.
+
+**The execution lock:** No major framing pivots until 30 days of daily use. The vision is good enough. Execution is what's missing.
 
 ---
 
@@ -901,6 +950,17 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Onboarding is three paths in order of leverage.** Pipeline paste (free-text describe active book, Wren parses) day one. Bulk file ingestion (CSVs, resumes, agreements) phase 3. Live integrations (Gmail, calendar, Granola/Fathom, Paraform) phase 3+. Active recruiter with active book gets to populated, useful Wren in under 60 minutes or they bounce.
 - **Manual feel comes from manual feeding, not bad UI.** Wren feels off because the recruiter pastes everything and Wren has no signal until then. UI polish doesn't fix this. Ingestion does. Email integration first, calendar second, call tools third. Each removes a manual step.
 - **Don't restart from scratch.** Codebase pivot debt is light. Prompts, schema, agent layer, debrief extraction, provider-agnostic AI all carry forward. Architecture inversion is additive (build the loop, build mobile, build ingestion) not destructive. Refactor frontend after the engine runs, not before.
+- **Product framing locked: Wren is the entry-level recruiter you can't hire.** Domain "hirewren.com" matches the pitch ("Hire Wren"). The deal desk thesis is the wedge into broader operational coverage. Internally Wren handles communication, scheduling, prep, signal capture, pipeline awareness, plus closing intelligence as the moat layer. Externally the pitch is "the entry-level recruiter you've always wanted to hire."
+- **Proof point: Alex from Super Recruiter.** Built a 7-figure staffing firm by automating operational work with AI for himself. The thesis is validated. Wren puts that capability in the hands of solo independents.
+- **Phone-first, browser-as-dashboard.** Phone (PWA) is the operational layer (push, voice, swipe-to-act). Browser is the dashboard (onboarding, configuration, deep review). Both surfaces read from the same agent loop. Soccer game test: see top action, act on one in under 10 seconds.
+- **PWA, not native app.** Faster path on existing React/Vite stack. Service worker for push, Web Speech API for voice. Native is a 6+ month decision deferred until product-market fit.
+- **Google Workspace is the priority integration.** One OAuth covers Gmail + Calendar + Meet transcripts. Most ICP recruiters live in Workspace. Meet is the primary intake surface (not phone). Gemini auto-transcripts in Drive make Meet ingestion essentially free.
+- **Pricing locked at $499/month standard, $199/month beta.** Math: $100k entry-level recruiter is $130-150k loaded. Wren handles 30-40% of that work at $6k/year. ROI is overwhelming for capacity-constrained solo billers ($500k-$1M).
+- **ICP refined within ICP: capacity-constrained solo billers ($500k-$1M) are the urgent buyer.** They can't scale further without help. They'll pay $499/month tomorrow if Wren works. Lower-billing recruiters ($200k-$500k) follow word-of-mouth.
+- **30-day execution lock.** No major framing pivots until 30 days of daily real use on Paraform candidates. The vision is good enough. Execution is what's missing. The 90-day arc: month 1 strip down, month 2 phone, month 3 first paying users.
+- **VISION.md added as the founder vision document.** Anchors everything else. WREN.md is codebase context. POSITIONING.md is GTM. VISION.md is why we're building this and what it ultimately is.
+- **COLLISION_AUDIT.md captured for Phase 2 source material.** 32 collisions identified. Most resolve via Phase 2 architecture inversion. Carry-forward data flow fixes woven into the strip down build (CF-1 through CF-7).
+- **Three Claude Code build contexts: WREN.md (codebase), VISION.md (founder vision), COLLISION_AUDIT.md (known frictions).** New sessions read all three. POSITIONING.md is for chat-level GTM thinking, not Claude Code sessions.
 - **Agent loop ships before any UI changes.** Engine first, surface second. Phase 1 is the foundation that makes Phase 2 (Actions Tray as Desk) possible. Do not build Actions Tray until the loop is producing reliable output.
 - **Cron runs on GitHub Actions, not Vercel cron.** Vercel Hobby tier doesn't support custom cron schedules. GitHub Actions is free and identical in behavior: scheduled workflow POSTs to `/api/agent-loop` with a shared secret. Switch to Vercel cron if/when on Pro.
 - **Service role key uses the new `sb_secret_xxx` format.** Stored in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. Bypasses RLS for the agent loop's cross-recruiter scan. Never expose this key client-side.

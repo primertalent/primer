@@ -6,6 +6,18 @@
 
 ---
 
+## The pitch
+
+**Hire Wren. The entry-level recruiter you've always wanted.**
+
+Wren thinks like you. Speaks like you. Has 15 years of recruiter judgment built in. Handles your routine work so you can focus on the work only you can do.
+
+Domain: hirewren.com. Pitch is the domain.
+
+**The math:** A $100k entry-level recruiter is $130-150k loaded. Solo recruiters can't afford that. Wren handles 30-40% of that work at $499/month. ROI is overwhelming for capacity-constrained solo billers.
+
+---
+
 ## Strategic Thesis
 
 **Build for the world where sourcing is solved.**
@@ -16,28 +28,51 @@ Today's recruiter wants more candidates. Tomorrow's recruiter has too many and c
 
 Every product, marketing, and pricing decision flows from this thesis. If a competitor is racing to commoditize sourcing, Wren is racing to be the layer that survives when sourcing is free.
 
+**The product is agent-shaped, not SaaS-shaped.** Wren runs continuously in the background. The recruiter doesn't navigate to find work. The work comes to them. Phone-first. Voice-native. Push-driven. Soccer-game-test passing: open Wren on a phone, see the top 3 actions, act on one in under 10 seconds, close the app. That's the bar.
+
+**Elite onboarding is the wedge for active closers.** The recruiter we want already has 8-15 active deals when they sign up. They need Wren populated and producing real actions on real deals within 60 minutes or they bounce. Three onboarding paths: pipeline paste (free text describe your book, Wren parses), bulk file ingestion (CSVs, resumes, agreements), live integrations (Gmail, calendar, Google Meet, call tools). Each path reduces manual feeding.
+
+**Wren earns its place by engaging only on real deals.** Active candidate in active role is the trigger for deal desk logic. Pre-deal evaluation is the recruiter's work. Beyond the deal desk, Wren handles broader operational work (communication, scheduling, prep, signal capture, pipeline awareness) for everyone the recruiter is working with.
+
+---
+
+## Proof point
+
+Alex from Super Recruiter built a 7-figure staffing firm by automating operational work with AI. He proved the thesis works for his firm.
+
+Wren puts that capability in the hands of solo independents who don't have a firm and never will. Same engine, different distribution, different ICP. Market is validated; execution is what's left.
+
+---
+
 ---
 
 ## ICP
 
-**Primary buyer: the good closer running solo.**
+**Primary buyer: the capacity-constrained solo biller doing $500k-$1M annually.**
+
+This recruiter is leaving money on the table because they can't scale further without help. They feel the time pressure daily. They'd hire a junior recruiter if the economics worked. They will pay $499/month tomorrow if Wren actually works.
+
+**Secondary: solo recruiters billing $200k-$500k.** Stretched but making it work. Buy after their peers do. Word of mouth ICP.
+
+**Profile of both tiers:**
 
 - 5 to 20+ years of recruiting experience
 - Solo independent, no team, no coordinator
-- Running on LinkedIn Recruiter, spreadsheets, email, maybe Paraform
+- Running on LinkedIn Recruiter, spreadsheets, email, Google Workspace, maybe Paraform
 - No ATS or actively avoiding heavyweight ATS
-- Billing $150k to $1M+ annually
 - Already competent at the close. Knows their rate. Feels the ceiling on deal volume.
 
 **The pitch is leverage, not coaching.**
 
-"You're already good at this. Wren lets you do it ten times instead of three."
+"You're already good at this. Wren lets you do it ten times instead of three. Like hiring an entry-level recruiter who's already trained on your judgment."
 
 **Why this segmentation matters:**
 
 Bad closers buy Wren as a skill upgrade. They run more deals. Their close rate stays flat. They churn at 60 days because volume didn't fix the underlying gap.
 
 Good closers buy Wren as leverage. They run more deals at their existing close rate. They scale revenue without scaling hours. The floor under their off days and the multiplier on their best days both compound. They stay.
+
+Recruiters billing under $150k typically have a deal flow problem (sourcing, BD), not a capacity problem. Wren doesn't solve their issue. Wrong fit.
 
 **Where good closers cluster:**
 
@@ -172,6 +207,18 @@ In 18 months when AI sourcing is commoditized, the same recruiters will be drown
 
 "Even great closers leave deals on the table when they're tired, distracted, or running too many at once. Wren isn't here to teach you to close. It's here to make sure your tenth deal of the week gets the same attention as your first."
 
+**"How long until Wren is actually useful for me? I don't want to rebuild my whole pipeline in another tool."**
+
+"Day one. You describe your active book in 10 minutes — paste it like you'd describe it to a friend who asked what's on your plate. Wren parses it into structured deals. By minute 30 you're acting on Wren-generated suggestions on real candidates. The historical data layers in over weeks. We're built for active closers with active books, not for people starting fresh."
+
+**"How is this different from another AI tool I have to check?"**
+
+"You don't check Wren. Wren tells you. It runs in the background, watches your active deals, and surfaces what needs you. Open it on your phone between calls, see the top action, act on it, close the app. The product works whether you're in it or not."
+
+**"I don't have time to feed another system."**
+
+"Right. That's why Wren reads from where you already work. Email integration parses candidate replies. Calendar integration links interviews. Call tool integration captures debriefs. Manual paste is a bridge for week one. By month two, the system runs on its own."
+
 ---
 
 ## Sharper Pitch Variants
@@ -183,10 +230,12 @@ Variations to test in different channels and contexts.
 - "Helping recruiters close their best candidates with technology."
 - "The deal desk for solo recruiters."
 - "Wren is for the close, not the source."
+- "An agent for the recruiter's deal desk."
 
 **Mid-length (homepage hero, founder LinkedIn header):**
 
 - "Wren is the deal desk for solo recruiters. We pressure-test candidates, run closes, and surface signals and risk. You stay the closer. Wren makes sure every deal gets your A game."
+- "Wren runs your deal desk while you run your day. Active deals only. Real signal. Honest pushback. The agent that closes deals while you're at the soccer game."
 
 **Long (manifesto post, investor pitch, deep content):**
 
@@ -305,3 +354,103 @@ Strategic questions to revisit after Thursday's real use day, after first 5 exte
 
 > Format:
 > **[YYYY-MM-DD] [Recruiter handle or pseudonym]:** Key quote or insight. Context. What it implies for product or messaging.
+---
+
+## Design Principles
+
+> The product surface, not the product scope. Captured before being built so the patterns are deliberate, not accidental. Apply when shipping V1 features. Build the system bottom-up through Call Prep, stage-gates, Actions Tray. Do not impose top-down as a UI pass.
+
+### Operating frame
+
+Wren is a deal desk, not an ATS, CRM, chatbot, or generic SaaS dashboard. Every visual decision flows from that.
+
+- Three surfaces only: Desk, Deals, Network. No new top-level nav.
+- Density over whitespace. Operator-grade, not consumer-friendly.
+- Internal jargon stays internal. Zone A/B/C lives in WREN.md, not in the UI.
+- Hierarchy is visual, not named. Primary actions are unlabeled and obvious. Secondary collapses behind a "More" affordance or pushes down.
+- No chatbot language. No AI hype. No SaaS filler.
+
+### Vocabulary
+
+The product speaks operator. Labels to use:
+
+- Work this deal
+- Current read
+- Risk
+- Next move
+- Lock comp
+- Prep call
+- Push, Hold, Kill, Protect
+- Working, At-risk (not "Best Candidates," nothing implying a ranking algorithm we don't have)
+
+### Wren Read pattern
+
+The read is a verdict, not a form.
+
+- One sentence verdict (Push/Hold/Kill/Protect with the why)
+- One sentence risk
+- One sentence what kills it
+
+Prose, not five labeled fields. If the model can't make a call in three sentences, it's hedging in structured format. Surface prior reads as history when calibration loop ships.
+
+### Action focus
+
+Three actions. Always three.
+
+- Five is a list, three is a focus.
+- If Wren can't pick three, it's not ready to pick any.
+- Long-term this is the Actions Tray's job. Don't overbuild on the dashboard.
+
+### Pipeline strip
+
+Money tied to specific deals, not aggregate metrics.
+
+- This week's locked fees
+- This week's at-risk fees
+- Next decision due
+
+Total pipeline value and weighted pipeline are CRM dashboard energy. Solo recruiters know their book in their head. Replace vanity metrics with named deals tied to dates.
+
+### What does not belong on the desk
+
+- Recent Movement feeds. Movement without judgment is a notification stream. If something moved and matters, it's in Action Focus. If it moved and doesn't matter, it doesn't belong on the desk.
+- Analytics dashboards. Wren is not a reporting tool.
+- Sourcing surfaces. Wren is the layer after sourcing.
+
+### Candidate view
+
+Live deal view, not a profile page.
+
+- Sticky Deal Status Bar at top
+- Wren Read directly below
+- Primary actions visually dominant
+- Resume, timeline, full debrief list, details collapsed below the fold
+- Prior reads surface when calibration loop ships
+
+### Role view
+
+- Sticky Role Status Bar
+- Compact stage strip
+- Working candidates and At-risk candidates surface before full list
+- Primary actions focused on working the role, not managing it
+
+### Network surface
+
+Network is memory, not inventory.
+
+Rows emphasize: last touch, strongest signal, relevant active role, prior outcome, suggested action. Not a candidate database UI. A "what do I know about this person and what should I do with them" surface.
+
+### How the design system gets built
+
+Bottom-up through V1 features. Not top-down as a polish pass.
+
+- Call Prep introduces the Wren Read pattern and the Push/Hold/Kill/Protect vocabulary
+- Stage-gate flows introduce the stage strip and Working/At-risk surfaces
+- Actions Tray introduces the three-action focus
+- Calibration loop introduces prior reads history
+
+By the time these four ship, the design system exists. A dedicated UI pass after that is reward, not avoidance.
+
+### Aesthetic discipline
+
+Aesthetic dopamine is real fuel. It is also a procrastination vector dressed as taste. The tell: when a UI session ends, do I want to build the next feature or another UI session? First answer means it was fuel. Second answer means it was avoidance. Time-box accordingly.
