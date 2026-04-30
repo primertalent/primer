@@ -4,7 +4,7 @@ import { AgentProvider } from './context/AgentContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
-import Dashboard from './pages/Dashboard'
+import Desk from './pages/Desk'
 import CandidateCard from './pages/CandidateCard'
 import Queue from './pages/Queue'
 import Roles from './pages/Roles'
@@ -25,7 +25,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/desk" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/desk" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/desk" element={<ProtectedRoute><Desk /></ProtectedRoute>} />
           <Route path="/dashboard" element={<Navigate to="/desk" replace />} />
           <Route path="/network" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
           <Route path="/network/new" element={<ProtectedRoute><CreateCandidate /></ProtectedRoute>} />

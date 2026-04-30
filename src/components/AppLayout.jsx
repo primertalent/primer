@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import WrenResponse from './WrenResponse'
 
 export default function AppLayout({ children, fullBleed = false }) {
   const { signOut } = useAuth()
@@ -36,7 +35,6 @@ export default function AppLayout({ children, fullBleed = false }) {
         ? <div className="app-full">{children}</div>
         : <main className="app-main">{children}</main>
       }
-      <WrenResponse />
     </div>
   )
 }

@@ -16,49 +16,45 @@ function parseJson(text) {
 
 export function AgentProvider({ children }) {
   const navigate = useNavigate()
-  const [status, setStatus] = useState('idle')
-  const [response, setResponse] = useState(null)
+  const [ephemeralCards, setEphemeralCards] = useState([])
   const registryRef = useRef(new Map())
 
-  const think = useCallback(() => {
-    setStatus('thinking')
-    setResponse(null)
+  const addEphemeralCard = useCallback((card) => {
+    setEphemeralCards(prev => [card, ...prev])
   }, [])
 
-  const speak = useCallback((message, suggestions = []) => {
-    setResponse({ message, suggestions })
-    setStatus('speaking')
+  const dismissEphemeralCard = useCallback((id) => {
+    setEphemeralCards(prev => prev.filter(c => c.id !== id))
   }, [])
 
-  const fail = useCallback((message = 'Saved. Wren hit a branch generating next steps.') => {
-    setResponse({ message, suggestions: [] })
-    setStatus('error')
-  }, [])
-
-  const clear = useCallback(() => {
-    setStatus('idle')
-    setResponse(null)
-  }, [])
-
-  // Fire agentResponse prompt in background. Save must already be committed before calling.
   const fireResponse = useCallback((action, context) => {
-    think()
     const { system, messages, maxTokens } = buildAgentResponseMessages(action, context)
     generateText({ system, messages, maxTokens })
       .then(raw => {
         const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
         const parsed = parseJson(cleaned)
         if (parsed?.message) {
-          speak(parsed.message, parsed.suggestions ?? [])
-        } else {
-          fail()
+          addEphemeralCard({
+            id: crypto.randomUUID(),
+            ephemeral: true,
+            urgency: 'now',
+            action_type: action,
+            why: parsed.message,
+            suggested_next_step: null,
+            suggestions: parsed.suggestions ?? [],
+            entityName: context?.candidate?.name ?? context?.role_title ?? null,
+            candidateId: context?.candidate?.id ?? null,
+            roleId: context?.role_id ?? null,
+            pipelineId: context?.pipeline_id ?? null,
+            created_at: new Date().toISOString(),
+          })
         }
       })
-      .catch(() => fail())
-  }, [think, speak, fail])
+      .catch(() => {
+        // Silent — ephemeral card generation is non-critical
+      })
+  }, [addEphemeralCard])
 
-  // Register a page-level handler for a suggestion action.
-  // Pages call registerAction on mount and unregisterAction on unmount.
   const registerAction = useCallback((actionId, handler) => {
     registryRef.current.set(actionId, handler)
   }, [])
@@ -67,7 +63,6 @@ export function AgentProvider({ children }) {
     registryRef.current.delete(actionId)
   }, [])
 
-  // Dispatch a suggestion action. Checks page registry first, then falls back to navigation.
   const dispatch = useCallback((actionId, context) => {
     const handler = registryRef.current.get(actionId)
     if (handler) {
@@ -79,43 +74,39 @@ export function AgentProvider({ children }) {
     const pid = context?.pipeline_id
     switch (actionId) {
       case 'screen_against_role':
-        if (cid) navigate(`/candidates/${cid}`, { state: { autoScreen: rid } })
+        if (cid) navigate(`/network/${cid}`, { state: { autoScreen: rid } })
         break
       case 'draft_submission':
-        if (cid) navigate(`/candidates/${cid}`)
+        if (cid) navigate(`/network/${cid}`)
         break
       case 'add_fee':
-        if (rid) navigate(`/roles/${rid}/edit`)
+        if (rid) navigate(`/roles/${rid}`)
         break
       case 'log_debrief':
-        if (cid) navigate(`/candidates/${cid}`, { state: { openDebrief: true } })
+        if (cid) navigate(`/network/${cid}`, { state: { openDebrief: true } })
         break
       case 'log_interaction':
-        if (cid) navigate(`/candidates/${cid}`, { state: { openLog: true } })
+        if (cid) navigate(`/network/${cid}`, { state: { openLog: true } })
         break
       case 'set_expected_comp':
-        if (cid) navigate(`/candidates/${cid}`, { state: { openCompFor: pid } })
+        if (cid) navigate(`/network/${cid}`, { state: { openCompFor: pid } })
         break
       case 'prep_for_interview':
-        if (cid) navigate(`/candidates/${cid}`)
-        break
       case 'prep_call':
         if (cid) navigate(`/network/${cid}`)
         break
       case 'draft_outreach':
-        if (cid) navigate(`/candidates/${cid}`)
+        if (cid) navigate(`/network/${cid}`)
         break
       case 'build_search_strings':
         if (rid) navigate(`/roles/${rid}`)
         break
       case 'find_network_fits':
-        navigate(rid ? `/candidates?role=${rid}` : '/candidates')
+        navigate(rid ? `/network?role=${rid}` : '/network')
         break
       case 'queue_follow_up':
-        if (cid) navigate(`/candidates/${cid}`)
-        break
       case 'draft_urgency_note':
-        if (cid) navigate(`/candidates/${cid}`)
+        if (cid) navigate(`/network/${cid}`)
         break
       default:
         break
@@ -124,10 +115,12 @@ export function AgentProvider({ children }) {
 
   return (
     <AgentContext.Provider value={{
-      status, response,
-      think, speak, fail, clear,
-      fireResponse, dispatch,
-      registerAction, unregisterAction,
+      ephemeralCards,
+      dismissEphemeralCard,
+      fireResponse,
+      dispatch,
+      registerAction,
+      unregisterAction,
     }}>
       {children}
     </AgentContext.Provider>

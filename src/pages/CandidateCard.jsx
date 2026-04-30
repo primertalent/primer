@@ -1719,22 +1719,6 @@ export default function CandidateCard() {
         interaction: { type: logForm.type, occurred_at: data.occurred_at },
         pipeline: pipelines[0] ? { id: pipelines[0].id, role_title: pipelines[0].roles?.title, current_stage: pipelines[0].current_stage } : null,
       })
-      // Auto-prompt for debrief after logging a call or meeting
-      if (logForm.type === 'call' || logForm.type === 'meeting') {
-        const autoRoleId = pipelines.length === 1 ? pipelines[0].id : ''
-        setDebriefModal({
-          open: true,
-          phase: 'input',
-          interactionId: data.id,
-          pipelineId: autoRoleId,
-          raw: '',
-          outcome: 'neutral',
-          extracted: null,
-          reviewSummary: '',
-          reviewNextAction: '',
-          error: null,
-        })
-      }
     }
     setLogSaving(false)
   }
