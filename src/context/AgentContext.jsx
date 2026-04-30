@@ -5,6 +5,22 @@ import { buildAgentResponseMessages } from '../lib/prompts/agentResponse'
 
 const AgentContext = createContext(null)
 
+// Which IDs each action requires. Used in dev to warn on silent no-ops.
+const REQUIRED_IDS = {
+  screen_against_role: ['candidate_id'],
+  draft_submission:    ['candidate_id'],
+  add_fee:             ['role_id'],
+  log_debrief:         ['candidate_id'],
+  log_interaction:     ['candidate_id'],
+  set_expected_comp:   ['candidate_id'],
+  prep_for_interview:  ['candidate_id'],
+  prep_call:           ['candidate_id'],
+  draft_outreach:      ['candidate_id'],
+  build_search_strings:['role_id'],
+  queue_follow_up:     ['candidate_id'],
+  draft_urgency_note:  ['candidate_id'],
+}
+
 function parseJson(text) {
   try { return JSON.parse(text) } catch {}
   try {
@@ -43,9 +59,11 @@ export function AgentProvider({ children }) {
             suggested_next_step: null,
             suggestions: parsed.suggestions ?? [],
             entityName: context?.candidate?.name ?? context?.role_title ?? null,
-            candidateId: context?.candidate?.id ?? null,
-            roleId: context?.role_id ?? null,
-            pipelineId: context?.pipeline_id ?? null,
+            // Resolve nested paths first (how callers currently pass IDs),
+            // then fall back to flat keys (forward-compatible).
+            candidateId: context?.candidate?.id ?? context?.candidate_id ?? null,
+            roleId:      context?.role?.id     ?? context?.role_id      ?? null,
+            pipelineId:  context?.pipeline?.id ?? context?.pipeline_id  ?? null,
             created_at: new Date().toISOString(),
           })
         }
@@ -64,6 +82,22 @@ export function AgentProvider({ children }) {
   }, [])
 
   const dispatch = useCallback((actionId, context) => {
+    // Dev-mode guard: warn immediately when a chip will silently no-op due to
+    // a missing required ID. This is how the suhail_goyal class of bug hides.
+    if (import.meta.env.DEV) {
+      const required = REQUIRED_IDS[actionId]
+      if (required) {
+        const missing = required.filter(key => !context?.[key])
+        if (missing.length) {
+          console.warn(
+            `[AgentContext] dispatch('${actionId}') will no-op — missing: ${missing.join(', ')}.\n` +
+            `Context received:`, context, `\n` +
+            `Check the fireResponse() call site that produced this chip.`
+          )
+        }
+      }
+    }
+
     const handler = registryRef.current.get(actionId)
     if (handler) {
       handler(context)
