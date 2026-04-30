@@ -6,6 +6,48 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 19 — 2026-04-30
+**Phase 2 strip down — Commits A and B. SaaS shape → agent shape.**
+
+**Strategy locked:**
+- VISION.md created — founder vision document, entry-level recruiter framing, 90-day arc, $499/month pricing thesis
+- WREN.md updated — new product framing ("Wren is the entry-level recruiter you can't hire"), ICP updated to $500k-$1M solo billers, three foundations reframed
+- POSITIONING.md updated — design principles section added, vocabulary locked (Push/Hold/Kill/Protect)
+- COLLISION_AUDIT.md created — 29 findings across 8 patterns, carry-forward items documented, strip down disposition for each
+
+**Full collision audit produced.** Eight pattern types identified: save-handler auto-opens, duplicate input requests, competing surfaces, redundant next-step prompts, SaaS-shape navigation, agent-output-ignored paths, stale trigger patterns, shell vs agent mismatch. Strip down plan written and approved.
+
+**Phase 1 completion (pre-Commit A):**
+- Call Prep module shipped (`callPrep.js`) — replaces Zone A stubs with real 60-second pre-call briefs (prep_interview, lock_comp, prep_counter)
+- Stage-Gate Agent Flows — advancing to interviewing/offer/placed fires specific action types with missing_signals context
+- Recruiter vs AI Confidence — migration adds 4 columns to pipeline, pre/post confidence capture on interaction log and debrief review, divergence ≥3 fires agentResponse, DealStatusBar shows W/Y post scores
+- Auto-debrief popup killed — was auto-opening after every call log. WrenResponse chip handles the prompt instead.
+- Agent loop: switched default model to Haiku to fix Hobby tier timeout. Curl max-time tightened to 15s.
+
+**Commit A — Desk as primary surface:**
+- `src/pages/Desk.jsx` (new): reads `actions` table, batch entity name enrichment, Supabase realtime subscription for new inserts, merges ephemeral cards from fireResponse with persisted actions, three empty states, WrenCommand inline toggle
+- `src/components/ActionCard.jsx` (new): urgency badge, entity name/subtitle, Wren's message, suggested_next_step, default chips per action_type, dismiss/snooze
+- `src/context/AgentContext.jsx` refactored: fireResponse now writes ephemeral cards instead of bottom bar state. Removed status/response/speak/think/fail/clear. Added ephemeralCards, dismissEphemeralCard. Fixed nested vs flat ID extraction (role.id, pipeline.id). Added REQUIRED_IDS map + dev-mode console.warn on dispatch with missing required IDs.
+- `src/components/WrenResponse.jsx` deleted
+- `src/pages/Dashboard.jsx` deleted
+- `src/components/AppLayout.jsx`: WrenResponse removed
+
+**Bugs fixed (Commit A era):**
+- Chip context merge order — model-generated slugs (`suhail_goyal`) were overwriting real UUIDs. Fixed: `{ ...(s.context ?? {}), ...chipContext }` so platform entity IDs always win. agentResponse.js updated to not instruct model to generate entity IDs.
+- AgentContext nested ID extraction — roleId/pipelineId were looking for flat `context.role_id` but callers pass `context.role.id`. Fixed to check nested path first.
+- Agent loop JSON parse failure — Haiku returning preamble or truncated JSON. Added three-stage parse (direct → strip fences → regex extract). Raised maxTokens 1200→2000. Fixed content block access to find type='text' explicitly.
+
+**Commit B — Side panels:**
+- `src/components/SidePanel.jsx` (new): 680px overlay panel, slides from right, Escape/click-outside closes
+- CandidateCard: accepts `id`/`onClose` props, AppLayout conditional on panel mode, back/delete use onClose when in panel
+- RoleDetail: same treatment
+- ActionCard: `onCardClick` prop, card body click opens panel, header and chips stop propagation
+- Desk: panel state `{ type, id }`, openPanel/closePanel, SidePanel renders CandidateCard or RoleDetail
+
+**What's next:** Commit C — LogForm collapse (unified log+debrief form, single notes field, background extraction, no modal).
+
+---
+
 ## Session 18 — 2026-04-20
 **WREN.md strategy updates + Role page deal cockpit refactor.**
 

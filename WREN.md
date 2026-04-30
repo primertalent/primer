@@ -440,11 +440,12 @@ If any answer is wrong, redesign or defer.
 ## Current state
 
 **What's built and working:**
-- Conversational agent layer: WrenResponse sticky bottom bar speaks back after every action. Message + 1-3 suggestion chips. Thinking/speaking/error states with personality text rotation.
-- WrenCommand: paste/upload/URL → auto-saves intake/multi-screen → WrenResponse confirms. No Save All button. Resume auto-parses on drop (single resume, no result showing). File dedup by name+size.
-- Dashboard: Deal desk home (Zone 3 WrenCommand, Zone 1 Pipeline Value, Zone 2 The Desk)
-  - Pipeline Value: primary total + probability-weighted, stage probabilities interviewing=0.25/offer=0.75/placed=1.00
-  - The Desk: urgency-sorted deal rows (overdue → today → active/stale) with risk pills
+- **Desk (Phase 2 — Commit A+B):** Agent loop output as primary surface. Reads `actions` table, batch entity enrichment, Supabase realtime subscription. Three empty states (scanning, caught up, active). WrenCommand inline toggle ("Drop something"). Action cards render Wren's message + suggested_next_step + default chips per action_type + dismiss/snooze. Clicking a card body opens a side panel.
+- **Side panels (Commit B):** CandidateCard and RoleDetail open as 680px overlay panels from action card clicks. Escape or click-outside closes. Back/delete use onClose in panel mode. Old `/network/:id` and `/roles/:id` full-page routes still live.
+- **AgentContext (Commit A):** fireResponse writes ephemeral cards to Desk instead of bottom bar. REQUIRED_IDS map + dev-mode console.warn on dispatch with missing required IDs. Nested ID extraction fixed (role.id, pipeline.id).
+- **WrenResponse (the floating bottom bar) is gone.** Deleted. The Desk is the agent's voice.
+- **Dashboard is gone.** Replaced by Desk.
+- WrenCommand: paste/upload/URL → auto-saves intake/multi-screen → ephemeral action card confirms on Desk. No Save All button. Resume auto-parses on drop. File dedup by name+size.
 - CandidateCard: refactored as a live deal view (not a record view)
   - **Deal Status Bar** (sticky top): candidate name + current role/company | role link | stage + days-in-stage | AI score / recruiter score (color-coded) | risk pills (Comp gap, Counter offer risk, Thin motivation, Slow HM, Stalled) | next action | expected comp or "Set comp" chip. For off-pipeline candidates: last touch + signal badges + "Add to a role" chip. Counter offer risk derives from `debrief.motivation_signals`, `competitive_signals`, `risk_flags` (keywords: underpaid, comp gap, passive, below market) + `career_signals` Long Tenure flag.
   - **Card hierarchy**: Deal Status Bar → Latest debrief summary card → Debrief signals panel → Zone A/B/C actions → Interactions log (3 visible, show more) → Pipeline (collapsed) → Resume & timeline (collapsed) → All debriefs (collapsed) → Career signals (collapsed) → Screener results (collapsed) → Details & edit (collapsed)
@@ -484,10 +485,12 @@ If any answer is wrong, redesign or defer.
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
 - Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
-- Dashboard ActivityDigest / NeedsAttention / TodayPipeline — replaced by deal desk zones.
+- Dashboard ActivityDigest / NeedsAttention / TodayPipeline — replaced by Desk action cards.
 - Daily Brief skill — removed. Redundant with Dashboard.
 - Boolean Search skill — removed. Sourcing tool, not deal desk.
 - Queue from nav — removed. File and route preserved until Actions Tray ships.
+- WrenResponse.jsx — removed. Desk is the agent's voice.
+- Dashboard.jsx — removed. Replaced by Desk.jsx.
 
 **Build plan (organized around the three foundations):**
 
@@ -525,8 +528,9 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Calibration view (recruiter vs AI confidence over time)
 
 **What's next (immediate):**
-- Phase 1 remaining: Stage-Gate Agent Flows, Custom Hiring Process per Role, Recruiter vs AI Confidence
-- Phase 2 (Surface): Actions Tray as Desk's home (loop output as primary surface), CandidateCard and RoleDetail collapse into side panels, mobile experience, push notifications
+- **Commit C:** LogForm collapse — unified single log+debrief form. Single notes textarea IS the debrief raw input. Save fires background extraction. No modal, no review phase. Extracted signals surface as action card on Desk. Resolves CF-2 (notes = debrief raw) and CF-3 (smart role default).
+- **Commit D:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
+- **Commit E:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
 - Phase 3 (Ingestion): Onboarding pipeline paste, bulk file ingestion, Gmail integration, calendar, call tools
 - Phase 4 (Polish): Beautiful UI, deal scorecard, close sequence generator, calibration view
 
