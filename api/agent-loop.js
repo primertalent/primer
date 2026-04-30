@@ -154,14 +154,23 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
     messages,
   })
 
-  const raw     = aiResponse.content[0]?.text ?? ''
-  const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+  const raw = aiResponse.content.find(b => b.type === 'text')?.text ?? ''
 
-  let parsed
-  try {
-    parsed = JSON.parse(cleaned)
-  } catch {
-    console.error('[agent-loop] JSON parse failed for recruiter', recruiterId, raw.slice(0, 200))
+  // Try direct parse, then strip markdown fences, then regex-extract first JSON object.
+  let parsed = null
+  const attempts = [
+    raw.trim(),
+    raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim(),
+  ]
+  for (const attempt of attempts) {
+    try { parsed = JSON.parse(attempt); break } catch {}
+  }
+  if (!parsed) {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match) try { parsed = JSON.parse(match[0]) } catch {}
+  }
+  if (!parsed) {
+    console.error('[agent-loop] JSON parse failed for recruiter', recruiterId, raw.slice(0, 300))
     return { recruiter_id: recruiterId, actions_written: 0, parse_error: true }
   }
 

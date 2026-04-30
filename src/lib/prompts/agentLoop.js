@@ -74,7 +74,7 @@ ${contextBlock}`
   return {
     system,
     messages: [{ role: 'user', content: message }],
-    maxTokens: 1200,
+    maxTokens: 2000,
   }
 }
 
