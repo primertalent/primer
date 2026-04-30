@@ -1219,8 +1219,9 @@ function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipel
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function CandidateCard() {
-  const { id } = useParams()
+export default function CandidateCard({ id: idProp, onClose }) {
+  const { id: paramId } = useParams()
+  const id = idProp ?? paramId
   const navigate = useNavigate()
   const { recruiter } = useRecruiter()
   const { fireResponse, registerAction, unregisterAction } = useAgent()
@@ -1736,7 +1737,7 @@ export default function CandidateCard() {
       ])
       const { error } = await supabase.from('candidates').delete().eq('id', id)
       if (error) throw error
-      navigate('/network')
+      if (onClose) onClose(); else navigate('/network')
     } catch {
       setDeleteError('Delete failed. Try again.')
       setDeleting(false)
@@ -2344,20 +2345,24 @@ export default function CandidateCard() {
 
   // ── Render states ────────────────────────────────────────
 
+  const isPanel = Boolean(onClose)
+
   if (loading) {
-    return <AppLayout><div className="loading-state"><div className="spinner" /></div></AppLayout>
+    const s = <div className="loading-state"><div className="spinner" /></div>
+    return isPanel ? s : <AppLayout>{s}</AppLayout>
   }
 
   if (notFound) {
-    return (
-      <AppLayout>
-        <div className="page-error">
-          <p className="page-error-title">Candidate not found.</p>
-          <p className="page-error-body">This record may have been deleted or you may not have access.</p>
-          <button className="btn-ghost" onClick={() => navigate('/network')}>Back to Network</button>
-        </div>
-      </AppLayout>
+    const s = (
+      <div className="page-error">
+        <p className="page-error-title">Candidate not found.</p>
+        <p className="page-error-body">This record may have been deleted or you may not have access.</p>
+        <button className="btn-ghost" onClick={() => onClose ? onClose() : navigate('/network')}>
+          {isPanel ? 'Close' : 'Back to Network'}
+        </button>
+      </div>
     )
+    return isPanel ? s : <AppLayout>{s}</AppLayout>
   }
 
   const fullName = `${candidate.first_name} ${candidate.last_name}`
@@ -2369,13 +2374,13 @@ export default function CandidateCard() {
       }, null)
     : null
 
-  return (
-    <AppLayout>
+  const __body = (
+    <>
 
         {/* Page header — back + Zone C only */}
         <div className="page-header">
           <div className="page-header-left">
-            <button className="btn-back" onClick={() => navigate('/network')}>← Back</button>
+            <button className="btn-back" onClick={() => onClose ? onClose() : navigate('/network')}>← Back</button>
           </div>
           <div className="page-header-actions" style={{ position: 'relative' }}>
             <button className="btn-ghost btn-sm" onClick={() => setZoneCOpen(v => !v)}>⋯ More</button>
@@ -3279,6 +3284,7 @@ export default function CandidateCard() {
         />
       )}
 
-    </AppLayout>
+    </>
   )
+  return isPanel ? __body : <AppLayout>{__body}</AppLayout>
 }

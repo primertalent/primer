@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import AppLayout from '../components/AppLayout'
 import ActionCard from '../components/ActionCard'
+import SidePanel from '../components/SidePanel'
 import WrenCommand from '../components/WrenCommand'
+import CandidateCard from './CandidateCard'
+import RoleDetail from './RoleDetail'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { useAgent } from '../context/AgentContext'
 import { supabase } from '../lib/supabase'
@@ -15,7 +18,15 @@ export default function Desk() {
   const [hasAnyHistory, setHasAnyHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [intakeOpen, setIntakeOpen] = useState(false)
+  const [panel, setPanel] = useState({ type: null, id: null })
   const loadedRef = useRef(false)
+
+  function openPanel(action) {
+    if (action.candidateId) setPanel({ type: 'candidate', id: action.candidateId })
+    else if (action.roleId)  setPanel({ type: 'role',      id: action.roleId })
+  }
+
+  function closePanel() { setPanel({ type: null, id: null }) }
 
   useEffect(() => {
     if (!recruiter?.id || loadedRef.current) return
@@ -170,6 +181,7 @@ export default function Desk() {
                 onDismiss={() => handleDismiss(action)}
                 onSnooze={action.ephemeral ? null : () => handleSnooze(action)}
                 onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
+                onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
               />
             ))}
           </div>
@@ -193,6 +205,18 @@ export default function Desk() {
         )}
 
       </div>
+
+      {panel.id && (
+        <SidePanel onClose={closePanel}>
+          {panel.type === 'candidate' && (
+            <CandidateCard id={panel.id} onClose={closePanel} />
+          )}
+          {panel.type === 'role' && (
+            <RoleDetail id={panel.id} onClose={closePanel} />
+          )}
+        </SidePanel>
+      )}
+
     </AppLayout>
   )
 }

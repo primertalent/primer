@@ -13,7 +13,7 @@ const DEFAULT_CHIPS = {
 const URGENCY_LABEL = { now: 'Now', today: 'Today' }
 const URGENCY_CLASS = { now: 'action-urgency--now', today: 'action-urgency--today' }
 
-export default function ActionCard({ action, onDismiss, onSnooze, onChipClick }) {
+export default function ActionCard({ action, onDismiss, onSnooze, onChipClick, onCardClick }) {
   const chips = action.suggestions?.length
     ? action.suggestions
     : (DEFAULT_CHIPS[action.action_type] ?? [])
@@ -28,8 +28,11 @@ export default function ActionCard({ action, onDismiss, onSnooze, onChipClick })
   const urgencyClass = action.ephemeral ? 'action-urgency--live' : (URGENCY_CLASS[action.urgency] ?? '')
 
   return (
-    <div className={`action-card${action.ephemeral ? ' action-card--ephemeral' : ''}`}>
-      <div className="action-card-header">
+    <div
+      className={`action-card${action.ephemeral ? ' action-card--ephemeral' : ''}${onCardClick ? ' action-card--clickable' : ''}`}
+      onClick={onCardClick}
+    >
+      <div className="action-card-header" onClick={e => e.stopPropagation()}>
         <div className="action-card-meta">
           {urgencyLabel && (
             <span className={`action-urgency ${urgencyClass}`}>{urgencyLabel}</span>
@@ -58,7 +61,7 @@ export default function ActionCard({ action, onDismiss, onSnooze, onChipClick })
       )}
 
       {chips.length > 0 && (
-        <div className="action-chips">
+        <div className="action-chips" onClick={e => e.stopPropagation()}>
           {chips.slice(0, 3).map((s, i) => (
             <button
               key={i}

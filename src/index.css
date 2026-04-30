@@ -6979,3 +6979,39 @@ select.field-input {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
 }
+
+.action-card--clickable {
+  cursor: pointer;
+}
+
+.action-card--clickable:hover {
+  border-color: var(--color-accent-hover);
+}
+
+/* ── Side Panel ──────────────────────────────────────────── */
+
+.side-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.side-panel {
+  width: 100%;
+  max-width: 680px;
+  height: 100%;
+  background: var(--color-bg);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}

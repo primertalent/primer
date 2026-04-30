@@ -392,8 +392,9 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function RoleDetail() {
-  const { id }          = useParams()
+export default function RoleDetail({ id: idProp, onClose }) {
+  const { id: paramId } = useParams()
+  const id              = idProp ?? paramId
   const navigate        = useNavigate()
   const { recruiter }   = useRecruiter()
   const { fireResponse, registerAction, unregisterAction } = useAgent()
@@ -678,7 +679,7 @@ export default function RoleDetail() {
     if (!window.confirm(`Delete "${role.title}"? This cannot be undone.`)) return
     setDeleting(true)
     await supabase.from('roles').delete().eq('id', id)
-    navigate('/roles')
+    if (onClose) onClose(); else navigate('/roles')
   }
 
   async function handleBuildSearchStrings() {
@@ -827,31 +828,36 @@ export default function RoleDetail() {
 
   // ── Loading / error states ──────────────────────────────
 
+  const isPanel = Boolean(onClose)
+
   if (loading) {
-    return <AppLayout><div className="loading-state"><div className="spinner" /></div></AppLayout>
+    const s = <div className="loading-state"><div className="spinner" /></div>
+    return isPanel ? s : <AppLayout>{s}</AppLayout>
   }
 
   if (fetchError) {
-    return (
-      <AppLayout>
-        <div className="page-error">
-          <p className="page-error-title">Couldn't load this role.</p>
-          <p className="page-error-body">Check the browser console for details, then try refreshing.</p>
-          <button className="btn-ghost" onClick={() => navigate('/roles')}>Back to Roles</button>
-        </div>
-      </AppLayout>
+    const s = (
+      <div className="page-error">
+        <p className="page-error-title">Couldn't load this role.</p>
+        <p className="page-error-body">Check the browser console for details, then try refreshing.</p>
+        <button className="btn-ghost" onClick={() => onClose ? onClose() : navigate('/roles')}>
+          {isPanel ? 'Close' : 'Back to Roles'}
+        </button>
+      </div>
     )
+    return isPanel ? s : <AppLayout>{s}</AppLayout>
   }
 
   if (notFound) {
-    return (
-      <AppLayout>
-        <div className="page-error">
-          <p className="page-error-title">Role not found.</p>
-          <button className="btn-ghost" onClick={() => navigate('/roles')}>Back to Roles</button>
-        </div>
-      </AppLayout>
+    const s = (
+      <div className="page-error">
+        <p className="page-error-title">Role not found.</p>
+        <button className="btn-ghost" onClick={() => onClose ? onClose() : navigate('/roles')}>
+          {isPanel ? 'Close' : 'Back to Roles'}
+        </button>
+      </div>
     )
+    return isPanel ? s : <AppLayout>{s}</AppLayout>
   }
 
   // ── Derived state ───────────────────────────────────────
@@ -877,14 +883,14 @@ export default function RoleDetail() {
 
   // ── Render ──────────────────────────────────────────────
 
-  return (
-    <AppLayout>
+  const __body = (
+    <>
 
       {/* Sticky Role Status Bar */}
       <RoleStatusBar
         role={role}
         pipeline={pipeline}
-        onBack={() => navigate('/roles')}
+        onBack={() => onClose ? onClose() : navigate('/roles')}
         healthPills={healthPills}
         nextAction={nextAction}
         onPillClick={handlePillClick}
@@ -1268,6 +1274,7 @@ export default function RoleDetail() {
         </div>
       )}
 
-    </AppLayout>
+    </>
   )
+  return isPanel ? __body : <AppLayout>{__body}</AppLayout>
 }
