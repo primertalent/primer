@@ -15,6 +15,7 @@ import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGene
 import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
 import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
 import { buildCallPrepMessages } from '../lib/prompts/callPrep'
+import { buildConfidenceScoreMessages } from '../lib/prompts/confidenceScore'
 import { urgencyClass } from '../lib/urgency'
 import { useAgent } from '../context/AgentContext'
 
@@ -972,6 +973,8 @@ function DealStatusBar({ candidate, pipelines, debriefs, interactions, onOpenCom
   const aiScore = primary?.fit_score != null ? Math.round(primary.fit_score) : null
   const recruiterScore = primary?.recruiter_score ?? null
   const aiScoreClass = aiScore == null ? '' : aiScore >= 70 ? 'cc-sticky-score--green' : aiScore >= 40 ? 'cc-sticky-score--amber' : 'cc-sticky-score--red'
+  const confAI = primary?.ai_confidence_post ?? null
+  const confRecruiter = primary?.recruiter_confidence_post ?? null
 
   const daysInStage = primary?.updated_at ? daysSince(primary.updated_at) : null
   const stageParts = [
@@ -1013,6 +1016,13 @@ function DealStatusBar({ candidate, pipelines, debriefs, interactions, onOpenCom
             )}
             {recruiterScore != null && (
               <span className="cc-sticky-score cc-sticky-score--recruiter">You {recruiterScore}</span>
+            )}
+            {(confAI != null || confRecruiter != null) && (
+              <>
+                <span className="cc-sticky-score-divider">·</span>
+                {confAI != null && <span className="cc-sticky-score cc-sticky-score--conf">W{confAI}</span>}
+                {confRecruiter != null && <span className="cc-sticky-score cc-sticky-score--conf-recruiter">Y{confRecruiter}</span>}
+              </>
             )}
           </div>
         )}
@@ -1275,7 +1285,7 @@ export default function CandidateCard() {
 
   // Interaction log form
   const [logOpen, setLogOpen] = useState(false)
-  const [logForm, setLogForm] = useState({ type: 'call', direction: 'outbound', occurred_at: '', body: '' })
+  const [logForm, setLogForm] = useState({ type: 'call', direction: 'outbound', occurred_at: '', body: '', confidence: '' })
   const [logSaving, setLogSaving] = useState(false)
   const [logError, setLogError] = useState(null)
 
@@ -1291,6 +1301,7 @@ export default function CandidateCard() {
     extracted: null,
     reviewSummary: '',
     reviewNextAction: '',
+    confidence_post: '',
     error: null,
   })
 
@@ -1654,7 +1665,7 @@ export default function CandidateCard() {
 
   function handleLogOpen() {
     const today = new Date().toISOString().slice(0, 16) // "YYYY-MM-DDTHH:MM"
-    setLogForm({ type: 'call', direction: 'outbound', occurred_at: today, body: '' })
+    setLogForm({ type: 'call', direction: 'outbound', occurred_at: today, body: '', confidence: '' })
     setLogError(null)
     setLogOpen(true)
   }
@@ -1681,6 +1692,28 @@ export default function CandidateCard() {
     } else {
       setInteractions(prev => [data, ...prev])
       setLogOpen(false)
+
+      // Save pre-confidence if entered on a call/meeting with an active pipeline
+      const preConf = logForm.confidence ? parseInt(logForm.confidence, 10) : null
+      if (preConf && preConf >= 1 && preConf <= 10 && pipelines[0]) {
+        const pipelineId = pipelines[0].id
+        supabase.from('pipeline').update({ recruiter_confidence_pre: preConf }).eq('id', pipelineId)
+        setPipelines(prev => prev.map(p => p.id === pipelineId ? { ...p, recruiter_confidence_pre: preConf } : p))
+        ;(async () => {
+          try {
+            const { system, messages, maxTokens } = buildConfidenceScoreMessages('pre', {
+              candidate, pipelineEntry: pipelines[0], debriefs, interactions,
+            })
+            const text = await generateText({ system, messages, maxTokens })
+            const aiConf = parseInt(text.trim(), 10)
+            if (aiConf >= 1 && aiConf <= 10) {
+              await supabase.from('pipeline').update({ ai_confidence_pre: aiConf }).eq('id', pipelineId)
+              setPipelines(prev => prev.map(p => p.id === pipelineId ? { ...p, ai_confidence_pre: aiConf } : p))
+            }
+          } catch { /* non-critical */ }
+        })()
+      }
+
       fireResponse('interaction_logged', {
         candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
         interaction: { type: logForm.type, occurred_at: data.occurred_at },
@@ -1832,7 +1865,7 @@ export default function CandidateCard() {
   }
 
   async function handleSaveDebrief() {
-    const { extracted, reviewSummary, reviewNextAction, interactionId, pipelineId, outcome, raw } = debriefModal
+    const { extracted, reviewSummary, reviewNextAction, confidence_post, interactionId, pipelineId, outcome, raw } = debriefModal
     if (!extracted) return
     setDebriefModal(prev => ({ ...prev, phase: 'saving' }))
 
@@ -1904,6 +1937,37 @@ export default function CandidateCard() {
     }
 
     closeDebriefModal()
+
+    // Save post-confidence and check divergence in background
+    const postConf = confidence_post ? parseInt(confidence_post, 10) : null
+    if (postConf && postConf >= 1 && postConf <= 10 && resolvedPipelineId) {
+      supabase.from('pipeline').update({ recruiter_confidence_post: postConf }).eq('id', resolvedPipelineId)
+      setPipelines(prev => prev.map(p => p.id === resolvedPipelineId ? { ...p, recruiter_confidence_post: postConf } : p))
+      ;(async () => {
+        try {
+          const freshDebriefs = [saved, ...debriefs]
+          const { system, messages, maxTokens } = buildConfidenceScoreMessages('post', {
+            candidate, pipelineEntry: resolvedPipeline, debriefs: freshDebriefs, interactions,
+          })
+          const text = await generateText({ system, messages, maxTokens })
+          const aiConf = parseInt(text.trim(), 10)
+          if (aiConf >= 1 && aiConf <= 10) {
+            await supabase.from('pipeline').update({ ai_confidence_post: aiConf }).eq('id', resolvedPipelineId)
+            setPipelines(prev => prev.map(p => p.id === resolvedPipelineId ? { ...p, ai_confidence_post: aiConf } : p))
+            if (Math.abs(postConf - aiConf) >= 3) {
+              fireResponse('confidence_divergence', {
+                candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
+                recruiter_confidence: postConf,
+                ai_confidence: aiConf,
+                divergence: Math.abs(postConf - aiConf),
+                direction: postConf > aiConf ? 'recruiter_higher' : 'wren_higher',
+                role_title: resolvedPipeline?.roles?.title,
+              })
+            }
+          }
+        } catch { /* non-critical */ }
+      })()
+    }
   }
 
   async function handleAddToRole(role) {
@@ -2510,6 +2574,18 @@ export default function CandidateCard() {
                   <input type="datetime-local" className="log-date" value={logForm.occurred_at} onChange={e => setLogForm(f => ({ ...f, occurred_at: e.target.value }))} />
                 </div>
                 <textarea className="log-textarea" placeholder="Notes…" rows={3} value={logForm.body} onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))} />
+                {(logForm.type === 'call' || logForm.type === 'meeting') && (
+                  <div className="confidence-inline">
+                    <label className="confidence-label">Your confidence on this candidate? (1–10)</label>
+                    <input
+                      type="number" min="1" max="10"
+                      className="confidence-input"
+                      placeholder="—"
+                      value={logForm.confidence}
+                      onChange={e => setLogForm(f => ({ ...f, confidence: e.target.value }))}
+                    />
+                  </div>
+                )}
                 {logError && <p className="error" style={{ marginTop: 4 }}>{logError}</p>}
                 <div className="log-form-actions">
                   <button className="btn-primary btn-sm" onClick={handleLogSave} disabled={logSaving}>{logSaving ? 'Saving…' : 'Save'}</button>
@@ -3180,6 +3256,16 @@ export default function CandidateCard() {
                       </ul>
                     </div>
                   )}
+                </div>
+                <div className="debrief-confidence-row">
+                  <label className="confidence-label">Your confidence after this call? (1–10)</label>
+                  <input
+                    type="number" min="1" max="10"
+                    className="confidence-input"
+                    placeholder="Optional"
+                    value={debriefModal.confidence_post}
+                    onChange={e => setDebriefModal(prev => ({ ...prev, confidence_post: e.target.value }))}
+                  />
                 </div>
                 <div className="modal-actions">
                   <button

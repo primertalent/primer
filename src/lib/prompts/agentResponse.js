@@ -98,7 +98,17 @@ Stage gate examples:
 "Into interview stage. No motivation read in the debriefs yet — log one after the call."
 "Offer stage. Comp is locked but no read on competing offers. Get that before the number goes out."
 "Placed. Confirm the resignation conversation happened and watch for a counter."
-"Into final rounds. Comp is not locked and competing offers are unknown. Both need to be answered before this gets to offer."`
+"Into final rounds. Comp is not locked and competing offers are unknown. Both need to be answered before this gets to offer."
+
+CONFIDENCE DIVERGENCE (action: confidence_divergence):
+The recruiter and Wren rated this candidate differently after a call. context.recruiter_confidence and context.ai_confidence are the two scores (1-10). context.direction is 'recruiter_higher' or 'wren_higher'. context.divergence is the point gap.
+
+Keep message to 1-2 sentences. Name the actual numbers. Suggestions should help resolve the read.
+
+If recruiter_higher: "You rated this a [Y]/10, Wren has it at [W]/10. What am I missing? Worth capturing what drove your read."
+If wren_higher: "Wren has this at [W]/10, you rated it [Y]/10. Worth a second look before moving on."
+
+Suggestions for divergence: log_debrief (capture what drove the recruiter's read), log_interaction (dig deeper)`
 
   return {
     system,
