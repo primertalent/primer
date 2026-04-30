@@ -52,7 +52,7 @@ SUGGESTION RULES:
   set_expected_comp, draft_outreach, find_network_fits, build_search_strings, queue_follow_up,
   log_interaction, draft_urgency_note, prep_call
 - For prep_call: include prep_type in context — one of: prep_interview, lock_comp, prep_counter
-- Pass relevant IDs and names in each suggestion's context object so the action can execute
+- Do NOT include candidate_id, pipeline_id, or role_id in context — entity IDs are resolved by the platform from the action's linked entity, not from the suggestion context. Adding them causes navigation failures.
 
 Good message examples:
 "Got it. Inworld AE role saved. What is your fee on this one?"

@@ -63,7 +63,7 @@ export default function ActionCard({ action, onDismiss, onSnooze, onChipClick })
             <button
               key={i}
               className={`action-chip${i === 0 ? ' action-chip--primary' : ''}`}
-              onClick={() => onChipClick(s.action, { ...chipContext, ...(s.context ?? {}) })}
+              onClick={() => onChipClick(s.action, { ...(s.context ?? {}), ...chipContext })}
             >
               {s.label}
             </button>
