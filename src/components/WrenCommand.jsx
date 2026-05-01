@@ -1114,21 +1114,22 @@ export default function WrenCommand() {
           recruiter={recruiter}
           jdChips={jdChips}
           onClear={() => setResult(null)}
-          onSaved={({ candidateId, candidate, role, screening }) => {
+          onSaved={({ candidateId, roleId, candidate, role, screening }) => {
             if (candidateId) {
               fireResponse('candidate_created', {
                 candidate: {
+                  id:              candidateId,
                   name:            candidate?.name,
                   current_title:   candidate?.current_title,
                   current_company: candidate?.current_company,
                 },
-                role:     role ? { title: role.title, company: role.company } : null,
+                role:     role ? { id: roleId, title: role.title, company: role.company } : null,
                 screening: screening ? { score: screening.score } : null,
               })
-            } else {
+            } else if (roleId) {
               fireResponse('role_saved', {
-                candidate_present: false,
-                role: role ? { title: role.title, company: role.company } : null,
+                role_id:           roleId,
+                role: role ? { id: roleId, title: role.title, company: role.company } : null,
               })
             }
           }}
@@ -1140,9 +1141,10 @@ export default function WrenCommand() {
           recruiter={recruiter}
           jdChips={jdChips}
           onClear={() => setMultiResult(null)}
-          onSaved={({ candidate, rankings }) => {
+          onSaved={({ candidateId, candidate, rankings }) => {
             fireResponse('candidate_created', {
               candidate: {
+                id:              candidateId,
                 name:            candidate?.name,
                 current_title:   candidate?.current_title,
                 current_company: candidate?.current_company,

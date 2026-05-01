@@ -10,11 +10,20 @@ const DEFAULT_CHIPS = {
   mcp_opportunity:    [{ label: 'Draft submission', action: 'draft_submission' }],
 }
 
+// build_search_strings auto-fires on role creation — never show as a manual chip.
+// Role-only actions require a role_id; candidate-only actions require a candidate_id.
+const ROLE_ONLY_ACTIONS = new Set(['add_fee', 'build_search_strings'])
+const CANDIDATE_ONLY_ACTIONS = new Set([
+  'log_debrief', 'log_interaction', 'set_expected_comp', 'draft_submission',
+  'draft_outreach', 'queue_follow_up', 'draft_urgency_note',
+  'prep_for_interview', 'prep_call', 'screen_against_role',
+])
+
 const URGENCY_LABEL = { now: 'Now', today: 'Today' }
 const URGENCY_CLASS = { now: 'action-urgency--now', today: 'action-urgency--today' }
 
 export default function ActionCard({ action, onDismiss, onSnooze, onComplete, onChipClick, onCardClick }) {
-  const chips = action.suggestions?.length
+  const rawChips = action.suggestions?.length
     ? action.suggestions
     : (DEFAULT_CHIPS[action.action_type] ?? [])
 
@@ -23,6 +32,15 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
     pipeline_id:  action.pipelineId ?? null,
     role_id:      action.roleId ?? null,
   }
+
+  // Suppress build_search_strings (auto-fires on role creation).
+  // Drop role-only chips when no role_id, candidate-only chips when no candidate_id.
+  const chips = rawChips.filter(chip => {
+    if (chip.action === 'build_search_strings') return false
+    if (ROLE_ONLY_ACTIONS.has(chip.action) && !chipContext.role_id) return false
+    if (CANDIDATE_ONLY_ACTIONS.has(chip.action) && !chipContext.candidate_id) return false
+    return true
+  })
 
   const urgencyLabel = URGENCY_LABEL[action.urgency]
   const urgencyClass = action.ephemeral ? 'action-urgency--live' : (URGENCY_CLASS[action.urgency] ?? '')

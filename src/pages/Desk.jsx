@@ -93,7 +93,7 @@ export default function Desk() {
 
     const [pipeRes, candRes, roleRes] = await Promise.all([
       pipelineIds.length
-        ? supabase.from('pipeline').select('id, candidates(id, first_name, last_name), roles(title, clients(name))').in('id', pipelineIds)
+        ? supabase.from('pipeline').select('id, candidates(id, first_name, last_name), roles(id, title, clients(name))').in('id', pipelineIds)
         : { data: [] },
       candidateIds.length
         ? supabase.from('candidates').select('id, first_name, last_name').in('id', candidateIds)
@@ -112,6 +112,7 @@ export default function Desk() {
         entitySubtitle = p?.roles?.title ?? null
         candidateId = p?.candidates?.id ?? null
         pipelineId = a.linked_entity_id
+        roleId = p?.roles?.id ?? null
       } else if (a.linked_entity_type === 'candidate') {
         const c = (candRes.data ?? []).find(r => r.id === a.linked_entity_id)
         entityName = c ? `${c.first_name} ${c.last_name}`.trim() : null
