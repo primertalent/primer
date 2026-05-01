@@ -6,6 +6,30 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 22 — 2026-05-01
+**Card explosion fix. Four-layer dedup: prompt one-per-row, write-side gate, ephemeral key-replace, auto-debrief on interaction save.**
+
+**Fix 1 — agentLoop.js (prompt):**
+- Replaced "do not generate duplicate actions" guidance with hard rule: exactly one active_action per pipeline row, highest priority wins
+- Added URGENCY TIERING block: pre_pipeline and first_stage stages locked to "this_week" urgency unless a time-sensitive signal is present (interview scheduled today/tomorrow, offer pending, overdue follow-up >3 days, competing offer active)
+
+**Fix 2 — api/agent-loop.js (write-side gate):**
+- Before inserting any pipeline-linked action, queries for an existing undismissed/uncompleted/non-snoozed action on the same `linked_entity_id` where `linked_entity_type = 'pipeline'`
+- Urgency rank: NOW=3, TODAY=2, THIS_WEEK=1. If incoming rank ≤ existing → skip. If strictly higher → delete existing, insert new. Does not update in place (preserves content_hash idempotency)
+- Content hash check still runs first to block identical actions regardless of entity type
+
+**Fix 3 — AgentContext.jsx (ephemeral card map):**
+- Ephemeral card state changed from array to object map keyed by `pipelineId ?? candidateId ?? roleId ?? card.id`
+- New signal for same entity replaces old card instead of stacking
+- Exposed as sorted `Object.values(ephemeralMap)` array — Desk.jsx unchanged
+
+**Fix 4 — CandidateCard.jsx (auto-debrief on interaction save):**
+- `runBackgroundDebrief(savedInteraction)` added: fires debrief extraction automatically when an interaction with notes is saved
+- Runs in background (no await, no UI block). Saves extracted debrief to DB, updates pipeline next_action, fires `debrief_saved` fireResponse, auto-completes risk_flag + sharpening_ask actions
+- User pastes once — Wren logs the interaction and extracts the debrief. No separate trigger required.
+
+---
+
 ## Session 21 — 2026-05-01
 **V3 design system applied. Action card chip bugs fixed. Agent loop first run with real pipeline data.**
 

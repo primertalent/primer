@@ -32,15 +32,24 @@ function parseJson(text) {
 
 export function AgentProvider({ children }) {
   const navigate = useNavigate()
-  const [ephemeralCards, setEphemeralCards] = useState([])
+  // Keyed by entity ID (pipelineId ?? candidateId ?? roleId ?? card.id) so that
+  // a new signal for the same entity replaces the old card instead of stacking.
+  const [ephemeralMap, setEphemeralMap] = useState({})
   const registryRef = useRef(new Map())
 
   const addEphemeralCard = useCallback((card) => {
-    setEphemeralCards(prev => [card, ...prev])
+    const entityKey = card.pipelineId ?? card.candidateId ?? card.roleId ?? card.id
+    setEphemeralMap(prev => ({ ...prev, [entityKey]: card }))
   }, [])
 
-  const dismissEphemeralCard = useCallback((id) => {
-    setEphemeralCards(prev => prev.filter(c => c.id !== id))
+  const dismissEphemeralCard = useCallback((cardId) => {
+    setEphemeralMap(prev => {
+      const entry = Object.entries(prev).find(([, c]) => c.id === cardId)
+      if (!entry) return prev
+      const next = { ...prev }
+      delete next[entry[0]]
+      return next
+    })
   }, [])
 
   const fireResponse = useCallback((action, context) => {
@@ -146,6 +155,9 @@ export function AgentProvider({ children }) {
         break
     }
   }, [navigate])
+
+  const ephemeralCards = Object.values(ephemeralMap)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
   return (
     <AgentContext.Provider value={{

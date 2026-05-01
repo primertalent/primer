@@ -8,12 +8,12 @@ import { highestUrgencyClass } from '../lib/urgency'
 // ── Constants ─────────────────────────────────────────
 
 const SIGNAL_CONFIG = {
-  'Promoted':          { color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
-  'Long Tenure':       { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
-  'Fast Riser':        { color: '#6b21a8', bg: '#faf5ff', border: '#e9d5ff' },
-  'AI Experience':     { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc' },
-  "President's Club":  { color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
-  'Quota Buster':      { color: '#166534', bg: '#dcfce7', border: '#86efac' },
+  'Promoted':          { color: 'var(--signal-blue)',   bg: 'var(--chip)', border: 'var(--hair)' },
+  'Long Tenure':       { color: 'var(--signal-green)',  bg: 'var(--chip)', border: 'var(--hair)' },
+  'Fast Riser':        { color: 'var(--signal-purple)', bg: 'var(--chip)', border: 'var(--hair)' },
+  'AI Experience':     { color: 'var(--signal-teal)',   bg: 'var(--chip)', border: 'var(--hair)' },
+  "President's Club":  { color: 'var(--signal-amber)',  bg: 'var(--chip)', border: 'var(--hair)' },
+  'Quota Buster':      { color: 'var(--signal-green)',  bg: 'var(--chip)', border: 'var(--hair)' },
 }
 
 const ALL_SIGNALS = Object.keys(SIGNAL_CONFIG)
@@ -103,7 +103,7 @@ function SignalPips({ signals }) {
         )
       })}
       {arr.length > 3 && (
-        <span className="signal-badge" style={{ background: 'var(--color-bg)', color: 'var(--color-muted)', borderColor: 'var(--color-border)' }}>
+        <span className="signal-badge" style={{ background: 'var(--bg)', color: 'var(--mute)', borderColor: 'var(--hair)' }}>
           +{arr.length - 3}
         </span>
       )}
@@ -433,7 +433,7 @@ export default function Candidates() {
                         {c.first_name} {c.last_name}
                       </Link>
                       {(c.current_title || c.current_company) && (
-                        <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                        <span style={{ display: 'block', fontSize: 12, color: 'var(--mute)', marginTop: 2 }}>
                           {[c.current_title, c.current_company].filter(Boolean).join(' · ')}
                         </span>
                       )}

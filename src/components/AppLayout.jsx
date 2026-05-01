@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import birdMark from '../../wren-bird-mark.png'
 
 export default function AppLayout({ children, fullBleed = false }) {
   const { signOut } = useAuth()
@@ -7,7 +8,10 @@ export default function AppLayout({ children, fullBleed = false }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="wordmark">Wren</span>
+        <div className="masthead">
+          <img src={birdMark} className="bird-mark" alt="" aria-hidden="true" />
+          <span className="wordmark">Wren</span>
+        </div>
         <nav className="app-nav">
           <NavLink
             to="/desk"

@@ -107,12 +107,12 @@ function computeTenureSummary(timeline) {
 // ── Signal badge config ───────────────────────────────
 
 const SIGNAL_CONFIG = {
-  'Promoted':        { color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
-  'Long Tenure':     { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
-  'Fast Riser':      { color: '#6b21a8', bg: '#faf5ff', border: '#e9d5ff' },
-  'AI Experience':   { color: '#0e7490', bg: '#ecfeff', border: '#a5f3fc' },
-  "President's Club":{ color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
-  'Quota Buster':    { color: '#166534', bg: '#dcfce7', border: '#86efac' },
+  'Promoted':        { color: 'var(--signal-blue)',   bg: 'var(--chip)', border: 'var(--hair)' },
+  'Long Tenure':     { color: 'var(--signal-green)',  bg: 'var(--chip)', border: 'var(--hair)' },
+  'Fast Riser':      { color: 'var(--signal-purple)', bg: 'var(--chip)', border: 'var(--hair)' },
+  'AI Experience':   { color: 'var(--signal-teal)',   bg: 'var(--chip)', border: 'var(--hair)' },
+  "President's Club":{ color: 'var(--signal-amber)',  bg: 'var(--chip)', border: 'var(--hair)' },
+  'Quota Buster':    { color: 'var(--signal-green)',  bg: 'var(--chip)', border: 'var(--hair)' },
 }
 
 // ── Comp range parser ─────────────────────────────────────
@@ -1759,6 +1759,72 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
     setLogOpen(true)
   }
 
+  async function runBackgroundDebrief(savedInteraction) {
+    if (!candidate || !savedInteraction.body?.trim()) return
+    const pipeline = pipelines[0] ?? null
+    const role = pipeline?.roles ?? null
+    const stage = pipeline?.current_stage ?? null
+    try {
+      const messages = buildDebriefExtractorMessages(candidate, role, stage, debriefs, savedInteraction.body)
+      const raw = await generateText({ messages, maxTokens: 2048 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      const extracted = JSON.parse(cleaned)
+
+      const resolvedPipelineId = pipeline?.id ?? null
+      const payload = {
+        recruiter_id:           recruiter.id,
+        candidate_id:           id,
+        pipeline_id:            resolvedPipelineId,
+        role_id:                pipeline?.role_id ?? null,
+        interaction_id:         savedInteraction.id,
+        outcome:                'neutral',
+        feedback_raw:           savedInteraction.body,
+        summary:                extracted.summary ?? '',
+        motivation_signals:     extracted.motivation_signals ?? [],
+        competitive_signals:    extracted.competitive_signals ?? [],
+        risk_flags:             extracted.risk_flags ?? [],
+        positive_signals:       extracted.positive_signals ?? [],
+        hiring_manager_signals: extracted.hiring_manager_signals ?? [],
+        objections:             extracted.risk_flags ?? [],
+        strengths:              extracted.positive_signals ?? [],
+        next_action:            extracted.next_action ?? '',
+        questions_to_ask_next:  extracted.questions_to_ask_next ?? [],
+        updates_to_record:      extracted.updates_to_record ?? [],
+      }
+
+      const { data: saved, error: saveErr } = await supabase.from('debriefs').insert(payload).select().single()
+      if (saveErr) { console.warn('[auto-debrief] save failed:', saveErr.message); return }
+
+      setDebriefs(prev => [saved, ...prev])
+
+      if (resolvedPipelineId && saved.next_action) {
+        await supabase.from('pipeline').update({ next_action: saved.next_action }).eq('id', resolvedPipelineId)
+        setPipelines(prev => prev.map(p =>
+          p.id === resolvedPipelineId ? { ...p, next_action: saved.next_action } : p
+        ))
+      }
+
+      fireResponse('debrief_saved', {
+        candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
+        debrief: {
+          summary:             saved.summary,
+          risk_flags:          saved.risk_flags ?? [],
+          motivation_signals:  saved.motivation_signals ?? [],
+          competitive_signals: saved.competitive_signals ?? [],
+          next_action:         saved.next_action,
+        },
+        pipeline: pipeline ? { id: pipeline.id, role_title: pipeline.roles?.title, current_stage: pipeline.current_stage } : null,
+      })
+
+      if (resolvedPipelineId) {
+        autoCompleteActions(resolvedPipelineId, 'pipeline', ['risk_flag', 'sharpening_ask'])
+          .then(ids => { if (ids.length) onActionsCompleted?.(ids) })
+      }
+    } catch (err) {
+      console.warn('[auto-debrief] extraction failed silently:', err.message)
+    }
+  }
+
   async function handleLogSave() {
     if (!logForm.body.trim()) { setLogError('Notes are required.'); return }
     setLogSaving(true)
@@ -1808,6 +1874,9 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
         interaction: { type: logForm.type, occurred_at: data.occurred_at },
         pipeline: pipelines[0] ? { id: pipelines[0].id, role_title: pipelines[0].roles?.title, current_stage: pipelines[0].current_stage } : null,
       })
+
+      // Auto-extract debrief from interaction notes in background — no await, never blocks UI
+      ;(async () => { await runBackgroundDebrief(data) })()
 
       // Auto-complete overdue follow-up actions for this pipeline
       if (pipelines[0]?.id) {

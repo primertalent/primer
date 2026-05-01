@@ -920,7 +920,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
               onChange={e => setFeePanelValue(e.target.value)}
               style={{ width: 100 }}
             />
-            {feePanelType === 'pct' && <span style={{ color: 'var(--color-muted)', fontSize: 13 }}>%</span>}
+            {feePanelType === 'pct' && <span style={{ color: 'var(--mute)', fontSize: 13 }}>%</span>}
             <button className="btn-primary btn-sm" onClick={handleFeeSave} disabled={feePanelSaving || !feePanelValue}>
               {feePanelSaving ? 'Saving…' : 'Save'}
             </button>
@@ -971,7 +971,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
             </div>
           )}
           {agmtOption === 'not_applicable' && (
-            <p style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 8 }}>
+            <p style={{ fontSize: 13, color: 'var(--mute)', marginBottom: 8 }}>
               The agreement pill will be hidden for this role.
             </p>
           )}
@@ -1155,7 +1155,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
       {stages.length === 0 ? (
         <p className="muted" style={{ marginBottom: 32 }}>
           No hiring stages defined.{' '}
-          <Link to={`/roles/${id}/edit`} style={{ color: 'var(--color-accent)' }}>
+          <Link to={`/roles/${id}/edit`} style={{ color: 'var(--ink)' }}>
             Edit this role
           </Link>{' '}
           to add stages.
@@ -1195,7 +1195,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
               <p className="role-jd-body">{jdToShow}</p>
               {rawJd && rawJd !== jdToShow && (
                 <details style={{ marginTop: 12 }}>
-                  <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-muted)', userSelect: 'none' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--mute)', userSelect: 'none' }}>
                     View raw JD
                   </summary>
                   <p className="role-jd-body" style={{ marginTop: 8, opacity: 0.65 }}>{rawJd}</p>

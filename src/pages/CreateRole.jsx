@@ -545,7 +545,7 @@ export default function CreateRole() {
                 min="0"
                 max="100"
               />
-              <span style={{ marginLeft: 8, color: 'var(--color-muted)', fontSize: 14 }}>%</span>
+              <span style={{ marginLeft: 8, color: 'var(--mute)', fontSize: 14 }}>%</span>
             </div>
           ) : (
             <div className="comp-input-wrap" style={{ marginTop: 8 }}>

@@ -148,7 +148,7 @@ function MessageCard({ message, onApprove, onHold, onSend, onSaveEdit, onDelete 
           <button className="btn-ghost btn-sm" onClick={handleHold} disabled={acting}>Hold</button>
         )}
         {isDrafted && !confirmDelete && (
-          <button className="btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--color-error)' }} onClick={() => setConfirmDelete(true)}>
+          <button className="btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--signal-red)' }} onClick={() => setConfirmDelete(true)}>
             Delete
           </button>
         )}

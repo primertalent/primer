@@ -58,9 +58,14 @@ REASONING RULES:
 LIMITS:
 - Max 6 active_actions per run (highest urgency and confidence first)
 - Max 3 sharpening_asks per run (most impactful gaps only)
+- Exactly one active_action per pipeline row. Reason through all gaps internally; surface only the single highest-priority action for that deal.
 - why and suggested_next_step: 1-2 sentences, specific and contextual, no hedging
-- Do not generate duplicate actions for the same pipeline
-- If the desk is empty or all data is very thin, return empty arrays rather than low-signal noise`
+- If the desk is empty or all data is very thin, return empty arrays rather than low-signal noise
+
+URGENCY TIERING:
+- If the stage is pre_pipeline or first_stage (Sourced, Outreach, Applied, or any early intake / screening stage), urgency must be "this_week" UNLESS a time-sensitive signal is present: an interview is scheduled today or tomorrow, an offer is pending, a follow-up is overdue by more than 3 days, or an active competing offer exists.
+- Middle, late, offer, and accepted stages may use "now" or "today" when the signal genuinely warrants it.
+- Default to the lowest urgency that fits the facts. Escalate only when the deal is genuinely at risk today.`
 
   const contextBlock = deskState.pipelines.length === 0
     ? 'No active pipeline entries.'

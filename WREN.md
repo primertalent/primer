@@ -492,6 +492,11 @@ If any answer is wrong, redesign or defer.
   - Action card chip fixes: WrenCommand now passes `candidateId`/`roleId` into fireResponse context; Desk pipeline enrichment includes `roles.id`; `build_search_strings` suppressed as manual chip; role/candidate chip filtering by entity ID presence.
   - Agent loop first successful run with real pipeline data: 3 actions generated for 1 pipeline row.
   - Sessions 3+4 pending: verdict pill (PUSH/PROTECT/HOLD/KILL) on action cards, confidence delta display (AI score vs recruiter score side-by-side).
+- **Card explosion fix (session 22):** Four-layer dedup across prompt, write gate, ephemeral state, and interaction flow.
+  - Prompt (`agentLoop.js`): hard one-per-pipeline-row rule + URGENCY TIERING block (early stages locked to THIS_WEEK unless time-sensitive signal present).
+  - Write gate (`api/agent-loop.js`): per-pipeline dedup before every insert — incoming urgency must be strictly higher than any existing active card for that row; otherwise skip. Delete-and-insert (not update) preserves content_hash idempotency.
+  - Ephemeral state (`AgentContext.jsx`): changed from append-array to keyed object map (`pipelineId ?? candidateId ?? roleId`). Same entity replaces old card rather than stacking.
+  - Auto-debrief (`CandidateCard.jsx`): `runBackgroundDebrief()` fires automatically on every interaction save with notes content. Extracts debrief, saves to DB, updates pipeline next_action, fires `debrief_saved` response, auto-completes risk/sharpening actions. User pastes once, Wren does both.
 
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
@@ -541,7 +546,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 **What's next (immediate):**
 - **V3 session 3:** Verdict pill on action cards — add `verdict` field (`push`/`protect`/`hold`/`kill`) to agent loop prompt output and `actions` table. ActionCard renders verdict pill in JetBrains Mono with Fraunces italic description. Unlocks 2-column card layout.
 - **V3 session 4:** Confidence delta on action cards — surface `fit_score` (AI) and `recruiter_score` (human) side-by-side when pipeline row is linked. Fraunces 28px numbers, JetBrains Mono labels.
-- **Commit D:** LogForm collapse — unified single log+debrief form. Single notes textarea IS the debrief raw input. Save fires background extraction. No modal, no review phase. Extracted signals surface as action card on Desk. Resolves CF-2 (notes = debrief raw) and CF-3 (smart role default).
+- **Commit D:** LogForm collapse — unified single log+debrief form. The auto-debrief background extraction is now wired (session 22). What remains: collapse the separate LogForm + DebrieModal UI into a single unified notes textarea; remove the manual debrief trigger from Zone A. Resolves CF-2 and CF-3.
 - **Commit E:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
 - **Commit F:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
 - Phase 3 (Ingestion): Onboarding pipeline paste, bulk file ingestion, Gmail integration, calendar, call tools

@@ -180,6 +180,8 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
   ]
 
   // ── Write to actions table (idempotent via content_hash) ──
+  const URGENCY_RANK = { now: 3, today: 2, this_week: 1 }
+
   let written = 0
   for (const action of allActions) {
     const hashStr    = `${recruiterId}:${action.linked_entity_id ?? ''}:${action.action_type}:${action.suggested_next_step ?? ''}`
@@ -188,14 +190,39 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
     // Skip if an active or completed action with this hash exists.
     // Dismissed actions (dismissed_at set) are allowed to regenerate.
     // Completed actions (acted_on_at set) are permanently suppressed.
-    const { data: existing } = await supabase
+    const { data: hashMatch } = await supabase
       .from('actions')
       .select('id')
       .eq('content_hash', contentHash)
       .is('dismissed_at', null)
       .maybeSingle()
 
-    if (existing) continue
+    if (hashMatch) continue
+
+    // Per-pipeline dedup gate: one active card per pipeline row.
+    // If an existing undismissed/uncompleted/non-snoozed card exists for this
+    // pipeline row and the incoming urgency is not strictly higher, skip.
+    // If incoming is strictly higher urgency, delete the old card and proceed.
+    if (action.linked_entity_type === 'pipeline' && action.linked_entity_id) {
+      const nowIso = new Date().toISOString()
+      const { data: existingRow } = await supabase
+        .from('actions')
+        .select('id, urgency')
+        .eq('linked_entity_id', action.linked_entity_id)
+        .eq('linked_entity_type', 'pipeline')
+        .is('dismissed_at', null)
+        .is('acted_on_at', null)
+        .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`)
+        .maybeSingle()
+
+      if (existingRow) {
+        const incomingRank = URGENCY_RANK[action.urgency] ?? 0
+        const existingRank = URGENCY_RANK[existingRow.urgency] ?? 0
+        if (incomingRank <= existingRank) continue
+        // Incoming urgency is strictly higher — remove stale card, let insert proceed
+        await supabase.from('actions').delete().eq('id', existingRow.id)
+      }
+    }
 
     const { error: insertErr } = await supabase.from('actions').insert({
       recruiter_id:        recruiterId,
