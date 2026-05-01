@@ -78,9 +78,12 @@ function calcCurrentValue(pipeline, role) {
   let total = 0
   for (const entry of pipeline) {
     if (!entry.expected_comp) continue
+    const compMidpoint = entry.expected_comp_high
+      ? (entry.expected_comp + entry.expected_comp_high) / 2
+      : entry.expected_comp
     const fee = role.placement_fee_flat
       ? role.placement_fee_flat
-      : entry.expected_comp * (role.placement_fee_pct ?? 0)
+      : compMidpoint * (role.placement_fee_pct ?? 0)
     total += fee
   }
   return total
@@ -485,7 +488,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
           .select(`
             id, current_stage, fit_score, fit_score_rationale,
             next_action, next_action_due_at,
-            candidate_id, recruiter_score, recruiter_note, expected_comp,
+            candidate_id, recruiter_score, recruiter_note, expected_comp, expected_comp_high,
             candidates(id, first_name, last_name, current_title)
           `)
           .eq('role_id', id)

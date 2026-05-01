@@ -139,6 +139,15 @@ export default function Desk() {
     await supabase.from('actions').update({ snoozed_until: until }).eq('id', action.id)
   }
 
+  async function handleComplete(action) {
+    setPersistedActions(prev => prev.filter(a => a.id !== action.id))
+    await supabase.from('actions').update({ acted_on_at: new Date().toISOString() }).eq('id', action.id)
+  }
+
+  function handleActionsCompleted(ids) {
+    setPersistedActions(prev => prev.filter(a => !ids.includes(a.id)))
+  }
+
   const sortedPersisted = [...persistedActions].sort((a, b) =>
     (URGENCY_RANK[a.urgency] ?? 3) - (URGENCY_RANK[b.urgency] ?? 3) ||
     new Date(b.created_at) - new Date(a.created_at)
@@ -180,6 +189,7 @@ export default function Desk() {
                 action={action}
                 onDismiss={() => handleDismiss(action)}
                 onSnooze={action.ephemeral ? null : () => handleSnooze(action)}
+                onComplete={action.ephemeral ? null : () => handleComplete(action)}
                 onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
                 onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
               />
@@ -209,7 +219,7 @@ export default function Desk() {
       {panel.id && (
         <SidePanel onClose={closePanel}>
           {panel.type === 'candidate' && (
-            <CandidateCard id={panel.id} onClose={closePanel} />
+            <CandidateCard id={panel.id} onClose={closePanel} onActionsCompleted={handleActionsCompleted} />
           )}
           {panel.type === 'role' && (
             <RoleDetail id={panel.id} onClose={closePanel} />

@@ -60,6 +60,24 @@
 
 ---
 
+---
+
+## Commit C — Out of Scope (captured 2026-04-30)
+
+The following items surfaced during Commit C scoping and are deferred:
+
+**OOS-1** — Rename "Work this deal" to a recruiter-desk-wide framing. Requires deciding the right framing for actions that apply across roles (not just the current deal). Deferred until the Actions Tray ships and the framing is clearer in practice.
+
+**OOS-2** — Let Generate (Zone B) pick a role context different from the current pipeline. Currently all Zone B actions use `pipelines[0]` as context. Allowing role selection inside the modal is CF-3 territory and bundles with the smart-role-default work.
+
+**OOS-3** — Consolidate multiple action cards per candidate into one card. Multiple agent loop actions for the same candidate create separate cards. The right consolidation pattern needs design work — which signals surface, which are suppressed, how priority is shown.
+
+**OOS-4** — Voice-driven generation ("Wren, give me interview questions for Attah for Hypercore"). Requires Web Speech API integration and intent parsing. Phase 3 / PWA work.
+
+**OOS-5** — Bulk PDF role import. Scope belongs in Phase 3 ingestion work alongside candidate and agreement bulk import.
+
+---
+
 ## What Resolves Automatically in the Strip Down
 Everything marked "Resolves in strip down" above disappears because:
 - WrenResponse bottom bar is removed — all modal vs WrenResponse collisions go away

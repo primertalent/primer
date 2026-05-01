@@ -6,6 +6,31 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 20 — 2026-04-30
+**Commit C + post-commit fixes. Sharpening pass shipped and hardened through real-use testing.**
+
+**Post-commit fixes (live testing revealed):**
+- **Side panel layout:** `side-panel-scroll` was missing padding, causing DSB negative margins to overflow and produce a horizontal scrollbar. Fixed: added `padding: 24px 24px 80px` and `overflow-x: hidden` to `side-panel-scroll`. Content now fits cleanly, no horizontal scroll.
+- **Comp edit discoverability:** `dsb-comp-value` was a button with no visual affordance — looked like inert text. Added `.dsb-comp-edit` CSS: `cursor: pointer`, hover accent color, pencil icon (`✎`) appears on hover.
+- **autoCompleteActions keyword broadening:** Filter was only checking `suggested_next_step` for comp keywords. Loop writes comp context into `why` field. Fixed: filter now checks both `why` and `suggested_next_step` with `/comp|expected|salary|compensation/i`.
+- **Desk visual sync on auto-complete:** `autoCompleteActions` was writing `acted_on_at` to DB but Desk state wasn't updating — cards stayed on screen until refresh. Root cause: UPDATE realtime subscription doesn't fire reliably (table lacks REPLICA IDENTITY FULL). Fix: `autoCompleteActions` now returns completed IDs; CandidateCard accepts `onActionsCompleted(ids)` prop; Desk passes `handleActionsCompleted` which filters `persistedActions` optimistically. Matches existing dismiss pattern exactly. UPDATE subscription removed. Three call sites wired: comp save, interaction save, debrief save.
+- Test data cleared from Supabase (51 rows). Recruiter and auth preserved.
+
+**Commit C — sharpening pass. Real-use friction resolved across Desk and side panel.**
+
+- **Item 4 (routing):** Back button on full-page CandidateCard now uses `navigate(-1)` with `/network` fallback. Panel mode was already correct.
+- **Item 7 (ESC):** SidePanel ESC already worked. Added capture-phase keydown handler in CandidateCard — inner modal ESC now closes the topmost modal before SidePanel's overlay handler fires. All 8 inner modals covered (sub, outreach, linkedin, pitch, iq, comp, debrief, editInteraction, logOpen).
+- **Item 5 (Add fee chip):** Removed "Add fee" from ActionCard DEFAULT_CHIPS for `missing_data`. Fee belongs to a role. Agent loop can still emit `add_fee` explicitly on role-linked actions.
+- **Item 8 (next_action):** Auto-regenerate on stage advance now writes to `pipeline.next_action` (not `candidates.enrichment_data`). Local `pipelines` state updated immediately. DealStatusBar already reads `pipeline.next_action` — display now correct. Empty state changed from "No next action" to "—".
+- **Item 1 (completion state):** Three action states: snooze, dismiss, complete. `acted_on_at` = complete (permanent suppression). Agent loop idempotency: removed `acted_on_at IS NULL` filter — completed rows now block re-generation, dismissed rows still allow it. ActionCard gets Complete button (persisted cards only). Desk adds `handleComplete` + UPDATE realtime subscription so cards disappear immediately on any acted_on_at/dismissed_at update.
+- **Item 2 (auto-complete):** `autoCompleteActions()` helper added to CandidateCard. Wired at three save sites: interaction save → complete `follow_up_overdue`; debrief save → complete `risk_flag` + `sharpening_ask`; comp save → complete `missing_data` (keyword-gated to comp-specific rows). `missing_data` is multi-condition so full completion is not safe — keyword heuristic on `suggested_next_step` is the V1 bound. Sub-type field logged as C.5 gap.
+- **Item 3 (comp range):** Migration `20260430000001_comp_range.sql` adds `expected_comp_high` (nullable numeric) to pipeline. Parser handles "150k", "150-200k", "$150,000-$200,000" → `{low, high}`. Display: `$150,000 – $200,000`. Comp modal changed to free-form text input with live preview. Edit affordance added (click existing comp value to re-open modal). Pipeline value uses midpoint when range set. `RoleDetail` query updated to fetch `expected_comp_high`.
+- **Item 6 (generate normalization):** All five Zone B generators now use modal pattern with editable textarea. Pitch + IQ moved from inline zone-b-result to dedicated modals. IQ JSON parsed and rendered as formatted `BEHAVIORAL / TECHNICAL QUESTIONS` sections (no more raw JSON display). Outreach and LinkedIn done-phases converted from read-only `<p>` to editable `<textarea>` / `<input>`. Submission already had editable textarea. ESC closes pitch/IQ modals via the inner-modal capture handler.
+- COLLISION_AUDIT.md: five Commit C out-of-scope items logged (OOS-1 through OOS-5).
+- WREN.md current state and What's Next updated. Commit D is now LogForm collapse (was C).
+
+---
+
 ## Session 19 — 2026-04-30
 **Phase 2 strip down — Commits A and B. SaaS shape → agent shape.**
 

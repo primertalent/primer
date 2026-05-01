@@ -2,7 +2,7 @@
 const DEFAULT_CHIPS = {
   follow_up_overdue:  [{ label: 'Log interaction', action: 'log_interaction' }, { label: 'Draft check-in', action: 'draft_urgency_note' }],
   risk_flag:          [{ label: 'Log debrief', action: 'log_debrief' }],
-  missing_data:       [{ label: 'Set comp', action: 'set_expected_comp' }, { label: 'Add fee', action: 'add_fee' }],
+  missing_data:       [{ label: 'Set comp', action: 'set_expected_comp' }],
   opportunity:        [{ label: 'Draft submission', action: 'draft_submission' }],
   stage_check:        [{ label: 'Log interaction', action: 'log_interaction' }],
   relationship_warm:  [{ label: 'Log interaction', action: 'log_interaction' }],
@@ -13,7 +13,7 @@ const DEFAULT_CHIPS = {
 const URGENCY_LABEL = { now: 'Now', today: 'Today' }
 const URGENCY_CLASS = { now: 'action-urgency--now', today: 'action-urgency--today' }
 
-export default function ActionCard({ action, onDismiss, onSnooze, onChipClick, onCardClick }) {
+export default function ActionCard({ action, onDismiss, onSnooze, onComplete, onChipClick, onCardClick }) {
   const chips = action.suggestions?.length
     ? action.suggestions
     : (DEFAULT_CHIPS[action.action_type] ?? [])
@@ -48,6 +48,11 @@ export default function ActionCard({ action, onDismiss, onSnooze, onChipClick, o
           {onSnooze && (
             <button className="action-snooze" onClick={onSnooze} title="Snooze 24 hours">
               snooze
+            </button>
+          )}
+          {onComplete && (
+            <button className="action-complete" onClick={onComplete} title="Mark complete">
+              done
             </button>
           )}
           <button className="action-dismiss" onClick={onDismiss} aria-label="Dismiss">×</button>

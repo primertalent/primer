@@ -115,6 +115,34 @@ const SIGNAL_CONFIG = {
   'Quota Buster':    { color: '#166534', bg: '#dcfce7', border: '#86efac' },
 }
 
+// ── Comp range parser ─────────────────────────────────────
+// Accepts free-form input: "150", "150k", "$150k", "150-200", "150k-200k",
+// "$150,000 - $200,000", "150,000-200,000". Returns { low, high } in whole dollars.
+
+function parseCompInput(raw) {
+  if (!raw) return null
+  const clean = raw.replace(/[$,\s]/g, '').toLowerCase()
+  const toNum = s => {
+    const n = parseFloat(s)
+    if (isNaN(n)) return null
+    return s.endsWith('k') ? Math.round(n * 1000) : n < 1000 ? Math.round(n * 1000) : Math.round(n)
+  }
+  const parts = clean.split(/[-–]/)
+  if (parts.length === 2) {
+    const low = toNum(parts[0])
+    const high = toNum(parts[1])
+    if (low && high && high > low) return { low, high }
+  }
+  const single = toNum(clean)
+  return single ? { low: single, high: null } : null
+}
+
+function formatCompRange(low, high) {
+  if (!low) return null
+  const fmt = n => '$' + Number(n).toLocaleString()
+  return high ? `${fmt(low)} – ${fmt(high)}` : fmt(low)
+}
+
 // ── Sub-components ────────────────────────────────────────
 
 function DetailRow({ label, value }) {
@@ -1051,11 +1079,13 @@ function DealStatusBar({ candidate, pipelines, debriefs, interactions, onOpenCom
           {primary?.next_action ? (
             <span className="dsb-next-action">{primary.next_action}</span>
           ) : (
-            <span className="dsb-next-action dsb-next-action--empty">No next action</span>
+            <span className="dsb-next-action dsb-next-action--empty">—</span>
           )}
           <div className="dsb-comp">
             {primary?.expected_comp != null ? (
-              <span className="dsb-comp-value">${primary.expected_comp.toLocaleString()}</span>
+              <button className="dsb-comp-value dsb-comp-edit" onClick={() => onOpenComp(primary)}>
+                {formatCompRange(primary.expected_comp, primary.expected_comp_high)}
+              </button>
             ) : (
               <button className="dsb-set-comp-chip" onClick={() => onOpenComp(primary)}>
                 Set comp
@@ -1219,7 +1249,7 @@ function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipel
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function CandidateCard({ id: idProp, onClose }) {
+export default function CandidateCard({ id: idProp, onClose, onActionsCompleted }) {
   const { id: paramId } = useParams()
   const id = idProp ?? paramId
   const navigate = useNavigate()
@@ -1340,9 +1370,9 @@ export default function CandidateCard({ id: idProp, onClose }) {
   // Interaction edit modal
   const [editInteractionModal, setEditInteractionModal] = useState({ open: false, interaction: null, linkedDebriefId: null })
 
-  // Zone B inline results
-  const [zoneBPitch, setZoneBPitch] = useState({ generating: false, result: null, error: null })
-  const [zoneBIQ, setZoneBIQ] = useState({ generating: false, result: null, error: null })
+  // Zone B modals (pitch + interview questions)
+  const [pitchModal, setPitchModal] = useState({ open: false, phase: 'idle', result: null, error: null })
+  const [iqModal, setIqModal] = useState({ open: false, phase: 'idle', result: null, error: null })
 
   // Submission draft modal
   const [subModal, setSubModal] = useState({
@@ -1439,6 +1469,30 @@ export default function CandidateCard({ id: idProp, onClose }) {
 
     fetchAll()
   }, [id, recruiter])
+
+  // Close inner modals on ESC before SidePanel's overlay handler fires.
+  // Uses capture phase so it intercepts ahead of SidePanel's document bubble listener.
+  useEffect(() => {
+    const anyOpen = subModal.open || outreachModal.open || linkedinModal.open ||
+      debriefModal.open || compModal.open || editInteractionModal.open || logOpen ||
+      pitchModal.open || iqModal.open
+    if (!anyOpen) return
+    function onKey(e) {
+      if (e.key !== 'Escape') return
+      e.stopImmediatePropagation()
+      if (subModal.open)              closeSubModal()
+      else if (outreachModal.open)    closeOutreachModal()
+      else if (linkedinModal.open)    closeLinkedinModal()
+      else if (pitchModal.open)       setPitchModal({ open: false, phase: 'idle', result: null, error: null })
+      else if (iqModal.open)          setIqModal({ open: false, phase: 'idle', result: null, error: null })
+      else if (compModal.open)        setCompModal(prev => ({ ...prev, open: false }))
+      else if (debriefModal.open)     setDebriefModal(prev => ({ ...prev, open: false }))
+      else if (editInteractionModal.open) setEditInteractionModal({ open: false, interaction: null, linkedDebriefId: null })
+      else if (logOpen)               setLogOpen(false)
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [subModal.open, outreachModal.open, linkedinModal.open, debriefModal.open, compModal.open, editInteractionModal.open, logOpen, pitchModal.open, iqModal.open])
 
   // Register page-level action handlers so suggestion chips work while on this page
   useEffect(() => {
@@ -1639,10 +1693,10 @@ export default function CandidateCard({ id: idProp, onClose }) {
           if (!trimmed) return
 
           await supabase
-            .from('candidates')
-            .update({ enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: trimmed } })
-            .eq('id', id)
-          setSavedNextAction(trimmed)
+            .from('pipeline')
+            .update({ next_action: trimmed })
+            .eq('id', entry.id)
+          setPipelines(prev => prev.map(p => p.id === entry.id ? { ...p, next_action: trimmed } : p))
         } catch {
           // Silent — next action stays as-is if generation fails
         }
@@ -1654,14 +1708,48 @@ export default function CandidateCard({ id: idProp, onClose }) {
   }
 
   async function handleCompModalSave() {
-    const compValue = parseInt(compModal.comp, 10)
-    if (!compValue || compValue <= 0) return
+    const parsed = parseCompInput(compModal.comp)
+    if (!parsed) return
     setCompModal(prev => ({ ...prev, saving: true }))
-    await supabase.from('pipeline').update({ expected_comp: compValue }).eq('id', compModal.entry.id)
-    const updatedEntry = { ...compModal.entry, expected_comp: compValue }
+    await supabase.from('pipeline')
+      .update({ expected_comp: parsed.low, expected_comp_high: parsed.high ?? null })
+      .eq('id', compModal.entry.id)
+    const updatedEntry = { ...compModal.entry, expected_comp: parsed.low, expected_comp_high: parsed.high ?? null }
     setPipelines(prev => prev.map(p => p.id === updatedEntry.id ? updatedEntry : p))
+    const completedIds = await autoCompleteActions(compModal.entry.id, 'pipeline', ['missing_data'], { compKeyword: true })
+    if (completedIds.length) onActionsCompleted?.(completedIds)
+    const wasAdvancing = compModal.nextStage && compModal.nextStage !== compModal.entry?.current_stage
     setCompModal({ open: false, entry: null, nextStage: '', comp: '', saving: false })
-    handleAdvanceStage(updatedEntry)
+    if (wasAdvancing) handleAdvanceStage(updatedEntry)
+  }
+
+  // Marks matching open actions as complete so the Desk card disappears immediately.
+  // action_types: array of action_type strings to target.
+  // entityId / entityType: the linked entity to match (pipeline or candidate).
+  // compKeyword: if true, further narrows missing_data rows to comp-related suggestions only.
+  async function autoCompleteActions(entityId, entityType, actionTypes, { compKeyword = false } = {}) {
+    if (!entityId || !recruiter?.id) return []
+    const { data: rows } = await supabase
+      .from('actions')
+      .select('id, action_type, why, suggested_next_step')
+      .eq('recruiter_id', recruiter.id)
+      .eq('linked_entity_id', entityId)
+      .eq('linked_entity_type', entityType)
+      .in('action_type', actionTypes)
+      .is('acted_on_at', null)
+      .is('dismissed_at', null)
+    if (!rows?.length) return []
+    const COMP_RE = /comp|expected|salary|compensation/i
+    const toComplete = compKeyword
+      ? rows.filter(r => COMP_RE.test(r.suggested_next_step ?? '') || COMP_RE.test(r.why ?? ''))
+      : rows
+    if (!toComplete.length) return []
+    const ids = toComplete.map(r => r.id)
+    await supabase
+      .from('actions')
+      .update({ acted_on_at: new Date().toISOString() })
+      .in('id', ids)
+    return ids
   }
 
   function handleLogOpen() {
@@ -1720,6 +1808,12 @@ export default function CandidateCard({ id: idProp, onClose }) {
         interaction: { type: logForm.type, occurred_at: data.occurred_at },
         pipeline: pipelines[0] ? { id: pipelines[0].id, role_title: pipelines[0].roles?.title, current_stage: pipelines[0].current_stage } : null,
       })
+
+      // Auto-complete overdue follow-up actions for this pipeline
+      if (pipelines[0]?.id) {
+        autoCompleteActions(pipelines[0].id, 'pipeline', ['follow_up_overdue'])
+          .then(ids => { if (ids.length) onActionsCompleted?.(ids) })
+      }
     }
     setLogSaving(false)
   }
@@ -1919,6 +2013,12 @@ export default function CandidateCard({ id: idProp, onClose }) {
         .update({ enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: reviewNextAction } })
         .eq('id', id)
       setSavedNextAction(reviewNextAction)
+    }
+
+    // Auto-complete risk and sharpening actions for this pipeline
+    if (resolvedPipelineId) {
+      autoCompleteActions(resolvedPipelineId, 'pipeline', ['risk_flag', 'sharpening_ask'])
+        .then(ids => { if (ids.length) onActionsCompleted?.(ids) })
     }
 
     closeDebriefModal()
@@ -2263,12 +2363,12 @@ export default function CandidateCard({ id: idProp, onClose }) {
   async function handleZoneBPitch() {
     const primaryRole = openRoles?.find(r => r.id === pipelines[0]?.role_id)
     if (!primaryRole || !candidate) return
-    setZoneBPitch({ generating: true, result: null, error: null })
+    setPitchModal({ open: true, phase: 'generating', result: null, error: null })
     try {
       const text = await generateText({ messages: buildCandidatePitchMessages(candidate, primaryRole), maxTokens: 1024 })
-      setZoneBPitch({ generating: false, result: text, error: null })
+      setPitchModal({ open: true, phase: 'done', result: text.trim(), error: null })
     } catch (err) {
-      setZoneBPitch({ generating: false, result: null, error: err.message ?? 'Failed.' })
+      setPitchModal({ open: true, phase: 'error', result: null, error: err.message ?? 'Failed.' })
     }
   }
 
@@ -2277,12 +2377,33 @@ export default function CandidateCard({ id: idProp, onClose }) {
     const primaryRole = openRoles?.find(r => r.id === primary?.role_id)
     if (!primaryRole) return
     const latestScreenResult = screenerHistory.find(s => s.role_id === primaryRole.id)?.result ?? null
-    setZoneBIQ({ generating: true, result: null, error: null })
+    setIqModal({ open: true, phase: 'generating', result: null, error: null })
     try {
-      const text = await generateText({ messages: buildInterviewQuestionMessages(primaryRole, latestScreenResult), maxTokens: 1024 })
-      setZoneBIQ({ generating: false, result: text, error: null })
+      const raw = await generateText({ messages: buildInterviewQuestionMessages(primaryRole, latestScreenResult), maxTokens: 1024 })
+      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+      let formatted = raw.trim()
+      try {
+        const parsed = JSON.parse(cleaned)
+        const sections = []
+        if (parsed.behavioral?.length) {
+          sections.push('BEHAVIORAL QUESTIONS')
+          parsed.behavioral.forEach((q, i) => {
+            sections.push(`\n${i + 1}. ${q.question}`)
+            if (q.signal) sections.push(`   Signal: ${q.signal}`)
+          })
+        }
+        if (parsed.technical?.length) {
+          sections.push('\nTECHNICAL QUESTIONS')
+          parsed.technical.forEach((q, i) => {
+            sections.push(`\n${i + 1}. ${q.question}`)
+            if (q.signal) sections.push(`   Signal: ${q.signal}`)
+          })
+        }
+        if (sections.length) formatted = sections.join('\n')
+      } catch { /* leave as raw text if JSON parse fails */ }
+      setIqModal({ open: true, phase: 'done', result: formatted, error: null })
     } catch (err) {
-      setZoneBIQ({ generating: false, result: null, error: err.message ?? 'Failed.' })
+      setIqModal({ open: true, phase: 'error', result: null, error: err.message ?? 'Failed.' })
     }
   }
 
@@ -2380,7 +2501,7 @@ export default function CandidateCard({ id: idProp, onClose }) {
         {/* Page header — back + Zone C only */}
         <div className="page-header">
           <div className="page-header-left">
-            <button className="btn-back" onClick={() => onClose ? onClose() : navigate('/network')}>← Back</button>
+            <button className="btn-back" onClick={() => onClose ? onClose() : (window.history.length > 1 ? navigate(-1) : navigate('/network'))}>← Back</button>
           </div>
           <div className="page-header-actions" style={{ position: 'relative' }}>
             <button className="btn-ghost btn-sm" onClick={() => setZoneCOpen(v => !v)}>⋯ More</button>
@@ -2507,39 +2628,19 @@ export default function CandidateCard({ id: idProp, onClose }) {
                 <button className="btn-ghost btn-sm" onClick={openLinkedinModal}>Draft LinkedIn</button>
                 <button
                   className="btn-ghost btn-sm"
-                  disabled={!pipelines.length || zoneBPitch.generating}
+                  disabled={!pipelines.length || pitchModal.phase === 'generating'}
                   onClick={handleZoneBPitch}
                 >
-                  {zoneBPitch.generating ? 'Generating…' : 'Generate pitch'}
+                  {pitchModal.phase === 'generating' ? 'Generating…' : 'Generate pitch'}
                 </button>
                 <button
                   className="btn-ghost btn-sm"
-                  disabled={!pipelines.length || zoneBIQ.generating}
+                  disabled={!pipelines.length || iqModal.phase === 'generating'}
                   onClick={handleZoneBInterviewQuestions}
                 >
-                  {zoneBIQ.generating ? 'Generating…' : 'Interview questions'}
+                  {iqModal.phase === 'generating' ? 'Generating…' : 'Interview questions'}
                 </button>
               </div>
-              {zoneBPitch.result && (
-                <div className="zone-b-result">
-                  <div className="zone-b-result-header">
-                    <span className="screener-block-label">Pitch</span>
-                    <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(zoneBPitch.result)}>Copy</button>
-                    <button className="btn-ghost btn-sm" onClick={() => setZoneBPitch(s => ({ ...s, result: null }))}>✕</button>
-                  </div>
-                  <p className="pitch-body">{zoneBPitch.result}</p>
-                </div>
-              )}
-              {zoneBIQ.result && (
-                <div className="zone-b-result">
-                  <div className="zone-b-result-header">
-                    <span className="screener-block-label">Interview Questions</span>
-                    <button className="btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(zoneBIQ.result)}>Copy</button>
-                    <button className="btn-ghost btn-sm" onClick={() => setZoneBIQ(s => ({ ...s, result: null }))}>✕</button>
-                  </div>
-                  <p className="pitch-body" style={{ whiteSpace: 'pre-wrap' }}>{zoneBIQ.result}</p>
-                </div>
-              )}
             </div>
           </section>
 
@@ -2842,7 +2943,7 @@ export default function CandidateCard({ id: idProp, onClose }) {
               <p className="error" style={{ marginTop: 8 }}>Couldn't generate the message. Try again.</p>
             )}
 
-            {linkedinModal.phase === 'done' && linkedinModal.text && (
+            {linkedinModal.phase === 'done' && linkedinModal.text != null && (
               <>
                 <div className="outreach-field">
                   <div className="outreach-field-header">
@@ -2857,7 +2958,12 @@ export default function CandidateCard({ id: idProp, onClose }) {
                       onClick={() => navigator.clipboard.writeText(linkedinModal.text)}
                     >Copy</button>
                   </div>
-                  <p className="outreach-body">{linkedinModal.text}</p>
+                  <textarea
+                    className="submission-textarea"
+                    rows={5}
+                    value={linkedinModal.text}
+                    onChange={e => setLinkedinModal(prev => ({ ...prev, text: e.target.value }))}
+                  />
                 </div>
                 <div className="modal-actions">
                   <button className="btn-ghost" onClick={handleGenerateLinkedIn}>Regenerate</button>
@@ -2927,7 +3033,11 @@ export default function CandidateCard({ id: idProp, onClose }) {
                       onClick={() => navigator.clipboard.writeText(outreachModal.result.subject)}
                     >Copy</button>
                   </div>
-                  <p className="outreach-subject">{outreachModal.result.subject}</p>
+                  <input
+                    className="field-input"
+                    value={outreachModal.result.subject}
+                    onChange={e => setOutreachModal(prev => ({ ...prev, result: { ...prev.result, subject: e.target.value } }))}
+                  />
                 </div>
                 <div className="outreach-field">
                   <div className="outreach-field-header">
@@ -2937,7 +3047,12 @@ export default function CandidateCard({ id: idProp, onClose }) {
                       onClick={() => navigator.clipboard.writeText(outreachModal.result.body)}
                     >Copy</button>
                   </div>
-                  <p className="outreach-body">{outreachModal.result.body}</p>
+                  <textarea
+                    className="submission-textarea"
+                    rows={8}
+                    value={outreachModal.result.body}
+                    onChange={e => setOutreachModal(prev => ({ ...prev, result: { ...prev.result, body: e.target.value } }))}
+                  />
                 </div>
                 <div className="modal-actions">
                   <button className="btn-ghost" onClick={handleGenerateOutreach}>Regenerate</button>
@@ -3072,25 +3187,34 @@ export default function CandidateCard({ id: idProp, onClose }) {
             <div className="modal-header">
               <div>
                 <h2 className="modal-title">Expected Comp</h2>
-                <p className="modal-subtitle">Advancing to {compModal.nextStage}</p>
+                <p className="modal-subtitle">
+                  {compModal.nextStage && compModal.nextStage !== compModal.entry?.current_stage
+                    ? `Advancing to ${compModal.nextStage}`
+                    : 'Edit expected comp'}
+                </p>
               </div>
+              <button className="modal-close" onClick={() => setCompModal({ open: false, entry: null, nextStage: '', comp: '', saving: false })}>✕</button>
             </div>
             <p className="sub-mode-hint" style={{ marginBottom: 16 }}>
-              What's this candidate's expected comp for this role? Wren uses this to track your pipeline value. You can update it later if it changes.
+              Enter a number, range, or shorthand: 150k, 150-200k, $150,000-$200,000
             </p>
             <div className="comp-prompt-row">
-              <span className="comp-prefix">$</span>
               <input
-                type="number"
+                type="text"
                 className="field-input comp-prompt-input"
-                placeholder="Annual base in dollars"
+                placeholder="e.g. 150k or 150-180k"
                 value={compModal.comp}
                 onChange={e => setCompModal(prev => ({ ...prev, comp: e.target.value }))}
-                min="0"
                 autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleCompModalSave()}
               />
             </div>
+            {compModal.comp && (() => {
+              const parsed = parseCompInput(compModal.comp)
+              return parsed
+                ? <p className="comp-preview">{formatCompRange(parsed.low, parsed.high)}</p>
+                : <p className="comp-preview comp-preview--invalid">Unrecognized format</p>
+            })()}
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button
                 className="btn-primary"
@@ -3282,6 +3406,78 @@ export default function CandidateCard({ id: idProp, onClose }) {
           onSave={handleEditInteractionSave}
           onClose={() => setEditInteractionModal({ open: false, interaction: null, linkedDebriefId: null })}
         />
+      )}
+
+      {/* Pitch modal */}
+      {pitchModal.open && (
+        <div className="modal-overlay" onClick={() => setPitchModal({ open: false, phase: 'idle', result: null, error: null })}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Candidate Pitch</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name}</p>
+              </div>
+              <button className="modal-close" onClick={() => setPitchModal({ open: false, phase: 'idle', result: null, error: null })}>✕</button>
+            </div>
+            {pitchModal.phase === 'generating' && (
+              <div className="modal-generating"><div className="spinner spinner--sm" />Generating pitch…</div>
+            )}
+            {pitchModal.phase === 'error' && (
+              <p className="error" style={{ marginTop: 8 }}>{pitchModal.error}</p>
+            )}
+            {pitchModal.phase === 'done' && pitchModal.result != null && (
+              <>
+                <textarea
+                  className="submission-textarea"
+                  rows={10}
+                  value={pitchModal.result}
+                  onChange={e => setPitchModal(prev => ({ ...prev, result: e.target.value }))}
+                />
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(pitchModal.result)}>Copy</button>
+                  <button className="btn-ghost" onClick={handleZoneBPitch}>Regenerate</button>
+                  <button className="btn-ghost" onClick={() => setPitchModal({ open: false, phase: 'idle', result: null, error: null })}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Interview questions modal */}
+      {iqModal.open && (
+        <div className="modal-overlay" onClick={() => setIqModal({ open: false, phase: 'idle', result: null, error: null })}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Interview Questions</h2>
+                <p className="modal-subtitle">{candidate.first_name} {candidate.last_name}</p>
+              </div>
+              <button className="modal-close" onClick={() => setIqModal({ open: false, phase: 'idle', result: null, error: null })}>✕</button>
+            </div>
+            {iqModal.phase === 'generating' && (
+              <div className="modal-generating"><div className="spinner spinner--sm" />Generating questions…</div>
+            )}
+            {iqModal.phase === 'error' && (
+              <p className="error" style={{ marginTop: 8 }}>{iqModal.error}</p>
+            )}
+            {iqModal.phase === 'done' && iqModal.result != null && (
+              <>
+                <textarea
+                  className="submission-textarea"
+                  rows={14}
+                  value={iqModal.result}
+                  onChange={e => setIqModal(prev => ({ ...prev, result: e.target.value }))}
+                />
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={() => navigator.clipboard.writeText(iqModal.result)}>Copy</button>
+                  <button className="btn-ghost" onClick={handleZoneBInterviewQuestions}>Regenerate</button>
+                  <button className="btn-ghost" onClick={() => setIqModal({ open: false, phase: 'idle', result: null, error: null })}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
     </>

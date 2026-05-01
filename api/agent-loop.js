@@ -185,13 +185,14 @@ async function runLoopForRecruiter(recruiterId, sourceRunId) {
     const hashStr    = `${recruiterId}:${action.linked_entity_id ?? ''}:${action.action_type}:${action.suggested_next_step ?? ''}`
     const contentHash = crypto.createHash('sha256').update(hashStr).digest('hex')
 
-    // Skip if an undismissed, unacted duplicate already exists
+    // Skip if an active or completed action with this hash exists.
+    // Dismissed actions (dismissed_at set) are allowed to regenerate.
+    // Completed actions (acted_on_at set) are permanently suppressed.
     const { data: existing } = await supabase
       .from('actions')
       .select('id')
       .eq('content_hash', contentHash)
       .is('dismissed_at', null)
-      .is('acted_on_at', null)
       .maybeSingle()
 
     if (existing) continue

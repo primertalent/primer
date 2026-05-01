@@ -440,21 +440,23 @@ If any answer is wrong, redesign or defer.
 ## Current state
 
 **What's built and working:**
-- **Desk (Phase 2 — Commit A+B):** Agent loop output as primary surface. Reads `actions` table, batch entity enrichment, Supabase realtime subscription. Three empty states (scanning, caught up, active). WrenCommand inline toggle ("Drop something"). Action cards render Wren's message + suggested_next_step + default chips per action_type + dismiss/snooze. Clicking a card body opens a side panel.
-- **Side panels (Commit B):** CandidateCard and RoleDetail open as 680px overlay panels from action card clicks. Escape or click-outside closes. Back/delete use onClose in panel mode. Old `/network/:id` and `/roles/:id` full-page routes still live.
+- **Desk (Phase 2 — Commit A+B+C):** Agent loop output as primary surface. Reads `actions` table, batch entity enrichment, Supabase realtime INSERT subscription. Three empty states (scanning, caught up, active). WrenCommand inline toggle ("Drop something"). Action cards render Wren's message + suggested_next_step + default chips per action_type + dismiss/snooze/complete. Clicking a card body opens a side panel.
+- **Action completion state (Commit C):** Three states: snooze (24h), dismiss (resurfaces on next loop cycle), complete (permanent — `acted_on_at`). Complete button on persisted cards. Auto-complete wired: `follow_up_overdue` on interaction save, `risk_flag`+`sharpening_ask` on debrief save, `missing_data` (comp keyword match on `why` + `suggested_next_step`) on comp save. Completed cards removed optimistically via `onActionsCompleted(ids)` prop callback from CandidateCard → Desk. Agent loop idempotency updated: completed rows suppress re-generation (`dismissed_at IS NULL` is the only re-generation gate); dismissed rows allow it.
+- **Side panels (Commit B):** CandidateCard and RoleDetail open as 680px overlay panels from action card clicks. ESC or click-outside closes. Back uses onClose in panel mode, navigate(-1) on full-page routes.
 - **AgentContext (Commit A):** fireResponse writes ephemeral cards to Desk instead of bottom bar. REQUIRED_IDS map + dev-mode console.warn on dispatch with missing required IDs. Nested ID extraction fixed (role.id, pipeline.id).
 - **WrenResponse (the floating bottom bar) is gone.** Deleted. The Desk is the agent's voice.
 - **Dashboard is gone.** Replaced by Desk.
 - WrenCommand: paste/upload/URL → auto-saves intake/multi-screen → ephemeral action card confirms on Desk. No Save All button. Resume auto-parses on drop. File dedup by name+size.
 - CandidateCard: refactored as a live deal view (not a record view)
-  - **Deal Status Bar** (sticky top): candidate name + current role/company | role link | stage + days-in-stage | AI score / recruiter score (color-coded) | risk pills (Comp gap, Counter offer risk, Thin motivation, Slow HM, Stalled) | next action | expected comp or "Set comp" chip. For off-pipeline candidates: last touch + signal badges + "Add to a role" chip. Counter offer risk derives from `debrief.motivation_signals`, `competitive_signals`, `risk_flags` (keywords: underpaid, comp gap, passive, below market) + `career_signals` Long Tenure flag.
+  - **Deal Status Bar** (sticky top): candidate name + current role/company | role link | stage + days-in-stage | AI score / recruiter score (color-coded) | risk pills | next action (reads from `pipeline.next_action`, auto-regenerates on stage advance and writes to the correct column) | expected comp range or "Set comp" chip. Comp is click-to-edit when set.
+  - **Expected comp (Commit C):** Free-form range input ("150k", "150-180k", "$150,000-$200,000"). Parsed to `{low, high}`. Stored as `pipeline.expected_comp` (low) + `pipeline.expected_comp_high`. Displayed as `$150,000 – $180,000`. Pipeline value uses midpoint for range entries.
   - **Card hierarchy**: Deal Status Bar → Latest debrief summary card → Debrief signals panel → Zone A/B/C actions → Interactions log (3 visible, show more) → Pipeline (collapsed) → Resume & timeline (collapsed) → All debriefs (collapsed) → Career signals (collapsed) → Screener results (collapsed) → Details & edit (collapsed)
-  - **Zone A "Work this deal"**: max 3 contextual primary actions via state-based rules (stage + last interaction + debrief status). Stage-specific: log interaction, log debrief, screen vs role, prep interview, lock comp, prep counter offer. Call-prep stubs for interview/offer actions (Wednesday build replaces stubs).
-  - **Zone B "Generate"**: draft submission, outreach, LinkedIn, pitch, interview questions. Pitch + IQ results render inline below Zone B.
+  - **Zone A "Work this deal"**: max 3 contextual primary actions via state-based rules.
+  - **Zone B "Generate" (Commit C):** All five generators use consistent modal pattern: pick phase (where relevant) → generating → done with editable textarea + copy/regenerate/close. Pitch and IQ moved from inline zone-b-result to modals. IQ JSON parsed and formatted as readable sections (no more raw JSON leak). Outreach and LinkedIn done-phases now use editable textareas.
   - **Zone C "More"**: overflow popover — Call Mode, Edit candidate, Remove from pipeline, Mark as placed.
-  - Interaction editing: click any interaction row → edit modal for type + notes. Preserves `debrief_id` link on save. "Debrief linked" notice shown.
-  - Resume auto-parses on card load if `cv_text` exists but `career_timeline` is null (no button press needed).
-  - Expected comp blocking modal on stage advance to interviewing/offer/placed when expected_comp is null
+  - Interaction editing: click any interaction row → edit modal for type + notes. Preserves `debrief_id` link on save.
+  - Resume auto-parses on card load if `cv_text` exists but `career_timeline` is null.
+  - Inner modal ESC (Commit C): capture-phase keydown handler closes topmost inner modal before SidePanel's overlay handler fires. All eight inner modals covered.
 - RoleDetail (Deals) refactored as role-level deal cockpit:
   - **Role Status Bar** (sticky top): role title + client subtitle | potential deal value (big) + current pipeline value + fee label | days open | health pills (Stalled, Cold client, No interviews, Overdue follow-up, Fee not set, Agreement missing, Agreement expiring) | next action
   - Potential deal value: `target_comp_min/max midpoint × openings × fee_pct`, or `fee_flat × openings`. Falls back to sum of `expected_comp × fee` across active pipeline.
@@ -528,9 +530,9 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Calibration view (recruiter vs AI confidence over time)
 
 **What's next (immediate):**
-- **Commit C:** LogForm collapse — unified single log+debrief form. Single notes textarea IS the debrief raw input. Save fires background extraction. No modal, no review phase. Extracted signals surface as action card on Desk. Resolves CF-2 (notes = debrief raw) and CF-3 (smart role default).
-- **Commit D:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
-- **Commit E:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
+- **Commit D:** LogForm collapse — unified single log+debrief form. Single notes textarea IS the debrief raw input. Save fires background extraction. No modal, no review phase. Extracted signals surface as action card on Desk. Resolves CF-2 (notes = debrief raw) and CF-3 (smart role default).
+- **Commit E:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
+- **Commit F:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
 - Phase 3 (Ingestion): Onboarding pipeline paste, bulk file ingestion, Gmail integration, calendar, call tools
 - Phase 4 (Polish): Beautiful UI, deal scorecard, close sequence generator, calibration view
 

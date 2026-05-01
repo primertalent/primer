@@ -6455,6 +6455,20 @@ select.field-input {
   font-size: 12px;
   color: var(--color-muted);
 }
+.dsb-comp-edit {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.dsb-comp-edit::after {
+  content: ' ✎';
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dsb-comp-edit:hover { color: var(--color-accent); }
+.dsb-comp-edit:hover::after { opacity: 1; }
 
 .dsb-set-comp-chip {
   font-size: 11px;
@@ -7013,5 +7027,7 @@ select.field-input {
 .side-panel-scroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding: 24px 24px 80px;
 }
