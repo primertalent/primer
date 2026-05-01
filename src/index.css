@@ -5,8 +5,8 @@
 }
 
 :root {
-  --color-bg: #f5f1e8;
-  --color-surface: #ede8db;
+  --color-bg: #ede8db;
+  --color-surface: #f5f1e8;
   --color-border: rgba(26, 23, 20, 0.09);
   --color-text: #1a1714;
   --color-muted: #6b655a;
