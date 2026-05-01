@@ -962,14 +962,7 @@ function computeZoneAActions({ pipelines, interactions, debriefs }) {
 
   const stage = primary.current_stage?.toLowerCase() ?? ''
   const latest = interactions[0]
-  const latestHasDebrief = latest
-    ? debriefs.some(d => d.interaction_id === latest.id)
-    : false
   const daysSinceContact = latest ? daysSince(latest.occurred_at) : null
-
-  if (latest && !latestHasDebrief && (latest.type === 'call' || latest.type === 'meeting')) {
-    actions.push({ id: 'log_debrief', label: 'Log debrief' })
-  }
 
   if (!latest || daysSinceContact === null || daysSinceContact > 7) {
     actions.push({ id: 'log_interaction', label: 'Log interaction' })
@@ -1262,13 +1255,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  const [suggestion, setSuggestion]         = useState(null)
-  const [generating, setGenerating]         = useState(false)
-  const [genError, setGenError]             = useState(null)
-  const [savedNextAction, setSavedNextAction] = useState(null) // from enrichment_data
-  const [nextActionEditing, setNextActionEditing] = useState(false)
-  const [nextActionDraft, setNextActionDraft]     = useState('')
-  const [nextActionSaving, setNextActionSaving]   = useState(false)
 
   // Add-to-role picker
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -1284,17 +1270,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   const [screenError, setScreenError] = useState(null)
   const [screenerHistory, setScreenerHistory] = useState([])
 
-  // Scorecard
-  const [scorecard, setScorecard] = useState(null)
-  const [scorecardGenerating, setScorecardGenerating] = useState(false)
-  const [scorecardError, setScorecardError] = useState(null)
-
-  // Candidate pitch
-  const [pitchText, setPitchText] = useState(null)
-  const [pitchGenerating, setPitchGenerating] = useState(false)
-  const [pitchError, setPitchError] = useState(null)
-  const [pitchSaving, setPitchSaving] = useState(false)
-  const [pitchSaved, setPitchSaved] = useState(false)
 
   // Outreach email modal
   const [outreachModal, setOutreachModal] = useState({
@@ -1363,7 +1338,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   const [stageHistory, setStageHistory] = useState(null)
   const [stageHistoryLoading, setStageHistoryLoading] = useState(false)
   const [zoneCOpen, setZoneCOpen] = useState(false)
-  const [zoneAStub, setZoneAStub] = useState(null)
   const [callPrepResult, setCallPrepResult] = useState({ type: null, loading: false, result: null, error: null })
   const [screeningInline, setScreeningInline] = useState(false) // Zone A screen trigger
 
@@ -1450,7 +1424,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
       } else {
         const c = candidateRes.data
         setCandidate(c)
-        setSavedNextAction(c.enrichment_data?.next_action ?? null)
         setPipelines(pipelineRes.data ?? [])
         setInteractions(interactionRes.data ?? [])
         setOpenRoles(rolesRes.data ?? [])
@@ -1496,7 +1469,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
 
   // Register page-level action handlers so suggestion chips work while on this page
   useEffect(() => {
-    registerAction('log_debrief',     ()    => handleOpenDebrief(null))
+    registerAction('log_debrief',     ()    => handleLogOpen())
     registerAction('log_interaction', ()    => handleLogOpen())
     registerAction('set_expected_comp', (ctx) => {
       const entry = pipelines.find(p => p.id === ctx?.pipeline_id) ?? pipelines[0]
@@ -1523,22 +1496,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.id])
 
-  async function handleGenerateNextAction() {
-    if (!candidate) return
-    setSuggestion(null)
-    setGenError(null)
-    setGenerating(true)
-
-    try {
-      const messages = buildNextActionMessages(candidate, pipelines, interactions)
-      const text = await generateText({ messages })
-      setSuggestion(text || 'No suggestion returned.')
-    } catch (err) {
-      setGenError(err.message ?? 'Failed to generate suggestion.')
-    } finally {
-      setGenerating(false)
-    }
-  }
 
   function handleOpenPicker() {
     setAddError(null)
@@ -1603,17 +1560,10 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
 
   const [advancingId, setAdvancingId] = useState(null)
 
-  const COMP_REQUIRED_STAGES = new Set(['interviewing', 'offer', 'placed'])
-
   async function handleAdvanceStage(entry) {
     const currentIdx = PIPELINE_STAGES.indexOf(entry.current_stage?.toLowerCase())
     if (currentIdx < 0 || currentIdx >= PIPELINE_STAGES.length - 1) return
     const nextStage = PIPELINE_STAGES[currentIdx + 1]
-
-    if (COMP_REQUIRED_STAGES.has(nextStage) && entry.expected_comp == null) {
-      setCompModal({ open: true, entry, nextStage, comp: '', saving: false })
-      return
-    }
 
     setAdvancingId(entry.id)
 
@@ -1681,9 +1631,11 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
         interactions_at_stage: interactions.filter(i => i.pipeline_id === entry.id).length,
         ...(stageGateAction ? { missing_signals: missingSignals } : {}),
       })
-      // Auto-regenerate next action in background — no await, never blocks UI
+      // Auto-regenerate next action only when null — never overwrite a debrief-captured next action
       ;(async () => {
         try {
+          const currentPipeline = pipelines.find(p => p.id === entry.id)
+          if (currentPipeline?.next_action) return
           const updatedPipelines = pipelines.map(p =>
             p.id === entry.id ? { ...p, current_stage: nextStage } : p
           )
@@ -2081,7 +2033,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
         .from('candidates')
         .update({ enrichment_data: { ...(candidate.enrichment_data ?? {}), next_action: reviewNextAction } })
         .eq('id', id)
-      setSavedNextAction(reviewNextAction)
     }
 
     // Auto-complete risk and sharpening actions for this pipeline
@@ -2186,80 +2137,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
       }
     }
     setAddingRoleId(null)
-  }
-
-  // ── Scorecard handler ────────────────────────────────────
-
-  async function handleGenerateScorecard() {
-    const role = openRoles?.find(r => r.id === screenerRoleId)
-    if (!role || !candidate?.cv_text) return
-    setScorecard(null)
-    setScorecardError(null)
-    setScorecardGenerating(true)
-    try {
-      const messages = buildScorecardMessages(candidate, role, screenResult)
-      const raw = await generateText({ messages, maxTokens: 1024 })
-      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
-      const result = JSON.parse(cleaned)
-      setScorecard(result)
-
-      // Persist to pipeline entry for this candidate × role (may not exist yet)
-      const { data: freshEntry } = await supabase
-        .from('pipeline')
-        .select('id')
-        .eq('candidate_id', id)
-        .eq('role_id', screenerRoleId)
-        .maybeSingle()
-      if (freshEntry) {
-        const { error: scErr } = await supabase
-          .from('pipeline')
-          .update({ scorecard_result: result })
-          .eq('id', freshEntry.id)
-        if (scErr) console.error('scorecard save failed:', scErr)
-      }
-    } catch (err) {
-      setScorecardError(err.message ?? 'Scorecard generation failed.')
-    } finally {
-      setScorecardGenerating(false)
-    }
-  }
-
-  // ── Candidate pitch handler ──────────────────────────────
-
-  async function handleGeneratePitch() {
-    const role = openRoles?.find(r => r.id === screenerRoleId)
-    if (!role || !candidate) return
-    setPitchText(null)
-    setPitchError(null)
-    setPitchSaved(false)
-    setPitchGenerating(true)
-    try {
-      const messages = buildCandidatePitchMessages(candidate, role)
-      const text = await generateText({ messages, maxTokens: 1024 })
-      setPitchText(text)
-    } catch (err) {
-      setPitchError(err.message ?? 'Pitch generation failed.')
-    } finally {
-      setPitchGenerating(false)
-    }
-  }
-
-  async function handleSavePitch() {
-    if (!pitchText || pitchSaving) return
-    setPitchSaving(true)
-    const role = openRoles?.find(r => r.id === screenerRoleId)
-    const roleKey = role ? `pitch_${role.id}` : 'pitch_general'
-    const { error } = await supabase
-      .from('candidates')
-      .update({
-        enrichment_data: {
-          ...(candidate.enrichment_data || {}),
-          [roleKey]: pitchText,
-        },
-      })
-      .eq('id', id)
-    if (!error) setPitchSaved(true)
-    setPitchSaving(false)
   }
 
   // ── Outreach email handlers ──────────────────────────────
@@ -2511,8 +2388,6 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
     if (action.id === 'prep_interview') { handleCallPrep('prep_interview'); return }
     if (action.id === 'lock_comp')      { handleCallPrep('lock_comp'); return }
     if (action.id === 'prep_counter')   { handleCallPrep('prep_counter'); return }
-    setZoneAStub(null)
-    if (action.id === 'log_debrief')    handleOpenDebrief(null)
     if (action.id === 'log_interaction') handleLogOpen()
     if (action.id === 'add_to_role')    handleOpenPicker()
     if (action.id === 'screen_role') {

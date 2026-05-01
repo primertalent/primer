@@ -6,6 +6,47 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 23 — 2026-05-01
+**Cleanup session. Dead code removed — no features added or changed.**
+
+**CF-1, CF-2, CF-7 (friction fixes):**
+- Stage advance no longer blocks on missing comp. Advance completes; `set_expected_comp` chip surfaces via stage-gate response.
+- `log_debrief` removed from Zone A. Background extraction already fires on every interaction save. Any Desk chip dispatching `log_debrief` now opens the log form.
+- Next action auto-regeneration on stage advance skips if `next_action` already has a value. Preserves debrief-captured next actions.
+
+**Dead files deleted (4):**
+- `api/wren.js` — stub endpoint, no callers
+- `src/lib/prompts/dailyBrief.js` — feature cut, no imports
+- `src/hooks/useStats.js` — no imports
+- `src/pages/Queue.jsx` — Actions Tray shipped as Desk; Queue import + `/queue` route removed from App.jsx
+
+**Dead state and functions removed from CandidateCard.jsx (~100 lines):**
+- State: `suggestion/generating/genError` (old WrenResponse inline), `savedNextAction` (set, never read), `nextActionEditing/Draft/Saving` (orphaned), `scorecard/scorecardGenerating/scorecardError` (pre-modal), `pitchText/pitchGenerating/pitchError/pitchSaving/pitchSaved` (pre-modal), `zoneAStub`
+- Functions: `handleGenerateNextAction`, `handleGenerateScorecard`, `handleGeneratePitch`, `handleSavePitch` — all defined, never called
+
+**Dead CSS removed (~2,130 lines):**
+- Morning brief (greeting/card/stats sections)
+- Today's Actions, Attention cards (old Dashboard)
+- `.candidate-columns` two-column layout
+- Queue page + Queue cards sections
+- Dashboard candidates section
+- Stat card links
+- All client sections (Clients list, Client detail, Contact card, Add contact, Client role row)
+- Delete action in Queue
+- Activity Digest + Today's Pipeline (old Dashboard overhaul)
+- Wren chat CSS (`.wren-shell` → `.wren-hint`, from removed Wren.jsx)
+- WrenResponse sticky bottom bar (`.wren-response*`, `.wren-suggestion-chip*`)
+
+**Confirmed active (not touched):**
+- `booleanSearchBuilder.js` — still called in CreateRole + RoleDetail for search string generation
+- `agentLoop.js` — imported by `api/agent-loop.js`
+- `debriefModal` — still accessible via per-interaction debrief button in interactions feed
+- `compModal` — still used by `set_expected_comp` action chip and Deal Status Bar
+
+**Line count:** 10,364 → 9,883 JS/JSX (−481). 7,139 → ~5,009 CSS (−2,130).
+
+---
+
 ## Session 22 — 2026-05-01
 **Card explosion fix. Four-layer dedup: prompt one-per-row, write-side gate, ephemeral key-replace, auto-debrief on interaction save.**
 

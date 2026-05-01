@@ -6,7 +6,6 @@ import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Desk from './pages/Desk'
 import CandidateCard from './pages/CandidateCard'
-import Queue from './pages/Queue'
 import Roles from './pages/Roles'
 import CreateRole from './pages/CreateRole'
 import Candidates from './pages/Candidates'
@@ -36,7 +35,6 @@ export default function App() {
           <Route path="/candidates/new" element={<Navigate to="/network/new" replace />} />
           <Route path="/candidates/:id" element={<Navigate to="/network/:id" replace />} />
           <Route path="/candidates/:id/edit" element={<Navigate to="/network/:id/edit" replace />} />
-          <Route path="/queue" element={<ProtectedRoute><Queue /></ProtectedRoute>} />
           <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
           <Route path="/roles/:id" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />
           <Route path="/roles/:id/edit" element={<ProtectedRoute><EditRole /></ProtectedRoute>} />
