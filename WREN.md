@@ -484,6 +484,15 @@ If any answer is wrong, redesign or defer.
   - Verified working: first run generated a `sharpening_ask` on a Sourced-stage candidate, correctly identified missing interaction data as the highest-leverage gap
   - Hobby tier note: 10s function timeout. Sonnet typically fits in 5–8s. If timeouts recur, swap `claude-sonnet-4-6` for `claude-haiku-4-5-20251001` in `api/agent-loop.js`
 
+- **V3 design system (session 21 — partial, sessions 3+4 pending):**
+  - Fonts: Fraunces (variable optical-size serif) for editorial voice, JetBrains Mono for operator labels, Inter for body. Loaded via Google Fonts.
+  - Color tokens: `--color-bg: #ede8db` (darker ambient), `--color-surface: #f5f1e8` (lighter work surface), `--color-border: rgba(26,23,20,0.09)` hairline, `--color-text: #1a1714`, `--color-muted: #6b655a`. Cards lift from the desk.
+  - `--radius: 0px` — square corners. All hardcoded border-radius values swept.
+  - Desk urgency sections: action cards grouped as `NOW / TODAY / THIS WEEK` with JetBrains Mono section headers + horizontal rules. Urgency pills removed from persisted cards.
+  - Action card chip fixes: WrenCommand now passes `candidateId`/`roleId` into fireResponse context; Desk pipeline enrichment includes `roles.id`; `build_search_strings` suppressed as manual chip; role/candidate chip filtering by entity ID presence.
+  - Agent loop first successful run with real pipeline data: 3 actions generated for 1 pipeline row.
+  - Sessions 3+4 pending: verdict pill (PUSH/PROTECT/HOLD/KILL) on action cards, confidence delta display (AI score vs recruiter score side-by-side).
+
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
 - Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
@@ -530,6 +539,8 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Calibration view (recruiter vs AI confidence over time)
 
 **What's next (immediate):**
+- **V3 session 3:** Verdict pill on action cards — add `verdict` field (`push`/`protect`/`hold`/`kill`) to agent loop prompt output and `actions` table. ActionCard renders verdict pill in JetBrains Mono with Fraunces italic description. Unlocks 2-column card layout.
+- **V3 session 4:** Confidence delta on action cards — surface `fit_score` (AI) and `recruiter_score` (human) side-by-side when pipeline row is linked. Fraunces 28px numbers, JetBrains Mono labels.
 - **Commit D:** LogForm collapse — unified single log+debrief form. Single notes textarea IS the debrief raw input. Save fires background extraction. No modal, no review phase. Extracted signals surface as action card on Desk. Resolves CF-2 (notes = debrief raw) and CF-3 (smart role default).
 - **Commit E:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
 - **Commit F:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
@@ -972,6 +983,13 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **Service role key uses the new `sb_secret_xxx` format.** Stored in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. Bypasses RLS for the agent loop's cross-recruiter scan. Never expose this key client-side.
 - **Actions table is idempotent via content hash.** Hash is `sha256(recruiter_id:linked_entity_id:action_type:suggested_next_step)`. Cron retries and overlapping runs don't duplicate undismissed actions. `source_run_id` groups all actions from a single loop run.
 - **Agent loop prompt designed for graceful degradation.** Day-one user with one Sourced-stage candidate gets a useful `sharpening_ask`. Rich-data user gets pattern-aware actions. Same prompt scales with available context — no separate thin-data path needed.
+- **V3 design language: Fraunces + JetBrains Mono + warm parchment.** Fraunces (variable optical-size serif, 400-600 weight) for all editorial/Wren-voice elements. JetBrains Mono for all operator metadata (labels, timestamps, codes, urgency headers). Inter as body font. Three-typeface system, not two.
+- **V3 color hierarchy: darker ambient bg, lighter work surfaces.** `--color-bg: #ede8db` (the desk), `--color-surface: #f5f1e8` (cards/work surfaces lift from bg). Borders are hairline translucent `rgba(26,23,20,0.09)`. No white cards on colored bg — work surfaces are warm but reading-weight light.
+- **V3 corners: `--radius: 0px` everywhere.** Square corners are load-bearing to the operator aesthetic. Half-doing it looks wrong. `border-radius: 50%` preserved for circular elements (dots, spinners, avatars).
+- **Urgency sections replace urgency pills on persisted cards.** Desk groups action cards under `NOW / TODAY / THIS WEEK` ruled headers. Pills on individual cards are redundant when the section header already communicates urgency. Ephemeral (live) cards keep the blue pill since they aren't in a section.
+- **`build_search_strings` is never a manual chip.** It auto-fires on role creation. Showing it as a chip is redundant and clutters the action. Suppressed in ActionCard regardless of what the agent suggests.
+- **ActionCard filters chips by entity ID availability.** Role-only chip actions (`add_fee`, `build_search_strings`) are hidden when no `role_id` in context. Candidate-only chip actions hidden when no `candidate_id`. Prevents silent no-ops and irrelevant suggestions.
+- **WrenCommand must pass entity IDs into fireResponse context.** `candidateId` and `roleId` are available from `onSaved` callback — must be forwarded so ephemeral cards are clickable and chips can dispatch with the right IDs. Missing IDs = unclickable card + silent chip no-ops.
 
 ---
 

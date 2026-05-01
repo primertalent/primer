@@ -6,6 +6,27 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 21 — 2026-05-01
+**V3 design system applied. Action card chip bugs fixed. Agent loop first run with real pipeline data.**
+
+**V3 design system (session 1 of 4):**
+- Extracted V3 design patterns from `Wren V3 Canvas _standalone_.html` — Fraunces serif, JetBrains Mono, warm parchment palette, square corners, hairline borders, urgency section headers
+- Fonts: Google Fonts import for Fraunces (variable optical-size serif), JetBrains Mono, Inter. Applied Fraunces to editorial elements (wordmark, page titles, action messages, empty state). Applied JetBrains Mono to operator labels (section headings, detail labels, stage badges, risk pills, urgency headers).
+- Color tokens: `--color-bg: #ede8db` (darker ambient desk), `--color-surface: #f5f1e8` (lighter work surfaces — cards lift from bg). `--color-text: #1a1714`, `--color-muted: #6b655a`, `--color-border: rgba(26,23,20,0.09)` hairline.
+- `--radius: 0px` — square corners throughout. All hardcoded `border-radius` values swept (99px→2px, 20/16/12px→2px, 10/8/6/4px→0).
+- Urgency sections: Desk now groups action cards as `NOW / TODAY / THIS WEEK` with JetBrains Mono section headers and horizontal rules. Urgency pills removed from persisted cards (section header carries urgency). Ephemeral/live cards keep the blue pill.
+- Initial bg/surface swap was inverted (lighter bg, darker cards). Corrected same session: darker sand is ambient, lighter parchment is work surface.
+
+**Action card chip fixes:**
+- WrenCommand `onSaved`: was not passing `candidateId` or `roleId` into `fireResponse` context. Fixed — both IDs now forwarded. Cards created on intake are now clickable and chips have entity IDs.
+- Desk pipeline enrichment: `roles(title)` select was missing `id`. Fixed — `roles(id, title, ...)` now fetched; `roleId` set on pipeline-linked action cards.
+- ActionCard chip filter: `build_search_strings` suppressed as a manual chip everywhere (auto-fires on role creation, redundant as chip). Role-only chips (`add_fee`, `build_search_strings`) filtered when no `role_id` in context. Candidate-only chips filtered when no `candidate_id`.
+
+**Agent loop:**
+- First successful run with real pipeline data: 1 pipeline row, 3 actions generated and written to `actions` table.
+
+---
+
 ## Session 20 — 2026-04-30
 **Commit C + post-commit fixes. Sharpening pass shipped and hardened through real-use testing.**
 
