@@ -8,9 +8,9 @@ export default function AppLayout({ children, fullBleed = false }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="masthead">
-          <img src={birdMark} className="bird-mark" alt="" aria-hidden="true" />
-          <span className="wordmark">Wren</span>
+        <div className="brand">
+          <img src={birdMark} className="brand-mark" alt="" aria-hidden="true" />
+          <span className="brand-name">Wren</span>
         </div>
         <nav className="app-nav">
           <NavLink

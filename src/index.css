@@ -201,21 +201,31 @@ body {
 
 /* ── Wordmark ───────────────────────────────────────── */
 
-.masthead {
+.brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
 }
 
-.bird-mark {
-  height: 18px;
-  width: auto;
+.brand-mark {
+  width: 28px;
+  height: 22px;
   display: block;
-  filter: brightness(0);            /* renders at --ink on light theme */
+  filter: brightness(0);
 }
 
-[data-theme="terminal"] .bird-mark {
-  filter: brightness(0) invert(1);  /* inverts to --ink on dark theme */
+[data-theme="terminal"] .brand-mark {
+  filter: brightness(0) invert(1);
+}
+
+.brand-name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.016em;
+  line-height: 1;
+  font-variation-settings: "opsz" 144;
+  color: var(--ink);
 }
 
 .wordmark {
