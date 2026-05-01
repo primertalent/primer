@@ -11,6 +11,12 @@ import { supabase } from '../lib/supabase'
 
 const URGENCY_RANK = { now: 0, today: 1, this_week: 2 }
 
+const URGENCY_SECTIONS = [
+  { key: 'now',       label: 'NOW' },
+  { key: 'today',     label: 'TODAY' },
+  { key: 'this_week', label: 'THIS WEEK' },
+]
+
 export default function Desk() {
   const { recruiter } = useRecruiter()
   const { ephemeralCards, dismissEphemeralCard, dispatch } = useAgent()
@@ -153,8 +159,6 @@ export default function Desk() {
     new Date(b.created_at) - new Date(a.created_at)
   )
 
-  const allCards = [...ephemeralCards, ...sortedPersisted]
-
   if (loading) {
     return (
       <AppLayout>
@@ -181,20 +185,52 @@ export default function Desk() {
           )}
         </div>
 
-        {allCards.length > 0 ? (
-          <div className="desk-cards">
-            {allCards.map(action => (
-              <ActionCard
-                key={action.id}
-                action={action}
-                onDismiss={() => handleDismiss(action)}
-                onSnooze={action.ephemeral ? null : () => handleSnooze(action)}
-                onComplete={action.ephemeral ? null : () => handleComplete(action)}
-                onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
-                onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
-              />
-            ))}
-          </div>
+        {(ephemeralCards.length > 0 || sortedPersisted.length > 0) ? (
+          <>
+            {ephemeralCards.length > 0 && (
+              <div className="desk-section">
+                <div className="desk-cards">
+                  {ephemeralCards.map(action => (
+                    <ActionCard
+                      key={action.id}
+                      action={action}
+                      onDismiss={() => handleDismiss(action)}
+                      onSnooze={null}
+                      onComplete={null}
+                      onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
+                      onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {URGENCY_SECTIONS.map(({ key, label }) => {
+              const cards = sortedPersisted.filter(a => a.urgency === key)
+              if (!cards.length) return null
+              return (
+                <div key={key} className="desk-section">
+                  <div className={`desk-tray-head desk-tray-head--${key}`}>
+                    <span className="desk-tray-urg">{label}</span>
+                    <span className="desk-tray-count">{cards.length}</span>
+                    <div className="desk-tray-rule" />
+                  </div>
+                  <div className="desk-cards">
+                    {cards.map(action => (
+                      <ActionCard
+                        key={action.id}
+                        action={action}
+                        onDismiss={() => handleDismiss(action)}
+                        onSnooze={() => handleSnooze(action)}
+                        onComplete={() => handleComplete(action)}
+                        onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
+                        onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </>
         ) : hasAnyHistory ? (
           <div className="desk-empty">
             <p className="desk-empty-headline">Caught up.</p>

@@ -5,14 +5,14 @@
 }
 
 :root {
-  --color-bg: #f7f5f0;
-  --color-surface: #ffffff;
-  --color-border: #e4e4e7;
-  --color-text: #18181b;
-  --color-muted: #71717a;
-  --color-accent: #18181b;
-  --color-accent-hover: #3f3f46;
-  --color-primary: #18181b;
+  --color-bg: #f5f1e8;
+  --color-surface: #ede8db;
+  --color-border: rgba(26, 23, 20, 0.09);
+  --color-text: #1a1714;
+  --color-muted: #6b655a;
+  --color-accent: #1a1714;
+  --color-accent-hover: #3a342e;
+  --color-primary: #1a1714;
   --color-error: #dc2626;
   --color-error-bg: #fef2f2;
   --color-sage: #5c7a5c;
@@ -21,8 +21,10 @@
   --color-signal-amber: #d97706;
   --color-signal-red:   #dc2626;
 
-  --radius: 8px;
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius: 0px;
+  --font: 'Inter', ui-sans-serif, -apple-system, system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 body {
@@ -30,6 +32,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01', 'cv11';
 }
 
 /* ── Auth pages ─────────────────────────────────────── */
@@ -347,7 +350,7 @@ body {
   color: #dc2626;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 8px;
 }
 
@@ -450,7 +453,7 @@ body {
   text-decoration: none;
   padding: 4px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   white-space: nowrap;
   background: var(--color-surface);
   transition: border-color 0.1s, background 0.1s;
@@ -668,7 +671,7 @@ body {
   padding: 3px 10px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 12px;
   color: var(--color-text);
 }
@@ -720,7 +723,7 @@ body {
   padding: 3px 10px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 12px;
   font-weight: 500;
   color: var(--color-text);
@@ -761,7 +764,7 @@ body {
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   box-sizing: border-box;
 }
 
@@ -777,7 +780,7 @@ body {
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   width: 160px;
 }
 
@@ -824,7 +827,7 @@ body {
   font-size: 13px;
   padding: 6px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
@@ -834,7 +837,7 @@ body {
   font-size: 13px;
   padding: 6px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-text);
   flex: 1;
@@ -846,7 +849,7 @@ body {
   font-size: 14px;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-text);
   resize: vertical;
@@ -1011,7 +1014,7 @@ body {
   height: 18px;
   padding: 0 5px;
   background: var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text);
@@ -1070,7 +1073,7 @@ body {
 .channel-badge {
   display: inline-block;
   padding: 2px 9px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1268,7 +1271,7 @@ body {
   flex-shrink: 0;
   display: inline-block;
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 12px;
   font-weight: 500;
   border: 1px solid var(--color-border);
@@ -1441,7 +1444,7 @@ select.field-input {
   padding: 8px 10px;
   font-size: 14px;
   color: var(--color-text);
-  border-radius: 4px;
+  border-radius: 0;
   cursor: pointer;
   transition: background 0.1s;
 }
@@ -1530,7 +1533,7 @@ select.field-input {
   height: 20px;
   background: none;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 11px;
   color: var(--color-muted);
   cursor: pointer;
@@ -1782,7 +1785,7 @@ select.field-input {
   padding: 2px 8px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 12px;
   color: var(--color-text);
   white-space: nowrap;
@@ -1926,7 +1929,7 @@ select.field-input {
 .source-badge {
   display: inline-block;
   padding: 2px 9px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 500;
   border: 1px solid var(--color-border);
@@ -2069,7 +2072,7 @@ select.field-input {
 .skill-tag-sm {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -2090,7 +2093,7 @@ select.field-input {
   align-items: baseline;
   gap: 1px;
   padding: 3px 9px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -2120,7 +2123,7 @@ select.field-input {
 .signal-badge {
   display: inline-block;
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -2225,7 +2228,7 @@ select.field-input {
   color: var(--color-muted);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   padding: 1px 8px;
 }
 
@@ -2312,7 +2315,7 @@ select.field-input {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   margin-top: 2px;
 }
 
@@ -2422,7 +2425,7 @@ select.field-input {
   height: 20px;
   padding: 0 6px;
   background: var(--color-border);
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text);
@@ -2537,7 +2540,7 @@ select.field-input {
 .modal {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 0;
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
@@ -3152,7 +3155,7 @@ select.field-input {
 .client-industry-tag {
   display: inline-block;
   padding: 2px 9px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 500;
   background: var(--color-bg);
@@ -3256,7 +3259,7 @@ select.field-input {
   flex-shrink: 0;
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 11px;
   font-weight: 500;
   color: #1e40af;
@@ -3419,7 +3422,7 @@ select.field-input {
 .screener-rec-badge {
   display: inline-block;
   padding: 5px 14px;
-  border-radius: 99px;
+  border-radius: 2px;
   font-size: 13px;
   font-weight: 600;
   border: 1px solid var(--color-border);
@@ -3539,7 +3542,7 @@ select.field-input {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 99px;
+  border-radius: 2px;
   border: 1px solid transparent;
 }
 
@@ -3604,7 +3607,7 @@ select.field-input {
   align-items: center;
   gap: 5px;
   padding: 4px 6px 4px 10px;
-  border-radius: 99px;
+  border-radius: 2px;
   border: 1px solid;
   font-size: 12px;
   font-weight: 500;
@@ -3683,7 +3686,7 @@ select.field-input {
   align-items: center;
   padding: 4px;
   color: var(--color-muted);
-  border-radius: 4px;
+  border-radius: 0;
   transition: color 0.12s;
 }
 
@@ -3753,7 +3756,7 @@ select.field-input {
   color: var(--color-muted);
   text-decoration: none;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 1px 8px;
   transition: color 0.12s, border-color 0.12s;
 }
@@ -4078,7 +4081,7 @@ select.field-input {
   color: var(--color-muted);
   padding: 2px 4px;
   line-height: 1;
-  border-radius: 4px;
+  border-radius: 0;
   opacity: 0;
   transition: opacity 0.15s;
   flex-shrink: 0;
@@ -4106,7 +4109,7 @@ select.field-input {
   color: var(--color-muted);
   padding: 2px 5px;
   line-height: 1;
-  border-radius: 4px;
+  border-radius: 0;
   opacity: 0;
   transition: opacity 0.15s;
   flex-shrink: 0;
@@ -4139,7 +4142,7 @@ select.field-input {
   color: #6b21a8;
   background: #faf5ff;
   border: 1px solid #e9d5ff;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 8px;
 }
 
@@ -4243,7 +4246,7 @@ select.field-input {
   padding: 16px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .multiscreen-draft-header {
@@ -4293,7 +4296,7 @@ select.field-input {
   color: var(--color-text-muted);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 7px;
 }
 
@@ -4307,7 +4310,7 @@ select.field-input {
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   resize: vertical;
   box-sizing: border-box;
 }
@@ -4339,7 +4342,7 @@ select.field-input {
   color: #6b21a8;
   background: #faf5ff;
   border: 1px solid #e9d5ff;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 7px;
   flex-shrink: 0;
   white-space: nowrap;
@@ -4478,7 +4481,7 @@ select.field-input {
   font-size: 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 2px;
   padding: 4px 12px;
   color: var(--color-text);
 }
@@ -4517,7 +4520,7 @@ select.field-input {
   height: 32px;
   padding: 0 14px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 2px;
   background: transparent;
   font-size: 13px;
   font-family: var(--font);
@@ -5139,7 +5142,7 @@ select.field-input {
   font-size: 12px;
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   white-space: nowrap;
@@ -5410,7 +5413,7 @@ select.field-input {
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
-  border-radius: 4px;
+  border-radius: 0;
   display: block;
 }
 
@@ -5523,7 +5526,7 @@ select.field-input {
   width: 100%;
   padding: 8px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -5616,7 +5619,7 @@ select.field-input {
   max-width: 640px;
   font-size: 14px;
   line-height: 1.6;
-  border-radius: 12px;
+  border-radius: 2px;
   padding: 10px 14px;
 }
 
@@ -5761,7 +5764,7 @@ select.field-input {
   color: var(--color-muted);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 7px;
 }
 
@@ -5804,7 +5807,7 @@ select.field-input {
   font-weight: 600;
   text-transform: capitalize;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid transparent;
 }
 .debrief-outcome--advance { background: #dcfce7; color: #166534; border-color: #86efac; }
@@ -5827,7 +5830,7 @@ select.field-input {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 0;
   display: inline-block;
   align-self: flex-start;
 }
@@ -5881,7 +5884,7 @@ select.field-input {
   line-height: 1.55;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-bg);
   color: var(--color-text);
   resize: vertical;
@@ -5919,7 +5922,7 @@ select.field-input {
   line-height: 1.5;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-bg);
   color: var(--color-text);
   resize: vertical;
@@ -5939,7 +5942,7 @@ select.field-input {
   display: flex;
   gap: 0;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
   width: fit-content;
 }
@@ -5964,7 +5967,7 @@ select.field-input {
 .pv-section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 20px 24px;
   margin-bottom: 16px;
 }
@@ -6043,7 +6046,7 @@ select.field-input {
   color: var(--color-muted);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 2px 8px;
 }
 .pv-skeleton {
@@ -6056,7 +6059,7 @@ select.field-input {
 .desk-section {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 20px 24px;
   margin-bottom: 16px;
 }
@@ -6099,7 +6102,7 @@ select.field-input {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 0;
   text-decoration: none;
   color: var(--color-text);
   border: 1px solid transparent;
@@ -6146,7 +6149,7 @@ select.field-input {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 20px;
+  border-radius: 2px;
   white-space: nowrap;
 }
 .risk-pill--overdue {
@@ -6184,7 +6187,7 @@ select.field-input {
   padding: 8px 12px;
   background: rgba(230, 126, 34, 0.07);
   border: 1px solid rgba(230, 126, 34, 0.25);
-  border-radius: 6px;
+  border-radius: 0;
   margin-bottom: 8px;
 }
 .comp-prompt-text {
@@ -6241,7 +6244,7 @@ select.field-input {
   flex-shrink: 0;
   background: var(--color-bg);
   padding: 3px 7px;
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid var(--color-border);
 }
 .wren-response-message {
@@ -6285,7 +6288,7 @@ select.field-input {
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 20px;
+  border-radius: 2px;
   cursor: pointer;
   white-space: nowrap;
   transition: opacity 0.15s;
@@ -6381,7 +6384,7 @@ select.field-input {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   color: var(--color-muted);
@@ -6399,7 +6402,7 @@ select.field-input {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 10px;
+  border-radius: 0;
   white-space: nowrap;
 }
 
@@ -6413,7 +6416,7 @@ select.field-input {
 .pill-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 14px 16px;
   margin-top: 8px;
 }
@@ -6426,7 +6429,7 @@ select.field-input {
 .inline-input {
   padding: 5px 8px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 13px;
   background: var(--color-bg);
   color: var(--color-text);
@@ -6474,7 +6477,7 @@ select.field-input {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 0;
   background: transparent;
   border: 1px dashed var(--color-border);
   color: var(--color-muted);
@@ -6705,7 +6708,7 @@ select.field-input {
   color: var(--color-muted);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 1px 6px;
 }
 
@@ -6872,7 +6875,7 @@ select.field-input {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .action-urgency--now {
@@ -6933,7 +6936,7 @@ select.field-input {
   font-size: 16px;
   color: var(--color-muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 0;
   line-height: 1;
 }
 
@@ -6966,7 +6969,7 @@ select.field-input {
 .action-chip {
   height: 32px;
   padding: 0 14px;
-  border-radius: 16px;
+  border-radius: 2px;
   font-size: 13px;
   font-family: var(--font);
   font-weight: 500;
@@ -7030,4 +7033,83 @@ select.field-input {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 24px 24px 80px;
+}
+
+/* ── V3 typography — editorial serif ──────────────────────── */
+
+.wordmark,
+.brief-headline,
+.page-title,
+.stat-value,
+.action-message,
+.desk-empty-headline,
+.dsb-name {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+}
+
+.wordmark      { font-weight: 400; letter-spacing: -0.02em; }
+.brief-headline { font-weight: 400; }
+.page-title    { font-weight: 500; letter-spacing: -0.01em; }
+.stat-value    { font-weight: 400; }
+.action-message { font-weight: 400; line-height: 1.55; }
+.desk-empty-headline { font-weight: 400; }
+.dsb-name      { font-weight: 500; letter-spacing: -0.01em; }
+
+/* ── V3 typography — operator mono ────────────────────────── */
+
+.section-heading,
+.detail-label,
+.stage-badge,
+.dsb-stage-badge,
+.dsb-subtitle,
+.brief-card-eyebrow,
+.today-actions-eyebrow,
+.action-urgency,
+.action-entity,
+.action-entity-sub,
+.risk-pill,
+.screener-rec-badge,
+.action-snooze,
+.action-complete,
+.action-dismiss {
+  font-family: var(--font-mono);
+}
+
+/* ── V3 desk — urgency tray sections ──────────────────────── */
+
+.desk-section {
+  margin-bottom: 32px;
+}
+
+.desk-tray-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.desk-tray-urg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  flex-shrink: 0;
+}
+
+.desk-tray-head--now       .desk-tray-urg { color: var(--color-signal-red); }
+.desk-tray-head--today     .desk-tray-urg { color: var(--color-text); }
+.desk-tray-head--this_week .desk-tray-urg { color: var(--color-muted); }
+
+.desk-tray-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.desk-tray-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }

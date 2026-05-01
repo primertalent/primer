@@ -34,7 +34,7 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
     >
       <div className="action-card-header" onClick={e => e.stopPropagation()}>
         <div className="action-card-meta">
-          {urgencyLabel && (
+          {action.ephemeral && urgencyLabel && (
             <span className={`action-urgency ${urgencyClass}`}>{urgencyLabel}</span>
           )}
           {action.entityName && (
