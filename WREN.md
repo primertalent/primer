@@ -155,7 +155,7 @@ Manual paste-in is a bridge. It cannot be the destination. Solo recruiters work 
 **Google Workspace is the highest-leverage integration target.** Most ICP recruiters live in Gmail + Google Calendar + Google Meet. One OAuth flow covers all three. Solo recruiter primary intake surface is Google Meet (not phone), and Meet auto-generates transcripts via Gemini if Workspace is enabled — which means transcript ingestion is essentially free once Drive access is granted.
 
 Order:
-1. **Email forwarding** (forwarding service + `api/ingest-email.js`, reuses WrenCommand classify path). No OAuth required. Smallest real-ingestion path. Immediate next bet.
+1. **Email forwarding** — `api/ingest-email.js` + CloudMailin. Shipped 2026-05-05. CloudMailin address `962aaa58086d04d26928@cloudmailin.net` is live for the founder's recruiter row. Gmail forwarding not yet configured — new inbound from Gmail doesn't surface as action cards until Build 2 wires that up.
 2. **Google Workspace OAuth** (Phase 4 — proper version of #1): one auth covers Gmail + Calendar + Meet transcripts. Most ICP recruiters live in Workspace. Meet auto-generates transcripts via Gemini if Workspace is enabled.
 3. **Granola or Fathom** for non-Google calls (phone, side calls, when Gemini isn't capturing).
 4. **Texts** (technically harder; Android easier than iPhone; forwarding-to-Wren as fallback).
@@ -528,11 +528,15 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - ⬜ RoleDetail strip-down (pre-strip-down architecture still in place)
 - ⬜ CF-1, CF-2, CF-4 open; CF-3 partial. Deferred until after Phase 2.5.
 
-**Phase 2.5 — Email ingestion (active build, ~5 days):**
-- `api/ingest-email.js` endpoint + forwarding service setup, reusing WrenCommand's classify path
-- Submittal draft after Meet transcript arrives, writes to drafts table, surfaces as action card
-- One Tier 1 autonomous send for logistics replies on confirmed interviews
-- Email forwarding is the immediate ingestion bet, not full Google Workspace OAuth
+**Phase 2.5 — Email ingestion (Build 1 shipped, Build 2 next):**
+- ✅ **Build 1 (shipped 2026-05-05):** `api/ingest-email.js` receives webhooks from CloudMailin. Auth via shared secret (header or query param). Multi-tenant routing via `recruiters.email_intake_address`. Haiku classifier marks emails as `candidate_communication`, `client_communication`, or `noise`. Fire-and-forget agent loop trigger via internal fetch to `api/agent-loop?recruiter_id=...`. Candidate matched by email or fuzzy name, created as stub if no match. Interaction written with classification in `meta` jsonb. Verified end-to-end with two test emails.
+- ⬜ **Build 2 (~2 days):** Submittal draft after Meet transcript arrives, writes to drafts table, surfaces new inbound as action cards in the Tray.
+- ⬜ **Build 3 (~2 days):** One Tier 1 autonomous send for logistics replies on confirmed interviews.
+
+**Known limitations after Build 1:**
+- New inbound from candidates without active pipelines does not surface as an action card. The agent loop only reasons about candidates with active pipelines. Intentional for Build 1; resolved in Build 2.
+- Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
+- The `drafts` table exists with RLS and constraints but has zero consumers in the UI. First consumer ships in Build 2.
 
 **Phase 3 — PWA (earliest day 30, only after ingestion is real and Tray is daily surface):**
 - Phone app with push notifications, voice input, voice output, swipe-to-act
@@ -545,7 +549,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Deal scorecard per candidate, close sequence generator, calibration view
 
 **What's next (immediate):**
-- **Phase 2.5 — Email ingestion (active build):** `api/ingest-email.js` endpoint + forwarding service setup. Submittal draft after Meet transcript arrives, writes to drafts table, surfaces as action card. One Tier 1 autonomous send for logistics replies on confirmed interviews. ~5 days of Claude Code work plus a few hours of founder configuration.
+- **Phase 2.5 — Email ingestion:** Build 1 shipped (2026-05-05). Build 2 (action cards + draft after transcript) is next. Build 3 (Tier 1 autonomous send) queued after that.
 - **Phase 2 completion (deferred until after Phase 2.5):** CandidateCard and RoleDetail strip-down. CF-1, CF-2, CF-4 open; CF-3 partial.
 - **Phase 3 (PWA):** Push notifications, voice, swipe-to-act. Earliest day 30, only after ingestion is real and Tray is daily surface.
 - **Phase 4 (Google Workspace OAuth):** Full Google auth covering Gmail + Calendar + Meet, deal scorecard, close sequence generator, calibration view.
