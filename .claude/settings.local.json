@@ -32,7 +32,30 @@
       "Bash(xargs wc *)",
       "Bash(vercel env *)",
       "Bash(gh workflow *)",
-      "Bash(vercel --prod)"
+      "Bash(vercel --prod)",
+      "Bash(grep -E '\\(color|font|serif|#[0-9a-f]{3,6}|parchment|verdant|NOW|TODAY|verdict|confidence|urgency\\)')",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; Write-Output \"=== Lines 1-30 ===\"; $lines[0..29] | ForEach-Object { $_.Substring\\(0, [Math]::Min\\($_.Length, 200\\)\\) })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; Write-Output \"=== Line 160-180 \\(last lines\\) ===\"; $lines[159..179] | ForEach-Object { $_.Substring\\(0, [Math]::Min\\($_.Length, 300\\)\\) })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $templateLine = $lines | Where-Object { $_ -match '__bundler/template' }; if \\($templateLine\\) { Write-Output \"Template line found\"; } $templateIdx = [Array]::IndexOf\\($lines, $templateLine\\); Write-Output \"Template at line $templateIdx\"; $lines[$templateIdx + 1].Substring\\(0, 3000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; for \\($i = 0; $i -lt $lines.Count; $i++\\) { if \\($lines[$i] -match '__bundler/template'\\) { Write-Output \"Found at line $i\"; $nextLine = $lines[$i+1]; Write-Output $nextLine.Substring\\(0, [Math]::Min\\(5000, $nextLine.Length\\)\\); break } })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; for \\($i = 0; $i -lt $lines.Count; $i++\\) { if \\($lines[$i] -match 'type=\"__bundler/template\"'\\) { Write-Output \"Found at line $i\"; $nextLine = $lines[$i+1]; Write-Output $nextLine.Substring\\(0, [Math]::Min\\(8000, $nextLine.Length\\)\\); break } })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; for \\($i = 0; $i -lt $lines.Count; $i++\\) { if \\($lines[$i] -match 'bundler'\\) { Write-Output \"Line $i`: $\\($lines[$i].Substring\\(0, [Math]::Min\\(150, $lines[$i].Length\\)\\)\\)\" } })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; Write-Output \"Line 175 \\(template start\\): $\\($lines[174].Substring\\(0, 200\\)\\)\"; Write-Output \"Line 176 length: $\\($lines[175].Length\\)\"; Write-Output \"Line 176 first 6000 chars:\"; Write-Output $lines[175].Substring\\(0, [Math]::Min\\(6000, $lines[175].Length\\)\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; for \\($i = 170; $i -lt $lines.Count; $i++\\) { Write-Output \"Line $i len=$\\($lines[$i].Length\\): $\\($lines[$i].Substring\\(0, [Math]::Min\\(200, $lines[$i].Length\\)\\)\\)\" })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $templateJson = $lines[175]; $decoded = $templateJson | ConvertFrom-Json; Write-Output $decoded.Substring\\(0, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[175]; Write-Output \"First 8000 chars:\"; Write-Output $raw.Substring\\(0, [Math]::Min\\(8000, $raw.Length\\)\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output \"Length: $\\($raw.Length\\)\"; Write-Output $raw.Substring\\(0, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output $raw.Substring\\(8000, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output $raw.Substring\\(16000, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output $raw.Substring\\(24000, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output $raw.Substring\\(32000, 8000\\))",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\Wren V3 Canvas _standalone_.html\" -Raw -Encoding UTF8; $lines = $content -split \"`n\"; $raw = $lines[176]; Write-Output $raw.Substring\\(40000, 4289\\))",
+      "Bash(powershell -Command \"Select-String -Path 'dist\\\\assets\\\\index-D56i-OSb.css' -Pattern '#f5f1e8|#fbf8f0|#efe9dc|#f0eee9' | Select-Object -First 20\")",
+      "Bash(grep \"--color-\" \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\pages\\\\Candidates.jsx\")",
+      "Bash(grep -F \"--color-\" \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\pages\\\\Candidates.jsx\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\index.css\" | Measure-Object -Line\\).Lines)"
     ]
   }
 }
