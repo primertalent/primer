@@ -308,17 +308,21 @@ If you've ever lost a candidate at the final round and known, in your gut, that 
 
 > Working hypothesis. Validate with first 10 paying users.
 
-**Anchor:** $200/month per user.
+**Anchor:** $499/month per user.
 
 **Math:**
-- One placement saved per year at $25k average fee = 125x ROI
-- Less than one hour of recruiter billable time per month
+- Solo recruiters at the $500k-$1M billing tier already pay $800-900/month for LinkedIn Recruiter
+- Wren at $499/month is roughly half that price
+- LinkedIn Recruiter is the sourcing layer. Wren is the operating layer. Different jobs, complementary tools.
+- One placement saved per year covers Wren for four years
 - API cost per heavy user is $25-80/month with optimization → 60-85% gross margin
 - Subscription revenue, not seat-based (one operator, one desk)
 
 **The pitch on pricing:**
 
-"$200 a month. Less than one hour of your billable time. One extra placement a year pays for three years. The AI cost is our problem, not yours."
+"$499 a month. Half of LinkedIn Recruiter. The operating layer that runs underneath your sourcing. One placement a year covers it for four years."
+
+Keep LinkedIn Recruiter. That's your sourcing layer. Wren is the operating layer underneath. Different jobs. Both worth what you pay.
 
 **What we don't do:**
 
@@ -329,8 +333,8 @@ If you've ever lost a candidate at the final round and known, in your gut, that 
 
 **Possible future tiers:**
 
-- Standalone Wren: $200/month
-- Wren + agreement parsing + bulk import: $300/month (for recruiters with real history)
+- Standalone Wren: $499/month
+- Wren + agreement parsing + bulk import: $699/month (for recruiters with real history)
 - Wren Agency: TBD when team features ever exist (probably never)
 
 ---

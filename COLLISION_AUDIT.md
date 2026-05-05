@@ -30,9 +30,9 @@
 | 5.5 | Nav has no attention signals or badges | AppLayout | Friction | Resolves in strip down |
 | 6.1 | Zone B generates without checking debrief signals | CandidateCard | Friction | Carry-forward |
 | 6.2 | compModal cancel fires nothing | CandidateCard | Minor | Carry-forward |
-| 6.3 | candidate_created WrenResponse context wrong (Desk not CandidateCard) | WrenCommand | Friction | Carry-forward |
-| 7.1 | Pill click fires redundant WrenResponse | RoleDetail | Friction | Carry-forward |
-| 7.2 | Next action regenerates on every stage advance, overwrites fresh debrief | CandidateCard | Friction | Carry-forward |
+| 6.3 | candidate_created WrenResponse context wrong (Desk not CandidateCard) | WrenCommand | Friction | Resolved 2026-05-05 — fireResponse fires Desk-scoped event, intake correctly orients to Desk. |
+| 7.1 | Pill click fires redundant WrenResponse | RoleDetail | Friction | Resolved 2026-05-05 — risk pills are static badges, no redundant fire confirmed. |
+| 7.2 | Next action regenerates on every stage advance, overwrites fresh debrief | CandidateCard | Friction | Resolved 2026-05-05 — handleAdvanceStage checks if (currentPipeline?.next_action) return before regenerating. |
 | 7.3 | Fee/agreement saves are silent (acceptable) | RoleDetail | Minor | Keep |
 | 8.1 | Zone B 5 static buttons regardless of stage | CandidateCard | Friction | Resolves in strip down |
 | 8.2 | Network page treats recruiter as filter operator | Candidates | Friction | Resolves in strip down |
@@ -57,6 +57,8 @@
 **CF-6 (collision 7.1)** — Pill click does not fire WrenResponse. Health pill click opens the relevant inline action directly. No redundant agent confirmation of what the user just clicked.
 
 **CF-7 (collision 7.2)** — Next action staleness check. Auto-regeneration on stage advance only fires if `next_action` is null or was last set >72 hours ago. Does not overwrite a freshly captured debrief next action.
+
+CF-1, CF-2, CF-3 (partial), CF-4 deferred until after Phase 2.5 ingestion ships. Real use will sharpen what actually needs to change in CandidateCard and RoleDetail.
 
 ---
 

@@ -86,6 +86,16 @@ Wren handles the operational work an entry-level recruiter would handle, with se
 
 ---
 
+## Operating principles
+
+**Three-tier autonomy.** Wren operates on three tiers. Acts on high-confidence reversible moves. Drafts for approval on judgment moves. Surfaces moments without drafting when the recruiter should decide whether the work is worth doing. The recruiter sees everything Wren did, approves what Wren proposed, and commissions what Wren noticed.
+
+**Wren is invisible to candidates.** The recruiter introduces Wren once as their assistant during the relationship's intro stage. Every message Wren sends goes out in the recruiter's voice, signed by the recruiter, indistinguishable in tone from messages the recruiter wrote themselves. The recruiter sees everything Wren did and stays the relationship-of-record. Wren earns trust through invisibility, not announcement.
+
+**The testable product principle.** Wren earns its place by showing up with context the recruiter didn't enter. Every time Wren asks the recruiter for data the recruiter has already produced somewhere else, Wren is a tool. Every time Wren arrives knowing what happened, Wren is a coworker. Ingestion is not a feature. Ingestion is what makes the product real.
+
+---
+
 ## The surfaces
 
 **Phone is the operational layer. Browser is the dashboard.**

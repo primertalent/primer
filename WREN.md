@@ -155,12 +155,11 @@ Manual paste-in is a bridge. It cannot be the destination. Solo recruiters work 
 **Google Workspace is the highest-leverage integration target.** Most ICP recruiters live in Gmail + Google Calendar + Google Meet. One OAuth flow covers all three. Solo recruiter primary intake surface is Google Meet (not phone), and Meet auto-generates transcripts via Gemini if Workspace is enabled — which means transcript ingestion is essentially free once Drive access is granted.
 
 Order:
-1. **Gmail** (OAuth, parse incoming candidate and client replies, draft responses inline, write structured interactions). Highest volume of communication.
-2. **Google Calendar** (link interviews to candidates, surface upcoming calls, generate pre-call prep automatically).
-3. **Google Meet transcripts via Drive** (intake calls, candidate calls — transcript already exists if Gemini is on, just need to read it).
-4. **Granola or Fathom** for non-Google calls (phone, side calls, when Gemini isn't capturing).
-5. **Texts** (last because technically harder; Android easier than iPhone; forwarding-to-Wren as fallback).
-6. **LinkedIn** (browser extension, candidate to pipeline in one click — deferred until LinkedIn API or browser ext story matures).
+1. **Email forwarding** (forwarding service + `api/ingest-email.js`, reuses WrenCommand classify path). No OAuth required. Smallest real-ingestion path. Immediate next bet.
+2. **Google Workspace OAuth** (Phase 4 — proper version of #1): one auth covers Gmail + Calendar + Meet transcripts. Most ICP recruiters live in Workspace. Meet auto-generates transcripts via Gemini if Workspace is enabled.
+3. **Granola or Fathom** for non-Google calls (phone, side calls, when Gemini isn't capturing).
+4. **Texts** (technically harder; Android easier than iPhone; forwarding-to-Wren as fallback).
+5. **LinkedIn** (browser extension, candidate to pipeline in one click — deferred until LinkedIn API or browser ext story matures).
 
 Each integration removes a manual step. The product gets less cumbersome as more data flows in automatically.
 
@@ -512,45 +511,44 @@ If any answer is wrong, redesign or defer.
 
 The pivot from SaaS shape to agent shape happens through three foundations, built in order. Each foundation makes the next one possible.
 
-**Phase 1 — Engine (mostly shipped):**
+**Phase 1 — Engine (shipped):**
 - ✅ Agent loop infrastructure: GitHub Actions cron, `api/agent-loop` endpoint, `agentLoop.js` prompt, `actions` table
 - ✅ Loop reads only active pipeline rows (per "When Wren engages" trigger)
 - ✅ Loop output: prioritized actions + sharpening data asks, both writing to `actions` table
-- ⬜ Stage-Gate Agent Flows wired into the loop (late_stage, offer, accepted triggers)
-- ⬜ Custom Hiring Process per Role (loop needs accurate stages to reason about deals correctly)
-- ⬜ Recruiter vs AI Confidence (data accumulates from day one even before UI ships)
+- ✅ Call Prep module
+- ✅ Stage-Gate Agent Flows (late_stage, offer, accepted triggers)
+- ✅ Recruiter vs AI Confidence (data accumulates from day one)
 
-**Phase 2 — Surface (2-3 weeks):**
-- Actions Tray as the Desk's home: loop output rendered as primary surface, replaces deal-list-as-Desk
-- CandidateCard collapses into a side panel that opens within the Desk, not a separate page
-- RoleDetail collapses similarly
-- Mobile experience (mobile web first, native later): single column, action cards, swipe-to-act, no nav
-- Push notifications for high-urgency actions
+**Phase 2 — Browser strip-down (structurally 60% done, paused at Phase 2.5):**
+- ✅ Actions Tray as Desk home: loop output as primary surface, Tray, ActionCard, AppLayout, SidePanel, WrenCommand agent-shaped and shipped
+- ✅ WrenResponse removed, log+debrief collapse, side panels
+- ✅ Drafts table (migration 20260505000000_drafts.sql), zero consumers yet
+- ✅ CF-5, CF-6, CF-7 resolved (see COLLISION_AUDIT.md)
+- ⬜ CandidateCard strip-down (pre-strip-down architecture still in place)
+- ⬜ RoleDetail strip-down (pre-strip-down architecture still in place)
+- ⬜ CF-1, CF-2, CF-4 open; CF-3 partial. Deferred until after Phase 2.5.
+
+**Phase 2.5 — Email ingestion (active build, ~5 days):**
+- `api/ingest-email.js` endpoint + forwarding service setup, reusing WrenCommand's classify path
+- Submittal draft after Meet transcript arrives, writes to drafts table, surfaces as action card
+- One Tier 1 autonomous send for logistics replies on confirmed interviews
+- Email forwarding is the immediate ingestion bet, not full Google Workspace OAuth
+
+**Phase 3 — PWA (earliest day 30, only after ingestion is real and Tray is daily surface):**
+- Phone app with push notifications, voice input, voice output, swipe-to-act
 - Soccer-game test: open Wren on phone, see top 3 actions, act on one in under 10 seconds
 
-**Phase 3 — Ingestion (3-4 weeks):**
-- Onboarding flow: pipeline paste first (free-text describe active book, Wren parses)
-- Bulk file ingestion: CSVs, resume folders, fee agreements
-- Gmail integration: OAuth, parse incoming, draft responses inline, structure interactions automatically
-- Calendar integration: link interviews, generate pre-call prep automatically
+**Phase 4 — Google Workspace OAuth:**
+- Full Google OAuth: Gmail + Calendar + Meet transcripts in one auth flow
+- Proper version of Phase 2.5 email ingestion, replaces forwarding service
 - Granola or Fathom call transcript integration
-
-**Phase 4 — Polish and depth (4 weeks):**
-- Beautiful UI matching engine intelligence (single working surface, restrained design, fast)
-- MCP marketing prompt at stage advancement (human-in-the-loop)
-- Deal scorecard per candidate
-- Close sequence generator by stage
-- Role activation scans Network for fits
-- Calibration view (recruiter vs AI confidence over time)
+- Deal scorecard per candidate, close sequence generator, calibration view
 
 **What's next (immediate):**
-- **V3 session 3:** Verdict pill on action cards — add `verdict` field (`push`/`protect`/`hold`/`kill`) to agent loop prompt output and `actions` table. ActionCard renders verdict pill in JetBrains Mono with Fraunces italic description. Unlocks 2-column card layout.
-- **V3 session 4:** Confidence delta on action cards — surface `fit_score` (AI) and `recruiter_score` (human) side-by-side when pipeline row is linked. Fraunces 28px numbers, JetBrains Mono labels.
-- **Commit D:** LogForm collapse — unified single log+debrief form. The auto-debrief background extraction is now wired (session 22). What remains: collapse the separate LogForm + DebrieModal UI into a single unified notes textarea; remove the manual debrief trigger from Zone A. Resolves CF-2 and CF-3.
-- **Commit E:** Network search overlay + Edit flows inline + nav reduction (Deals/Network items removed from nav).
-- **Commit F:** Carry-forward data flow fixes (CF-1 through CF-7 from COLLISION_AUDIT.md).
-- Phase 3 (Ingestion): Onboarding pipeline paste, bulk file ingestion, Gmail integration, calendar, call tools
-- Phase 4 (Polish): Beautiful UI, deal scorecard, close sequence generator, calibration view
+- **Phase 2.5 — Email ingestion (active build):** `api/ingest-email.js` endpoint + forwarding service setup. Submittal draft after Meet transcript arrives, writes to drafts table, surfaces as action card. One Tier 1 autonomous send for logistics replies on confirmed interviews. ~5 days of Claude Code work plus a few hours of founder configuration.
+- **Phase 2 completion (deferred until after Phase 2.5):** CandidateCard and RoleDetail strip-down. CF-1, CF-2, CF-4 open; CF-3 partial.
+- **Phase 3 (PWA):** Push notifications, voice, swipe-to-act. Earliest day 30, only after ingestion is real and Tray is daily surface.
+- **Phase 4 (Google Workspace OAuth):** Full Google auth covering Gmail + Calendar + Meet, deal scorecard, close sequence generator, calibration view.
 
 **Do not build:**
 - Team features, shared pipelines, assignments
