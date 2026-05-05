@@ -55,7 +55,9 @@
       "Bash(grep -F \"--color-\" \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\pages\\\\Candidates.jsx\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\" -Directory)",
       "Bash(Select-Object Name)",
-      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\index.css\" | Measure-Object -Line\\).Lines)"
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\index.css\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(Get-Command *)",
+      "WebFetch(domain:docs.cloudmailin.com)"
     ]
   }
 }

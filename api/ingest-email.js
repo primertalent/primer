@@ -64,14 +64,14 @@ function stripHtml(html) {
 }
 
 function normalizePayload(body) {
-  // CloudMailin envelope/headers format
+  // CloudMailin JSON Normalized format — headers are all lowercase
   if (body.envelope || body.headers) {
     return {
-      fromRaw:  body.headers?.From  || body.envelope?.from || '',
-      to:       body.envelope?.to   || body.headers?.To    || '',
-      subject:  body.headers?.Subject || '',
+      fromRaw:  body.headers?.from  || body.envelope?.from || '',
+      to:       body.envelope?.to   || body.headers?.to    || '',
+      subject:  body.headers?.subject || '',
       text:     body.plain || stripHtml(body.html || ''),
-      dateStr:  body.headers?.Date  || null,
+      dateStr:  body.headers?.date  || null,
     }
   }
   // Flat format (testing + other services)
