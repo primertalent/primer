@@ -80,11 +80,11 @@ function normalizePayload(body) {
   // CloudMailin JSON Normalized format — headers are all lowercase
   if (body.envelope || body.headers) {
     return {
-      fromRaw:         body.headers?.from     || body.envelope?.from || '',
-      to:              body.envelope?.to       || body.headers?.to   || '',
-      subject:         body.headers?.subject  || '',
-      text:            body.plain || stripHtml(body.html || ''),
-      dateStr:         body.headers?.date     || null,
+      fromRaw:         body.headers?.from     || body.envelope?.from || body.from || '',
+      to:              body.envelope?.to       || body.headers?.to   || body.to   || '',
+      subject:         body.headers?.subject  || body.subject        || '',
+      text:            body.plain || stripHtml(body.html || '') || body.text || '',
+      dateStr:         body.headers?.date     || body.date           || null,
       listUnsubscribe: body.headers?.['list-unsubscribe'] || null,
     }
   }
