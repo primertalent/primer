@@ -538,6 +538,20 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
 - The `drafts` table exists with RLS and constraints but has zero consumers in the UI. First consumer ships in Build 2.
 
+**Phase 2.75 — LinkedIn browser extension:**
+- Status: captured, not committed. Sequencing decision after Build 2 and Build 3 ship and email ingestion has been used on real candidates for 2+ weeks.
+- What it does: Chrome extension that adds Wren to LinkedIn profile and message surfaces. Scrapes visible content (user-consented, acting as the user). POSTs to the existing ingestion endpoint. In-place access to existing skills: screener, scorecard, pitch builder, outreach generators. Save to a role from a profile view. Generate outreach from a profile. Rate against an active JD.
+- Why it matters: 60-70% of first responses from candidates come back through LinkedIn, not email. Email ingestion is necessary but not sufficient. LinkedIn has no API for messages. Extension is the only path that doesn't depend on LinkedIn's API and doesn't get shut off.
+- Why it's strategic: This is where the work happens. Removes context switching. Skills already built become more useful from this surface. Once installed and trusted, switching cost is real. Demoable in 30 seconds.
+- Scope: 1-2 weeks. Manifest V3 compliance, LinkedIn DOM scraping, auth from extension to endpoint, in-extension UI.
+- Decision gate: After 2 weeks of real email ingestion use, ask whether email alone feels sufficient or LinkedIn data is constantly missing. If the second, build the extension before Phase 3. If the first, ship Phase 3 first.
+
+**Known ingestion gaps:**
+- LinkedIn messages: deferred until extension ships. Manual paste via WrenCommand works for now.
+- Phone calls: Granola/Fathom integration deferred to Phase 4.
+- Texts: deferred. Lowest signal-to-effort ratio.
+- In-person meeting notes: manual paste via WrenCommand works.
+
 **Phase 3 — PWA (earliest day 30, only after ingestion is real and Tray is daily surface):**
 - Phone app with push notifications, voice input, voice output, swipe-to-act
 - Soccer-game test: open Wren on phone, see top 3 actions, act on one in under 10 seconds
@@ -550,6 +564,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 
 **What's next (immediate):**
 - **Phase 2.5 — Email ingestion:** Build 1 shipped (2026-05-05). Build 2 (action cards + draft after transcript) is next. Build 3 (Tier 1 autonomous send) queued after that.
+- **Phase 2.75 — LinkedIn extension:** Sequencing decision after Build 3 ships and 2 weeks of email ingestion real use. See Phase 2.75 entry above for decision criteria.
 - **Phase 2 completion (deferred until after Phase 2.5):** CandidateCard and RoleDetail strip-down. CF-1, CF-2, CF-4 open; CF-3 partial.
 - **Phase 3 (PWA):** Push notifications, voice, swipe-to-act. Earliest day 30, only after ingestion is real and Tray is daily surface.
 - **Phase 4 (Google Workspace OAuth):** Full Google auth covering Gmail + Calendar + Meet, deal scorecard, close sequence generator, calibration view.
