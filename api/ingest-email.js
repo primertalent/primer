@@ -133,20 +133,24 @@ function isBlocklistedAddress(email) {
 
 // ── ingestion_log writer (fire-and-forget — never blocks response) ────────────
 
-function writeIngestionLog(recruiterId, fromEmail, subject, classification, reason, rawBody) {
-  supabase.from('ingestion_log').insert({
-    recruiter_id:   recruiterId,
-    from_email:     fromEmail || null,
-    subject:        (subject || '').slice(0, 300) || null,
-    classification,
-    reason,
-    raw_payload: {
-      from:         rawBody.from  || rawBody.envelope?.from  || rawBody.headers?.from  || null,
-      to:           rawBody.to    || rawBody.envelope?.to    || rawBody.headers?.to    || null,
-      subject:      (rawBody.subject || rawBody.headers?.subject || '').slice(0, 300),
-      body_preview: (rawBody.plain  || rawBody.text || '').slice(0, 300),
-    },
-  }).catch(err => console.warn('[ingest-email] ingestion_log write failed:', err.message))
+async function writeIngestionLog(recruiterId, fromEmail, subject, classification, reason, rawBody) {
+  try {
+    await supabase.from('ingestion_log').insert({
+      recruiter_id:   recruiterId,
+      from_email:     fromEmail || null,
+      subject:        (subject || '').slice(0, 300) || null,
+      classification,
+      reason,
+      raw_payload: {
+        from:         rawBody.from  || rawBody.envelope?.from  || rawBody.headers?.from  || null,
+        to:           rawBody.to    || rawBody.envelope?.to    || rawBody.headers?.to    || null,
+        subject:      (rawBody.subject || rawBody.headers?.subject || '').slice(0, 300),
+        body_preview: (rawBody.plain  || rawBody.text || '').slice(0, 300),
+      },
+    })
+  } catch (err) {
+    console.warn('[ingest-email] ingestion_log write failed:', err.message)
+  }
 }
 
 // ── Agent loop trigger (fire-and-forget) ──────────────────────────────────────
