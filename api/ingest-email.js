@@ -58,20 +58,26 @@ import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundE
 // ── Gemini Notes detection helpers ───────────────────────────────────────────
 
 function isGeminiNotesEmail(fromEmail, subject, body) {
-  // Primary: deterministic sender address — catches before classifier (which would
-  // classify automated notifications as noise and discard them).
+  // Primary: deterministic sender address (direct delivery from Google).
   if ((fromEmail || '').toLowerCase() === 'gemini-notes@google.com') return true
-  // Secondary: subject + body signals for forwarded or renamed variants.
-  const subjectMatch = /^Notes:/i.test((subject || '').trim())
-  const bodyMatch    = /auto-generated|These notes have been sent to invited guests/i.test(body || '')
+  // Secondary: subject + body signals — handles forwarded versions where the
+  // recruiter forwards the email to the CloudMailin address manually.
+  // Subject patterns: "Notes: ...", "Fw: Notes: ...", "Fwd: Notes: ..."
+  const s = (subject || '').trim()
+  const subjectMatch = /^(?:Fwd?:\s*)?Notes:/i.test(s)
+  // Body signals: auto-generated text, invited-guests notice, or the original
+  // sender address appearing in the quoted body of a forwarded email.
+  const bodyMatch = /auto-generated|These notes have been sent to invited guests|gemini-notes@google\.com/i.test(body || '')
   return subjectMatch && bodyMatch
 }
 
 // Extracts the candidate's name from a Gemini Notes subject line.
 // Expected pattern: "Notes: ... between [Recruiter Name] and [Candidate Name] [date?]"
 // The second person after "and" is the candidate.
+// Strips Fw:/Fwd:/Re: prefixes before matching so forwarded subjects work correctly.
 function extractCandidateNameRegex(subject) {
-  const m = /between\s+(?:[A-Z]\S+(?:\s+[A-Z]\S+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i.exec(subject || '')
+  const normalized = (subject || '').replace(/^(Fwd?:|Re:)\s*/gi, '').trim()
+  const m = /between\s+(?:[A-Z]\S+(?:\s+[A-Z]\S+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i.exec(normalized)
   if (!m) return null
   // Strip trailing date tokens (e.g. "May 6, 2026" or "5/6/2026")
   return m[1].replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d).*$/i, '').trim() || null
@@ -82,13 +88,15 @@ async function extractCandidateNameFromSubject(subject) {
   if (fromRegex) return fromRegex
 
   // Haiku fallback for non-standard subject formats (quoted titles, missing "between", etc.)
+  // Strip forward/reply prefixes before passing to the model — cleaner signal.
+  const normalizedSubject = (subject || '').replace(/^(Fwd?:|Re:)\s*/gi, '').trim()
   try {
     const resp = await anthropic.messages.create({
       model:      'claude-haiku-4-5-20251001',
       max_tokens: 30,
       messages:   [{
         role:    'user',
-        content: `This is a Google Gemini meeting notes email subject. Extract only the job candidate's full name. The subject describes a call between a recruiter and a job candidate. Return only the candidate's full name. If uncertain, return "unknown".\n\nSubject: ${subject}`,
+        content: `This is a Google Gemini meeting notes email subject. Extract only the job candidate's full name. The subject describes a call between a recruiter and a job candidate. Return only the candidate's full name. If uncertain, return "unknown".\n\nSubject: ${normalizedSubject}`,
       }],
     })
     const name = resp.content.find(b => b.type === 'text')?.text?.trim() ?? ''
