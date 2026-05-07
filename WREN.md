@@ -536,9 +536,10 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
   - ⬜ **Piece 3 — Submittal-after-Meet flow:** First real consumer of the drafts table. Detects Meet transcript inbound, generates submittal draft, surfaces as action card with inline review/approve/edit/discard. ~2–3 hours.
 - ⬜ **Build 3:** Tier 2 approval-based send. Gmail OAuth or current desk action. Queued after Piece 3.
 
-**Known limitations after Build 2 Piece 1 + 2:**
+**Known limitations / tech debt:**
 - Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
-- The `drafts` table exists with RLS and constraints but has zero consumers. First consumer ships in Build 2 Piece 3.
+- The `drafts` table first consumer ships in Build 2 Piece 3 (Gemini Notes capture + explicit draft trigger).
+- **`/api/ai` has no auth gate.** Any POST with a valid messages body bills the Anthropic key. Pre-existing condition, not introduced by Piece 3. Harden before any beta user signs up: add a Supabase JWT check or shared secret to the route. Piece 3 does not worsen the exposure — `fireResponse` in AgentContext already uses this endpoint.
 
 **Phase 2.75 — LinkedIn browser extension:**
 - Status: captured, not committed. Sequencing decision after Build 2 and Build 3 ship and email ingestion has been used on real candidates for 2+ weeks.

@@ -55,6 +55,216 @@ import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
 
+// ── Gemini Notes detection helpers ───────────────────────────────────────────
+
+function isGeminiNotesEmail(fromEmail, subject, body) {
+  // Primary: deterministic sender address — catches before classifier (which would
+  // classify automated notifications as noise and discard them).
+  if ((fromEmail || '').toLowerCase() === 'gemini-notes@google.com') return true
+  // Secondary: subject + body signals for forwarded or renamed variants.
+  const subjectMatch = /^Notes:/i.test((subject || '').trim())
+  const bodyMatch    = /auto-generated|These notes have been sent to invited guests/i.test(body || '')
+  return subjectMatch && bodyMatch
+}
+
+// Extracts the candidate's name from a Gemini Notes subject line.
+// Expected pattern: "Notes: ... between [Recruiter Name] and [Candidate Name] [date?]"
+// The second person after "and" is the candidate.
+function extractCandidateNameRegex(subject) {
+  const m = /between\s+(?:[A-Z]\S+(?:\s+[A-Z]\S+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i.exec(subject || '')
+  if (!m) return null
+  // Strip trailing date tokens (e.g. "May 6, 2026" or "5/6/2026")
+  return m[1].replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d).*$/i, '').trim() || null
+}
+
+async function extractCandidateNameFromSubject(subject) {
+  const fromRegex = extractCandidateNameRegex(subject)
+  if (fromRegex) return fromRegex
+
+  // Haiku fallback for non-standard subject formats (quoted titles, missing "between", etc.)
+  try {
+    const resp = await anthropic.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 30,
+      messages:   [{
+        role:    'user',
+        content: `This is a Google Gemini meeting notes email subject. Extract only the job candidate's full name. The subject describes a call between a recruiter and a job candidate. Return only the candidate's full name. If uncertain, return "unknown".\n\nSubject: ${subject}`,
+      }],
+    })
+    const name = resp.content.find(b => b.type === 'text')?.text?.trim() ?? ''
+    return (name === 'unknown' || !name) ? null : name
+  } catch {
+    return null
+  }
+}
+
+// ── Gemini Notes ingestion path ───────────────────────────────────────────────
+// Capture only — no AI draft generation. Draft fires when the recruiter
+// explicitly clicks "Draft submittal" on the action card (Piece 3 Chunk 2).
+//
+// Three outcomes:
+//   A — candidate not identified → notes_pending_match action card
+//   B — candidate matched, no active pipeline → intake_notes_ready (no pipeline context)
+//   C — candidate matched + active pipeline → intake_notes_ready (full pipeline context)
+//
+// NOTE: "Match candidate" chip navigates to /network as placeholder.
+// After manual match, re-triggering submittal generation from the candidate page
+// is a known gap — deferred to Piece 4.
+
+async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, host }) {
+  const candidateName = await extractCandidateNameFromSubject(subject)
+
+  // ── Candidate lookup ─────────────────────────────────────────────────────
+  let candidateId     = null
+  let candidateRecord = null
+
+  if (candidateName) {
+    const { first_name, last_name } = parseNameParts(candidateName)
+    let q = supabase
+      .from('candidates')
+      .select('id, first_name, last_name, current_title, current_company, location')
+      .eq('recruiter_id', recruiterId)
+      .ilike('first_name', first_name)
+
+    if (last_name && last_name !== '—') q = q.ilike('last_name', last_name)
+
+    const { data: match } = await q.maybeSingle()
+    if (match) { candidateId = match.id; candidateRecord = match }
+  }
+
+  // ── Write interaction (always — preserves the raw notes regardless of match) ─
+  const { data: interaction, error: intErr } = await supabase
+    .from('interactions')
+    .insert({
+      recruiter_id: recruiterId,
+      candidate_id: candidateId,
+      pipeline_id:  null,
+      type:         'email',
+      direction:    'inbound',
+      subject:      subject    || null,
+      body:         body       || null,
+      occurred_at:  occurredAt,
+      meta: {
+        from_email:               from.email    || null,
+        is_meet_notes:            true,
+        candidate_name_extracted: candidateName || null,
+        classification:           'candidate_communication',
+      },
+    })
+    .select('id')
+    .single()
+
+  if (intErr) throw intErr
+
+  // ── Outcome A: candidate not found ───────────────────────────────────────
+  if (!candidateId) {
+    const whyMsg = candidateName
+      ? `Meet notes received for "${candidateName}" but I couldn't find them in your network. Tell me who this is.`
+      : `Meet notes received but I couldn't identify the candidate from the subject. Tell me who this is.`
+
+    await supabase.from('actions').insert({
+      recruiter_id:        recruiterId,
+      action_type:         'notes_pending_match',
+      linked_entity_id:    null,
+      linked_entity_type:  null,
+      urgency:             'today',
+      why:                 whyMsg,
+      suggested_next_step: 'Match candidate',
+      confidence:          'high',
+      content_hash:        crypto.createHash('sha256')
+        .update(`${recruiterId}:null:notes_pending_match:${interaction.id}`)
+        .digest('hex'),
+      context: {
+        interaction_id: interaction.id,
+        subject:        subject        || null,
+        extracted_name: candidateName  || null,
+      },
+    }).catch(err => console.warn('[ingest-email] notes_pending_match action insert failed:', err.message))
+
+    triggerLoop(host, recruiterId)
+    return { outcome: 'A', candidate_name: candidateName }
+  }
+
+  // ── Active pipeline lookup (with role + client context for Outcome C) ────
+  const { data: activePipelines } = await supabase
+    .from('pipeline')
+    .select('id, roles(id, title, notes, target_comp_min, target_comp_max, clients(id, name))')
+    .eq('candidate_id', candidateId)
+    .eq('recruiter_id', recruiterId)
+    .eq('status', 'active')
+    .not('current_stage', 'in', '(placed,lost)')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+
+  const candidateFullName = `${candidateRecord.first_name} ${candidateRecord.last_name}`.trim()
+
+  // ── Outcome B: candidate found, no active pipeline ───────────────────────
+  if (!activePipelines?.length) {
+    await supabase.from('actions').insert({
+      recruiter_id:        recruiterId,
+      action_type:         'intake_notes_ready',
+      linked_entity_id:    candidateId,
+      linked_entity_type:  'candidate',
+      urgency:             'today',
+      why:                 `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`,
+      suggested_next_step: 'Read notes or add to a role',
+      confidence:          'high',
+      content_hash:        crypto.createHash('sha256')
+        .update(`${recruiterId}:${candidateId}:intake_notes_ready:${interaction.id}`)
+        .digest('hex'),
+      context: {
+        interaction_id: interaction.id,
+        candidate_id:   candidateId,
+        candidate_name: candidateFullName,
+        pipeline_id:    null,
+        role_id:        null,
+        role_title:     null,
+        client_name:    null,
+        notes_body:     body || '',
+      },
+    }).catch(err => console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message))
+
+    triggerLoop(host, recruiterId)
+    return { outcome: 'B', candidate_id: candidateId, candidate_name: candidateFullName }
+  }
+
+  // ── Outcome C: candidate found + active pipeline ─────────────────────────
+  const pipeline    = activePipelines[0]
+  const role        = pipeline.roles
+  const client      = role?.clients
+  const roleTitle   = role?.title ?? 'the role'
+
+  // Link interaction to pipeline
+  await supabase.from('interactions').update({ pipeline_id: pipeline.id }).eq('id', interaction.id)
+
+  await supabase.from('actions').insert({
+    recruiter_id:        recruiterId,
+    action_type:         'intake_notes_ready',
+    linked_entity_id:    pipeline.id,
+    linked_entity_type:  'pipeline',
+    urgency:             'today',
+    why:                 `Intake call notes captured for ${candidateFullName}, pitched for ${roleTitle}. Ready to draft submittal when you are.`,
+    suggested_next_step: 'Read notes or trigger submittal draft',
+    confidence:          'high',
+    content_hash:        crypto.createHash('sha256')
+      .update(`${recruiterId}:${pipeline.id}:intake_notes_ready:${interaction.id}`)
+      .digest('hex'),
+    context: {
+      interaction_id: interaction.id,
+      candidate_id:   candidateId,
+      candidate_name: candidateFullName,
+      pipeline_id:    pipeline.id,
+      role_id:        role?.id       ?? null,
+      role_title:     roleTitle,
+      client_name:    client?.name   ?? null,
+      notes_body:     body           || '',
+    },
+  }).catch(err => console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message))
+
+  triggerLoop(host, recruiterId)
+  return { outcome: 'C', candidate_id: candidateId, pipeline_id: pipeline.id }
+}
+
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -247,6 +457,23 @@ export default async function handler(req, res) {
     if (listUnsubscribe) {
       writeIngestionLog(recruiterId, from.email, subject, 'noise', 'unsubscribe_header', req.body)
       return res.status(200).json({ ok: true, skipped: 'unsubscribe_header' })
+    }
+
+    // ── Guard 4: Gemini Notes → capture path (pre-classifier) ────────────────
+    // gemini-notes@google.com is an automated sender the Haiku classifier would
+    // classify as noise and discard. Intercept here on the deterministic address.
+    // Draft generation does NOT happen here — only capture + action card insert.
+    // The recruiter triggers draft generation explicitly via "Draft submittal" chip.
+    if (isGeminiNotesEmail(from.email, subject, body)) {
+      const result = await handleGeminiNotesPath({
+        recruiterId,
+        subject,
+        body,
+        from,
+        occurredAt,
+        host: req.headers.host || 'localhost:3000',
+      })
+      return res.status(200).json({ ok: true, gemini_notes: true, ...result })
     }
 
     // ── Classify email (Haiku — fast, cheap) ────────────────────────────────
