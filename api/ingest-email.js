@@ -162,24 +162,28 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       ? `Meet notes received for "${candidateName}" but I couldn't find them in your network. Tell me who this is.`
       : `Meet notes received but I couldn't identify the candidate from the subject. Tell me who this is.`
 
-    await supabase.from('actions').insert({
-      recruiter_id:        recruiterId,
-      action_type:         'notes_pending_match',
-      linked_entity_id:    null,
-      linked_entity_type:  null,
-      urgency:             'today',
-      why:                 whyMsg,
-      suggested_next_step: 'Match candidate',
-      confidence:          'high',
-      content_hash:        crypto.createHash('sha256')
-        .update(`${recruiterId}:null:notes_pending_match:${interaction.id}`)
-        .digest('hex'),
-      context: {
-        interaction_id: interaction.id,
-        subject:        subject        || null,
-        extracted_name: candidateName  || null,
-      },
-    }).catch(err => console.warn('[ingest-email] notes_pending_match action insert failed:', err.message))
+    try {
+      await supabase.from('actions').insert({
+        recruiter_id:        recruiterId,
+        action_type:         'notes_pending_match',
+        linked_entity_id:    null,
+        linked_entity_type:  null,
+        urgency:             'today',
+        why:                 whyMsg,
+        suggested_next_step: 'Match candidate',
+        confidence:          'high',
+        content_hash:        crypto.createHash('sha256')
+          .update(`${recruiterId}:null:notes_pending_match:${interaction.id}`)
+          .digest('hex'),
+        context: {
+          interaction_id: interaction.id,
+          subject:        subject        || null,
+          extracted_name: candidateName  || null,
+        },
+      })
+    } catch (err) {
+      console.warn('[ingest-email] notes_pending_match action insert failed:', err.message)
+    }
 
     triggerLoop(host, recruiterId)
     return { outcome: 'A', candidate_name: candidateName }
@@ -200,29 +204,33 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
 
   // ── Outcome B: candidate found, no active pipeline ───────────────────────
   if (!activePipelines?.length) {
-    await supabase.from('actions').insert({
-      recruiter_id:        recruiterId,
-      action_type:         'intake_notes_ready',
-      linked_entity_id:    candidateId,
-      linked_entity_type:  'candidate',
-      urgency:             'today',
-      why:                 `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`,
-      suggested_next_step: 'Read notes or add to a role',
-      confidence:          'high',
-      content_hash:        crypto.createHash('sha256')
-        .update(`${recruiterId}:${candidateId}:intake_notes_ready:${interaction.id}`)
-        .digest('hex'),
-      context: {
-        interaction_id: interaction.id,
-        candidate_id:   candidateId,
-        candidate_name: candidateFullName,
-        pipeline_id:    null,
-        role_id:        null,
-        role_title:     null,
-        client_name:    null,
-        notes_body:     body || '',
-      },
-    }).catch(err => console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message))
+    try {
+      await supabase.from('actions').insert({
+        recruiter_id:        recruiterId,
+        action_type:         'intake_notes_ready',
+        linked_entity_id:    candidateId,
+        linked_entity_type:  'candidate',
+        urgency:             'today',
+        why:                 `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`,
+        suggested_next_step: 'Read notes or add to a role',
+        confidence:          'high',
+        content_hash:        crypto.createHash('sha256')
+          .update(`${recruiterId}:${candidateId}:intake_notes_ready:${interaction.id}`)
+          .digest('hex'),
+        context: {
+          interaction_id: interaction.id,
+          candidate_id:   candidateId,
+          candidate_name: candidateFullName,
+          pipeline_id:    null,
+          role_id:        null,
+          role_title:     null,
+          client_name:    null,
+          notes_body:     body || '',
+        },
+      })
+    } catch (err) {
+      console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message)
+    }
 
     triggerLoop(host, recruiterId)
     return { outcome: 'B', candidate_id: candidateId, candidate_name: candidateFullName }
@@ -237,29 +245,33 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   // Link interaction to pipeline
   await supabase.from('interactions').update({ pipeline_id: pipeline.id }).eq('id', interaction.id)
 
-  await supabase.from('actions').insert({
-    recruiter_id:        recruiterId,
-    action_type:         'intake_notes_ready',
-    linked_entity_id:    pipeline.id,
-    linked_entity_type:  'pipeline',
-    urgency:             'today',
-    why:                 `Intake call notes captured for ${candidateFullName}, pitched for ${roleTitle}. Ready to draft submittal when you are.`,
-    suggested_next_step: 'Read notes or trigger submittal draft',
-    confidence:          'high',
-    content_hash:        crypto.createHash('sha256')
-      .update(`${recruiterId}:${pipeline.id}:intake_notes_ready:${interaction.id}`)
-      .digest('hex'),
-    context: {
-      interaction_id: interaction.id,
-      candidate_id:   candidateId,
-      candidate_name: candidateFullName,
-      pipeline_id:    pipeline.id,
-      role_id:        role?.id       ?? null,
-      role_title:     roleTitle,
-      client_name:    client?.name   ?? null,
-      notes_body:     body           || '',
-    },
-  }).catch(err => console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message))
+  try {
+    await supabase.from('actions').insert({
+      recruiter_id:        recruiterId,
+      action_type:         'intake_notes_ready',
+      linked_entity_id:    pipeline.id,
+      linked_entity_type:  'pipeline',
+      urgency:             'today',
+      why:                 `Intake call notes captured for ${candidateFullName}, pitched for ${roleTitle}. Ready to draft submittal when you are.`,
+      suggested_next_step: 'Read notes or trigger submittal draft',
+      confidence:          'high',
+      content_hash:        crypto.createHash('sha256')
+        .update(`${recruiterId}:${pipeline.id}:intake_notes_ready:${interaction.id}`)
+        .digest('hex'),
+      context: {
+        interaction_id: interaction.id,
+        candidate_id:   candidateId,
+        candidate_name: candidateFullName,
+        pipeline_id:    pipeline.id,
+        role_id:        role?.id       ?? null,
+        role_title:     roleTitle,
+        client_name:    client?.name   ?? null,
+        notes_body:     body           || '',
+      },
+    })
+  } catch (err) {
+    console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message)
+  }
 
   triggerLoop(host, recruiterId)
   return { outcome: 'C', candidate_id: candidateId, pipeline_id: pipeline.id }
