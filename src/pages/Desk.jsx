@@ -8,6 +8,8 @@ import RoleDetail from './RoleDetail'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { useAgent } from '../context/AgentContext'
 import { supabase } from '../lib/supabase'
+import { generateText } from '../lib/ai'
+import { buildSubmittalFromMeetNotesMessages } from '../lib/prompts/submissionDraft'
 
 const URGENCY_RANK = { now: 0, today: 1, this_week: 2 }
 
@@ -19,13 +21,21 @@ const URGENCY_SECTIONS = [
 
 export default function Desk() {
   const { recruiter } = useRecruiter()
-  const { ephemeralCards, dismissEphemeralCard, dispatch } = useAgent()
+  const { ephemeralCards, dismissEphemeralCard, dispatch, registerAction, unregisterAction } = useAgent()
   const [persistedActions, setPersistedActions] = useState([])
   const [hasAnyHistory, setHasAnyHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [intakeOpen, setIntakeOpen] = useState(false)
   const [panel, setPanel] = useState({ type: null, id: null })
+  const [toast, setToast] = useState(null)
   const loadedRef = useRef(false)
+
+  // Auto-dismiss toast after 3s
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   function openPanel(action) {
     if (action.candidateId) setPanel({ type: 'candidate', id: action.candidateId })
@@ -65,6 +75,152 @@ export default function Desk() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [recruiter?.id])
+
+  // ── Submittal draft handlers ──────────────────────────────────────────────
+  // Registered here so they have access to recruiter, setPersistedActions, setToast.
+  // Re-registers when recruiter loads (first mount may fire before recruiter is ready).
+  useEffect(() => {
+    if (!recruiter?.id) return
+
+    registerAction('trigger_submittal_draft', async (ctx) => {
+      // Idempotency: reuse an existing generated/in_review draft for this pipeline
+      // created in the last 5 minutes — avoids duplicate Sonnet calls on retry.
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      try {
+        // Clear any previous failure flag before starting
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id ? { ...a, _generationFailed: false } : a
+        ))
+
+        const { data: existingDraft } = await supabase
+          .from('drafts')
+          .select('id, content')
+          .eq('linked_entity_id', ctx.pipeline_id)
+          .eq('linked_entity_type', 'pipeline')
+          .eq('artifact_type', 'submittal')
+          .in('status', ['generated', 'in_review'])
+          .gte('created_at', fiveMinutesAgo)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        let generatedText = ''
+        let draftId = null
+
+        if (existingDraft) {
+          generatedText = existingDraft.content?.text ?? ''
+          draftId = existingDraft.id
+        } else {
+          // Fetch candidate + role for prompt construction
+          let candidate = { first_name: ctx.candidate_name?.split(' ')[0] ?? 'Unknown', last_name: ctx.candidate_name?.split(' ').slice(1).join(' ') ?? '' }
+          let role = { title: ctx.role_title ?? 'Unknown', notes: null }
+
+          const [candRes, roleRes] = await Promise.all([
+            supabase.from('candidates').select('id, first_name, last_name, current_title, current_company, location, cv_text').eq('id', ctx.candidate_id).single(),
+            ctx.role_id
+              ? supabase.from('roles').select('id, title, notes, target_comp_min, target_comp_max').eq('id', ctx.role_id).single()
+              : Promise.resolve({ data: null, error: null }),
+          ])
+          if (!candRes.error && candRes.data) candidate = candRes.data
+          if (!roleRes.error && roleRes.data) role = roleRes.data
+
+          const messages = buildSubmittalFromMeetNotesMessages(candidate, role, ctx.notes_body || '', 'bullet')
+          generatedText = await generateText({ messages, maxTokens: 800 })
+
+          const { data: draft, error: draftErr } = await supabase
+            .from('drafts')
+            .insert({
+              recruiter_id:       recruiter.id,
+              linked_entity_id:   ctx.pipeline_id,
+              linked_entity_type: 'pipeline',
+              artifact_type:      'submittal',
+              content:            { format: 'bullet', text: generatedText },
+              status:             'generated',
+              confidence:         'high',
+              stakes:             'medium',
+              autonomy_tier:      2,
+            })
+            .select('id')
+            .single()
+
+          if (draftErr) throw draftErr
+          draftId = draft.id
+        }
+
+        // Update action row in-place: action_type → submittal_draft_ready, add draft context
+        const newContext = { ...(ctx.current_context ?? {}), draft_id: draftId, draft_text: generatedText }
+        await supabase.from('actions').update({
+          action_type: 'submittal_draft_ready',
+          context: newContext,
+        }).eq('id', ctx.action_id)
+
+        // Optimistic local state — preserves entityName, entitySubtitle, candidateId,
+        // pipelineId, roleId and all other enriched fields from loadActions
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id
+            ? { ...a, action_type: 'submittal_draft_ready', context: newContext }
+            : a
+        ))
+      } catch (err) {
+        console.error('[Desk] trigger_submittal_draft failed:', err)
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id ? { ...a, _generationFailed: true } : a
+        ))
+        setToast('Draft generation failed. Try again.')
+      }
+    })
+
+    registerAction('approve_submittal', async (ctx) => {
+      try {
+        await supabase.from('drafts').update({
+          status:      'approved',
+          approved_at: new Date().toISOString(),
+          content:     { format: 'bullet', text: ctx.content },
+        }).eq('id', ctx.draft_id)
+        setPersistedActions(prev => prev.filter(a => a.id !== ctx.action_id))
+        await supabase.from('actions').update({ acted_on_at: new Date().toISOString() }).eq('id', ctx.action_id)
+        setToast('Submittal copied. Paste into your email to send.')
+      } catch (err) {
+        console.warn('[Desk] approve_submittal failed:', err.message)
+      }
+    })
+
+    registerAction('save_submittal_edits', async (ctx) => {
+      try {
+        await supabase.from('drafts').update({
+          content: { format: 'bullet', text: ctx.content },
+        }).eq('id', ctx.draft_id)
+        // Merge edited draft_text into action context so page refresh shows the edit
+        const newContext = { ...(ctx.current_context ?? {}), draft_text: ctx.content }
+        await supabase.from('actions').update({ context: newContext }).eq('id', ctx.action_id)
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id ? { ...a, context: newContext } : a
+        ))
+      } catch (err) {
+        console.warn('[Desk] save_submittal_edits failed:', err.message)
+      }
+    })
+
+    registerAction('discard_submittal', async (ctx) => {
+      try {
+        await supabase.from('drafts').update({
+          status:       'discarded',
+          discarded_at: new Date().toISOString(),
+        }).eq('id', ctx.draft_id)
+        setPersistedActions(prev => prev.filter(a => a.id !== ctx.action_id))
+        await supabase.from('actions').update({ acted_on_at: new Date().toISOString() }).eq('id', ctx.action_id)
+      } catch (err) {
+        console.warn('[Desk] discard_submittal failed:', err.message)
+      }
+    })
+
+    return () => {
+      unregisterAction('trigger_submittal_draft')
+      unregisterAction('approve_submittal')
+      unregisterAction('save_submittal_edits')
+      unregisterAction('discard_submittal')
+    }
+  }, [recruiter?.id, registerAction, unregisterAction])
 
   async function loadActions() {
     // Check if agent loop has ever run for this recruiter
@@ -268,6 +424,10 @@ export default function Desk() {
           )}
         </SidePanel>
       )}
+
+      {/* Toast — DESIGN: border-radius 0, --panel bg, --hair-2 border, --ink text,
+          JetBrains Mono uppercase, no --win, no icon, no emoji */}
+      {toast && <div className="desk-toast">{toast}</div>}
 
     </AppLayout>
   )

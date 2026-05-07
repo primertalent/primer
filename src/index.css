@@ -5858,3 +5858,184 @@ select.field-input {
   height: 1px;
   background: var(--hair);
 }
+
+/* ── Shared draft/notes action buttons ───────────────────────────────────────
+   Matches action-chip exactly: border-radius 0, --bg bg, --hair border, --ink text.
+   DESIGN.md Rule 1: border-radius 0.
+   DESIGN.md Rule 3: no --win used anywhere here — primary is --ink, not --win. */
+
+.action-draft-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 0;                        /* Rule 1 */
+  font-size: 13px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  background: var(--bg);
+  border: 1px solid var(--hair);
+  color: var(--ink);
+}
+
+.action-draft-btn:hover {
+  background: var(--ink);
+  color: var(--ink-inverse);
+  border-color: var(--ink);
+}
+
+.action-draft-btn--primary {
+  background: var(--ink);
+  color: var(--ink-inverse);
+  border-color: var(--ink);
+}
+
+.action-draft-btn--primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.action-draft-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── intake_notes_ready: notes expansion ─────────────────────────────────────*/
+
+.action-notes {
+  margin-top: 14px;
+}
+
+.action-draft-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Notes expanded container — DESIGN.md Rule 2: NO box-shadow (inline, not floating) */
+.action-notes-body {
+  margin-top: 14px;
+  border-top: 1px solid var(--hair);
+  padding-top: 14px;
+}
+
+/* Section headers — DESIGN.md Rule 4: JetBrains Mono uppercase.
+   Hairline bottom border separates each header from its body. */
+.notes-section-header {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hair);
+}
+
+/* Section body — DESIGN.md Rule 4: Fraunces for prose. white-space: pre-wrap
+   preserves Gemini Notes line breaks without needing a parser for every variant. */
+.notes-section-body {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0 0 18px;
+  white-space: pre-wrap;
+}
+
+.action-notes-collapse {
+  margin-top: 4px;
+}
+
+/* Generating state indicator */
+.action-generating {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* DESIGN.md Rule 4: JetBrains Mono for operator labels */
+.action-generating-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--mute);
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+/* ── submittal_draft_ready: inline review ────────────────────────────────────*/
+
+.action-draft {
+  margin-top: 14px;
+}
+
+/* Preview text — DESIGN.md Rule 4: Fraunces prose, --mute so it reads as secondary */
+.action-draft-preview {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--mute);
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+}
+
+/* Expanded draft container — DESIGN.md Rule 2: NO box-shadow (inline, not floating) */
+.action-draft-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Textarea — DESIGN.md Rule 1: border-radius 0.
+   DESIGN.md Rule 2: focus uses border: 2px solid --ink, NOT box-shadow.
+   DESIGN.md Rule 4: Fraunces for the draft prose body.
+   Browser default outline suppressed; border carries the focus state. */
+.action-draft-textarea {
+  width: 100%;
+  min-height: 200px;
+  border: 1px solid var(--hair);
+  border-radius: 0;                        /* Rule 1 */
+  background: var(--bg);
+  font-family: var(--font-serif);          /* Rule 4: Fraunces for prose */
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  padding: 12px;
+  resize: vertical;
+  outline: none;                           /* Rule 2: no browser focus ring */
+  box-sizing: border-box;
+}
+
+.action-draft-textarea:focus {
+  border: 2px solid var(--ink);           /* Rule 2: solid ink border, no box-shadow */
+}
+
+.action-draft-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Desk toast ───────────────────────────────────────────────────────────────
+   DESIGN.md Rule 1: border-radius 0.
+   DESIGN.md Rule 4: JetBrains Mono uppercase for operator label.
+   No --win, no icon, no emoji, no border-radius. */
+.desk-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--hair-2);
+  border-radius: 0;                        /* Rule 1 */
+  padding: 12px 20px;
+  font-family: var(--font-mono);           /* Rule 4 */
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  z-index: 1000;
+  white-space: nowrap;
+  pointer-events: none;
+}
