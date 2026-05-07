@@ -540,6 +540,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
 - The `drafts` table first consumer ships in Build 2 Piece 3 (Gemini Notes capture + explicit draft trigger).
 - **`/api/ai` has no auth gate.** Any POST with a valid messages body bills the Anthropic key. Pre-existing condition, not introduced by Piece 3. Harden before any beta user signs up: add a Supabase JWT check or shared secret to the route. Piece 3 does not worsen the exposure — `fireResponse` in AgentContext already uses this endpoint.
+- **Discard chip on `intake_notes_ready` writes `acted_on_at`, which suppresses re-generation.** Semantically the field name is wrong (the recruiter didn't act, they declined). The behavior is right (recruiter explicitly declining shouldn't surface again on next loop). Future fix is loop-level: distinguish "declined to act" dismissal from "snooze" dismissal. Park until field-name confusion actually causes a debugging issue.
 
 **Phase 2.75 — LinkedIn browser extension:**
 - Status: captured, not committed. Sequencing decision after Build 2 and Build 3 ship and email ingestion has been used on real candidates for 2+ weeks.

@@ -94,6 +94,14 @@ Wren handles the operational work an entry-level recruiter would handle, with se
 
 **The testable product principle.** Wren earns its place by showing up with context the recruiter didn't enter. Every time Wren asks the recruiter for data the recruiter has already produced somewhere else, Wren is a tool. Every time Wren arrives knowing what happened, Wren is a coworker. Ingestion is not a feature. Ingestion is what makes the product real.
 
+**Wren enhances the life the recruiter already lives.** The recruiter is the user, but their attention is the product. They're a skilled operator running on tight margins where every minute of admin work is friction tax on billable hours. Assume they will not type, click, paste, or maintain anything that Wren could do itself.
+
+When Wren has structured signal about new data — a candidate name in an email subject, comp in a transcript, a meeting on a calendar — Wren creates the record. The recruiter never types data Wren already has. Wren's capture surfaces are the surfaces the recruiter already uses: their inbox, their calendar, their meetings. Wren reads from there. The recruiter doesn't change their workflow.
+
+The recruiter's first action on any signal is judgment, never data entry. "Which role does this fit?" not "Add this candidate to the system." Every ask Wren makes of the recruiter must justify itself. If a step exists in the recruiter's flow that Wren could remove, that step is technical debt.
+
+This principle resolves design decisions by elimination. When in doubt: which path requires less from the recruiter? That path is the right one.
+
 ---
 
 ## The surfaces

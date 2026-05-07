@@ -98,41 +98,153 @@ async function extractCandidateNameFromSubject(subject) {
   }
 }
 
+// Extracts structured candidate fields from Gemini Notes body via Haiku.
+// Bounded at 250 tokens; falls back to all-null on any parse failure so
+// candidate creation always proceeds even if extraction returns garbage.
+async function extractCandidateFieldsFromNotes(notesBody) {
+  try {
+    const resp = await anthropic.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 250,
+      messages:   [{
+        role:    'user',
+        content: `Extract candidate data from these recruiter call notes. Return ONLY valid JSON with these exact fields (null for anything not mentioned):
+{"current_title":null,"current_company":null,"location":null,"motivation_summary":null,"source_context":null}
+
+Call notes:
+${(notesBody || '').slice(0, 3000)}`,
+      }],
+    })
+    const raw     = resp.content.find(b => b.type === 'text')?.text?.trim() ?? ''
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+    const parsed  = JSON.parse(cleaned)
+    return {
+      current_title:      typeof parsed.current_title      === 'string' ? parsed.current_title.slice(0, 200)      : null,
+      current_company:    typeof parsed.current_company    === 'string' ? parsed.current_company.slice(0, 200)    : null,
+      location:           typeof parsed.location           === 'string' ? parsed.location.slice(0, 200)           : null,
+      motivation_summary: typeof parsed.motivation_summary === 'string' ? parsed.motivation_summary.slice(0, 500) : null,
+      source_context:     typeof parsed.source_context     === 'string' ? parsed.source_context.slice(0, 300)     : null,
+    }
+  } catch {
+    return { current_title: null, current_company: null, location: null, motivation_summary: null, source_context: null }
+  }
+}
+
 // ── Gemini Notes ingestion path ───────────────────────────────────────────────
 // Capture only — no AI draft generation. Draft fires when the recruiter
 // explicitly clicks "Draft submittal" on the action card (Piece 3 Chunk 2).
 //
-// Three outcomes:
-//   A — candidate not identified → notes_pending_match action card
-//   B — candidate matched, no active pipeline → intake_notes_ready (no pipeline context)
-//   C — candidate matched + active pipeline → intake_notes_ready (full pipeline context)
+// Candidate resolution (per "Wren enhances the life the recruiter already lives"):
+//   Wren auto-creates the candidate record when name extraction succeeds.
+//   notes_pending_match only fires when name extraction itself fails entirely.
 //
-// NOTE: "Match candidate" chip navigates to /network as placeholder.
-// After manual match, re-triggering submittal generation from the candidate page
-// is a known gap — deferred to Piece 4.
+// Outcomes after candidate resolution:
+//   A — name extraction failed (both regex + Haiku) → notes_pending_match (safety net)
+//   B — candidate resolved, no active pipeline → intake_notes_ready (no pipeline context)
+//   C — candidate resolved + active pipeline → intake_notes_ready (full pipeline context)
 
 async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, host }) {
   const candidateName = await extractCandidateNameFromSubject(subject)
 
-  // ── Candidate lookup ─────────────────────────────────────────────────────
-  let candidateId     = null
-  let candidateRecord = null
+  // ── Outcome A (safety net): name extraction completely failed ────────────
+  // Both regex and Haiku returned null — no structured signal to work with.
+  // Write interaction with null candidate_id and surface notes_pending_match.
+  // This branch is rare; the common path continues below.
+  if (!candidateName) {
+    const { data: interaction, error: intErr } = await supabase
+      .from('interactions')
+      .insert({
+        recruiter_id: recruiterId,
+        candidate_id: null,
+        pipeline_id:  null,
+        type:         'email',
+        direction:    'inbound',
+        subject:      subject    || null,
+        body:         body       || null,
+        occurred_at:  occurredAt,
+        meta: { from_email: from.email || null, is_meet_notes: true, candidate_name_extracted: null, classification: 'candidate_communication' },
+      })
+      .select('id')
+      .single()
 
-  if (candidateName) {
-    const { first_name, last_name } = parseNameParts(candidateName)
-    let q = supabase
-      .from('candidates')
-      .select('id, first_name, last_name, current_title, current_company, location')
-      .eq('recruiter_id', recruiterId)
-      .ilike('first_name', first_name)
+    if (intErr) throw intErr
 
-    if (last_name && last_name !== '—') q = q.ilike('last_name', last_name)
+    try {
+      await supabase.from('actions').insert({
+        recruiter_id:        recruiterId,
+        action_type:         'notes_pending_match',
+        linked_entity_id:    null,
+        linked_entity_type:  null,
+        urgency:             'today',
+        why:                 subject
+          ? `Meet notes received — "${subject.slice(0, 80)}" — but I couldn't identify the candidate. Tell me who this is.`
+          : `Meet notes received but I couldn't identify the candidate from the subject. Tell me who this is.`,
+        suggested_next_step: 'Match candidate',
+        confidence:          'high',
+        content_hash:        crypto.createHash('sha256').update(`${recruiterId}:null:notes_pending_match:${interaction.id}`).digest('hex'),
+        context: { interaction_id: interaction.id, subject: subject || null, extracted_name: null },
+      })
+    } catch (err) {
+      console.warn('[ingest-email] notes_pending_match action insert failed:', err.message)
+    }
 
-    const { data: match } = await q.maybeSingle()
-    if (match) { candidateId = match.id; candidateRecord = match }
+    triggerLoop(host, recruiterId)
+    return { outcome: 'A', candidate_name: null }
   }
 
-  // ── Write interaction (always — preserves the raw notes regardless of match) ─
+  // ── Candidate resolution: lookup existing or auto-create ─────────────────
+  // Wren has the candidate's name from the subject. Look up first — handles
+  // retries and cases where the recruiter manually added the candidate.
+  // If not found, auto-create from structured Gemini Notes body so the recruiter
+  // never has to type data Wren already has (per "Wren enhances the life the
+  // recruiter already lives" principle).
+  const { first_name, last_name } = parseNameParts(candidateName)
+  let candidateId     = null
+  let candidateRecord = null
+  let candidateCreated = false
+
+  let q = supabase
+    .from('candidates')
+    .select('id, first_name, last_name, current_title, current_company, location')
+    .eq('recruiter_id', recruiterId)
+    .ilike('first_name', first_name)
+
+  if (last_name && last_name !== '—') q = q.ilike('last_name', last_name)
+
+  const { data: existing } = await q.maybeSingle()
+
+  if (existing) {
+    candidateId     = existing.id
+    candidateRecord = existing
+  } else {
+    // Not found — extract fields from notes body and create the record
+    const extracted = await extractCandidateFieldsFromNotes(body)
+    const enrichment = (extracted.motivation_summary || extracted.source_context)
+      ? { intake_motivation: extracted.motivation_summary || null, source_context: extracted.source_context || null }
+      : null
+
+    const { data: newCand, error: createErr } = await supabase
+      .from('candidates')
+      .insert({
+        recruiter_id:    recruiterId,
+        first_name,
+        last_name:       last_name !== '—' ? last_name : null,
+        source:          'intake_call',
+        current_title:   extracted.current_title   || null,
+        current_company: extracted.current_company || null,
+        location:        extracted.location        || null,
+        ...(enrichment ? { enrichment_data: enrichment } : {}),
+      })
+      .select('id, first_name, last_name, current_title, current_company, location')
+      .single()
+
+    if (createErr) throw createErr
+    candidateId      = newCand.id
+    candidateRecord  = newCand
+    candidateCreated = true
+  }
+
+  // ── Write interaction (candidate_id always set at this point) ────────────
   const { data: interaction, error: intErr } = await supabase
     .from('interactions')
     .insert({
@@ -147,7 +259,8 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       meta: {
         from_email:               from.email    || null,
         is_meet_notes:            true,
-        candidate_name_extracted: candidateName || null,
+        candidate_name_extracted: candidateName,
+        candidate_created:        candidateCreated,
         classification:           'candidate_communication',
       },
     })
@@ -155,39 +268,6 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     .single()
 
   if (intErr) throw intErr
-
-  // ── Outcome A: candidate not found ───────────────────────────────────────
-  if (!candidateId) {
-    const whyMsg = candidateName
-      ? `Meet notes received for "${candidateName}" but I couldn't find them in your network. Tell me who this is.`
-      : `Meet notes received but I couldn't identify the candidate from the subject. Tell me who this is.`
-
-    try {
-      await supabase.from('actions').insert({
-        recruiter_id:        recruiterId,
-        action_type:         'notes_pending_match',
-        linked_entity_id:    null,
-        linked_entity_type:  null,
-        urgency:             'today',
-        why:                 whyMsg,
-        suggested_next_step: 'Match candidate',
-        confidence:          'high',
-        content_hash:        crypto.createHash('sha256')
-          .update(`${recruiterId}:null:notes_pending_match:${interaction.id}`)
-          .digest('hex'),
-        context: {
-          interaction_id: interaction.id,
-          subject:        subject        || null,
-          extracted_name: candidateName  || null,
-        },
-      })
-    } catch (err) {
-      console.warn('[ingest-email] notes_pending_match action insert failed:', err.message)
-    }
-
-    triggerLoop(host, recruiterId)
-    return { outcome: 'A', candidate_name: candidateName }
-  }
 
   // ── Active pipeline lookup (with role + client context for Outcome C) ────
   const { data: activePipelines } = await supabase
@@ -200,7 +280,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     .order('updated_at', { ascending: false })
     .limit(1)
 
-  const candidateFullName = `${candidateRecord.first_name} ${candidateRecord.last_name}`.trim()
+  const candidateFullName = [candidateRecord.first_name, candidateRecord.last_name].filter(Boolean).join(' ')
 
   // ── Outcome B: candidate found, no active pipeline ───────────────────────
   if (!activePipelines?.length) {
