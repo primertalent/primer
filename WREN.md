@@ -528,15 +528,17 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - ⬜ RoleDetail strip-down (pre-strip-down architecture still in place)
 - ⬜ CF-1, CF-2, CF-4 open; CF-3 partial. Deferred until after Phase 2.5.
 
-**Phase 2.5 — Email ingestion (Build 1 shipped, Build 2 next):**
+**Phase 2.5 — Email ingestion (Build 1 shipped, Build 2 partially shipped):**
 - ✅ **Build 1 (shipped 2026-05-05):** `api/ingest-email.js` receives webhooks from CloudMailin. Auth via shared secret (header or query param). Multi-tenant routing via `recruiters.email_intake_address`. Haiku classifier marks emails as `candidate_communication`, `client_communication`, or `noise`. Fire-and-forget agent loop trigger via internal fetch to `api/agent-loop?recruiter_id=...`. Candidate matched by email or fuzzy name, created as stub if no match. Interaction written with classification in `meta` jsonb. Verified end-to-end with two test emails.
-- ⬜ **Build 2 (~2 days):** Submittal draft after Meet transcript arrives, writes to drafts table, surfaces new inbound as action cards in the Tray.
-- ⬜ **Build 3 (~2 days):** One Tier 1 autonomous send for logistics replies on confirmed interviews.
+- 🔄 **Build 2 (in progress — Piece 1 + Piece 2 shipped 2026-05-06):**
+  - ✅ **Piece 1 — Classifier-first reorder:** Classifier runs before any DB write. Noise discarded to `ingestion_log` table without creating candidates or interactions. Three pre-classifier guards: self-send, domain blocklist (LinkedIn noreply, mailer-daemon, bounce, unsubscribe@), and List-Unsubscribe header detection. `ingestion_log` table created (migration 20260506000001). `interactions.candidate_id` made nullable to support `client_communication` writes. All four guard paths verified in production. Safe to enable Gmail filter forwarding.
+  - ✅ **Piece 2 — new_inbound action cards:** Candidate emails surface as action cards in the Desk Tray within 30–60 seconds of arrival, regardless of pipeline status. Cards carry urgency from classifier output, intent-derived why and suggested_next_step, and two chips: "Draft reply" (navigates to candidate page) and "Add to a role" (navigates with autoScreen state). Realtime INSERT handler fixed to derive entity IDs from `payload.new` instead of hardcoding null (commit 5d0fa07). Verified end-to-end with real email tests.
+  - ⬜ **Piece 3 — Submittal-after-Meet flow:** First real consumer of the drafts table. Detects Meet transcript inbound, generates submittal draft, surfaces as action card with inline review/approve/edit/discard. ~2–3 hours.
+- ⬜ **Build 3:** Tier 2 approval-based send. Gmail OAuth or current desk action. Queued after Piece 3.
 
-**Known limitations after Build 1:**
-- New inbound from candidates without active pipelines does not surface as an action card. The agent loop only reasons about candidates with active pipelines. Intentional for Build 1; resolved in Build 2.
+**Known limitations after Build 2 Piece 1 + 2:**
 - Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
-- The `drafts` table exists with RLS and constraints but has zero consumers in the UI. First consumer ships in Build 2.
+- The `drafts` table exists with RLS and constraints but has zero consumers. First consumer ships in Build 2 Piece 3.
 
 **Phase 2.75 — LinkedIn browser extension:**
 - Status: captured, not committed. Sequencing decision after Build 2 and Build 3 ship and email ingestion has been used on real candidates for 2+ weeks.
@@ -563,7 +565,8 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - Deal scorecard per candidate, close sequence generator, calibration view
 
 **What's next (immediate):**
-- **Phase 2.5 — Email ingestion:** Build 1 shipped (2026-05-05). Build 2 (action cards + draft after transcript) is next. Build 3 (Tier 1 autonomous send) queued after that.
+- **Phase 2.5 Build 2 Piece 3 (next session):** Submittal-after-Meet flow. Detects Meet transcript in inbound email, generates submittal draft, surfaces as action card with inline review/approve/edit/discard. First real consumer of the drafts table.
+- **Phase 2.5 Build 3 (queued after Piece 3):** Tier 2 approval-based send via Gmail OAuth or current desk action.
 - **Phase 2.75 — LinkedIn extension:** Sequencing decision after Build 3 ships and 2 weeks of email ingestion real use. See Phase 2.75 entry above for decision criteria.
 - **Phase 2 completion (deferred until after Phase 2.5):** CandidateCard and RoleDetail strip-down. CF-1, CF-2, CF-4 open; CF-3 partial.
 - **Phase 3 (PWA):** Push notifications, voice, swipe-to-act. Earliest day 30, only after ingestion is real and Tray is daily surface.
@@ -1001,7 +1004,7 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **COLLISION_AUDIT.md captured for Phase 2 source material.** 32 collisions identified. Most resolve via Phase 2 architecture inversion. Carry-forward data flow fixes woven into the strip down build (CF-1 through CF-7).
 - **Three Claude Code build contexts: WREN.md (codebase), VISION.md (founder vision), COLLISION_AUDIT.md (known frictions).** New sessions read all three. POSITIONING.md is for chat-level GTM thinking, not Claude Code sessions.
 - **Agent loop ships before any UI changes.** Engine first, surface second. Phase 1 is the foundation that makes Phase 2 (Actions Tray as Desk) possible. Do not build Actions Tray until the loop is producing reliable output.
-- **Cron runs on GitHub Actions, not Vercel cron.** Vercel Hobby tier doesn't support custom cron schedules. GitHub Actions is free and identical in behavior: scheduled workflow POSTs to `/api/agent-loop` with a shared secret. Switch to Vercel cron if/when on Pro.
+- **Cron runs on GitHub Actions, not Vercel cron.** Vercel Hobby tier doesn't support custom cron schedules. GitHub Actions is free and identical in behavior: scheduled workflow POSTs to `/api/agent-loop` with a shared secret. Switch to Vercel cron if/when on Pro. Workflow URL is `primer-rosy-two.vercel.app`. `hirewren.com` is owned but not yet wired to Vercel — follow-up in Phase 4 to configure the custom domain.
 - **Service role key uses the new `sb_secret_xxx` format.** Stored in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. Bypasses RLS for the agent loop's cross-recruiter scan. Never expose this key client-side.
 - **Actions table is idempotent via content hash.** Hash is `sha256(recruiter_id:linked_entity_id:action_type:suggested_next_step)`. Cron retries and overlapping runs don't duplicate undismissed actions. `source_run_id` groups all actions from a single loop run.
 - **Agent loop prompt designed for graceful degradation.** Day-one user with one Sourced-stage candidate gets a useful `sharpening_ask`. Rich-data user gets pattern-aware actions. Same prompt scales with available context — no separate thin-data path needed.
@@ -1012,6 +1015,8 @@ Architectural and product decisions that stand. Behavior here overrides intuitio
 - **`build_search_strings` is never a manual chip.** It auto-fires on role creation. Showing it as a chip is redundant and clutters the action. Suppressed in ActionCard regardless of what the agent suggests.
 - **ActionCard filters chips by entity ID availability.** Role-only chip actions (`add_fee`, `build_search_strings`) are hidden when no `role_id` in context. Candidate-only chip actions hidden when no `candidate_id`. Prevents silent no-ops and irrelevant suggestions.
 - **WrenCommand must pass entity IDs into fireResponse context.** `candidateId` and `roleId` are available from `onSaved` callback — must be forwarded so ephemeral cards are clickable and chips can dispatch with the right IDs. Missing IDs = unclickable card + silent chip no-ops.
+- **Verify migrations landed with `information_schema.tables`, not just SQL Editor confirmations.** A migration appeared to succeed but the CREATE TABLE statement silently didn't apply — only the ALTER TABLE ran. After running any migration that creates a new table, confirm existence before shipping code that writes to it.
+- **Realtime payload consumers must extract all needed data from the row, not just routing fields.** Build 2 Piece 2 had a bug where the Desk realtime INSERT handler hardcoded entity IDs to null, breaking chip rendering and dispatch on newly-arrived cards. The bug was invisible in code review because the data was correct in the DB — it only surfaced when clicking a live card. When reviewing realtime consumers, verify they read `linked_entity_type`/`linked_entity_id` and derive downstream IDs, not only `recruiter_id`. Fixed in commit 5d0fa07.
 
 ---
 
