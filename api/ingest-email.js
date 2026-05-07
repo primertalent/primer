@@ -51,6 +51,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
 
@@ -111,6 +112,13 @@ function parseNameParts(fullName) {
     first_name: parts[0] || 'Unknown',
     last_name:  parts.slice(1).join(' ') || '—',
   }
+}
+
+function buildWhy(name, intent) {
+  const who  = name || 'A candidate'
+  if (!intent) return `${who} replied.`
+  const detail = intent.charAt(0).toUpperCase() + intent.slice(1)
+  return `${who} replied. ${detail.endsWith('.') ? detail : `${detail}.`}`
 }
 
 // ── Pre-classifier noise guards ───────────────────────────────────────────────
@@ -400,6 +408,36 @@ export default async function handler(req, res) {
       .single()
 
     if (intErr) throw intErr
+
+    // ── Write new_inbound action card (immediate — no loop wait) ─────────────
+    // Surfaces the email on the Desk Tray the moment it arrives, even if the
+    // candidate has no active pipeline (which the agent loop would have missed).
+    try {
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(`${recruiterId}:${candidateId}:new_inbound:${interaction.id}`)
+        .digest('hex')
+
+      await supabase.from('actions').insert({
+        recruiter_id:        recruiterId,
+        action_type:         'new_inbound',
+        linked_entity_id:    candidateId,
+        linked_entity_type:  'candidate',
+        urgency:             classification?.urgency ?? 'this_week',
+        why:                 buildWhy(from.name, classification?.candidate_intent),
+        suggested_next_step: pipelineId ? 'Draft a reply' : 'Add to a role',
+        confidence:          'high',
+        content_hash:        contentHash,
+        context: {
+          interaction_id: interaction.id,
+          from_email:     from.email,
+          subject:        subject || null,
+          intent:         classification?.candidate_intent ?? null,
+        },
+      })
+    } catch (actionErr) {
+      console.warn('[ingest-email] new_inbound action insert failed:', actionErr.message)
+    }
 
     // ── Trigger agent loop (fire-and-forget) ─────────────────────────────────
     triggerLoop(req.headers.host || 'localhost:3000', recruiterId)

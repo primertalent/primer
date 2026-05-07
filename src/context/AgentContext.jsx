@@ -7,18 +7,19 @@ const AgentContext = createContext(null)
 
 // Which IDs each action requires. Used in dev to warn on silent no-ops.
 const REQUIRED_IDS = {
-  screen_against_role: ['candidate_id'],
-  draft_submission:    ['candidate_id'],
-  add_fee:             ['role_id'],
-  log_debrief:         ['candidate_id'],
-  log_interaction:     ['candidate_id'],
-  set_expected_comp:   ['candidate_id'],
-  prep_for_interview:  ['candidate_id'],
-  prep_call:           ['candidate_id'],
-  draft_outreach:      ['candidate_id'],
-  build_search_strings:['role_id'],
-  queue_follow_up:     ['candidate_id'],
-  draft_urgency_note:  ['candidate_id'],
+  screen_against_role:  ['candidate_id'],
+  draft_submission:     ['candidate_id'],
+  add_fee:              ['role_id'],
+  log_debrief:          ['candidate_id'],
+  log_interaction:      ['candidate_id'],
+  set_expected_comp:    ['candidate_id'],
+  prep_for_interview:   ['candidate_id'],
+  prep_call:            ['candidate_id'],
+  draft_outreach:       ['candidate_id'],
+  build_search_strings: ['role_id'],
+  queue_follow_up:      ['candidate_id'],
+  draft_urgency_note:   ['candidate_id'],
+  draft_inbound_reply:  ['candidate_id'],
 }
 
 function parseJson(text) {
@@ -149,6 +150,9 @@ export function AgentProvider({ children }) {
         break
       case 'queue_follow_up':
       case 'draft_urgency_note':
+        if (cid) navigate(`/network/${cid}`)
+        break
+      case 'draft_inbound_reply':
         if (cid) navigate(`/network/${cid}`)
         break
       default:

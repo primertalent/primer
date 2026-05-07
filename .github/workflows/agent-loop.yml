@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger agent loop
         run: |
-          curl -X POST https://hirewren.com/api/agent-loop \
+          curl -X POST https://primer-rosy-two.vercel.app/api/agent-loop \
             -H "Authorization: Bearer ${{ secrets.AGENT_LOOP_SECRET }}" \
             --fail-with-body \
             --max-time 15 \

@@ -57,7 +57,8 @@
       "Bash(Select-Object Name)",
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Ryan McGuinness\\\\primer\\\\src\\\\index.css\" | Measure-Object -Line\\).Lines)",
       "PowerShell(Get-Command *)",
-      "WebFetch(domain:docs.cloudmailin.com)"
+      "WebFetch(domain:docs.cloudmailin.com)",
+      "Bash(gh run *)"
     ]
   }
 }

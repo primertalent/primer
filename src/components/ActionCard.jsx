@@ -8,6 +8,7 @@ const DEFAULT_CHIPS = {
   relationship_warm:  [{ label: 'Log interaction', action: 'log_interaction' }],
   sharpening_ask:     [{ label: 'Log debrief', action: 'log_debrief' }],
   mcp_opportunity:    [{ label: 'Draft submission', action: 'draft_submission' }],
+  new_inbound:        [{ label: 'Draft reply', action: 'draft_inbound_reply' }, { label: 'Add to a role', action: 'screen_against_role' }],
 }
 
 // build_search_strings auto-fires on role creation — never show as a manual chip.
@@ -17,6 +18,7 @@ const CANDIDATE_ONLY_ACTIONS = new Set([
   'log_debrief', 'log_interaction', 'set_expected_comp', 'draft_submission',
   'draft_outreach', 'queue_follow_up', 'draft_urgency_note',
   'prep_for_interview', 'prep_call', 'screen_against_role',
+  'draft_inbound_reply',
 ])
 
 const URGENCY_LABEL = { now: 'Now', today: 'Today' }
