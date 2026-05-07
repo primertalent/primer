@@ -143,7 +143,7 @@ ${(notesBody || '').slice(0, 3000)}`,
 //   B — candidate resolved, no active pipeline → intake_notes_ready (no pipeline context)
 //   C — candidate resolved + active pipeline → intake_notes_ready (full pipeline context)
 
-async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, host }) {
+async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, messageId, host }) {
   const candidateName = await extractCandidateNameFromSubject(subject)
 
   // ── Outcome A (safety net): name extraction completely failed ────────────
@@ -162,6 +162,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         subject:      subject    || null,
         body:         body       || null,
         occurred_at:  occurredAt,
+        message_id:   messageId || null,
         meta: { from_email: from.email || null, is_meet_notes: true, candidate_name_extracted: null, classification: 'candidate_communication' },
       })
       .select('id')
@@ -256,6 +257,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       subject:      subject    || null,
       body:         body       || null,
       occurred_at:  occurredAt,
+      message_id:   messageId || null,
       meta: {
         from_email:               from.email    || null,
         is_meet_notes:            true,
@@ -389,6 +391,8 @@ function normalizePayload(body) {
       text:            body.plain || stripHtml(body.html || '') || body.text || '',
       dateStr:         body.headers?.date     || body.date           || null,
       listUnsubscribe: body.headers?.['list-unsubscribe'] || null,
+      // Defensive: check all known CloudMailin variants for Message-ID header
+      messageId:       body.headers?.['message-id'] || body.headers?.['message_id'] || body.headers?.['Message-ID'] || null,
     }
   }
   // Flat format (testing + other services)
@@ -399,6 +403,7 @@ function normalizePayload(body) {
     text:            body.text    || body.plain || stripHtml(body.html || ''),
     dateStr:         body.date    || null,
     listUnsubscribe: null,
+    messageId:       null,
   }
 }
 
@@ -493,7 +498,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { fromRaw, to, subject, text, dateStr, listUnsubscribe } = normalizePayload(req.body)
+    const { fromRaw, to, subject, text, dateStr, listUnsubscribe, messageId } = normalizePayload(req.body)
     const from       = parseFrom(fromRaw)
     const body       = text.trim()
     const occurredAt = parseDate(dateStr)
@@ -531,6 +536,22 @@ export default async function handler(req, res) {
 
     const recruiterId = recruiter.id
 
+    // ── Message-ID dedup (webhook retry protection) ──────────────────────────
+    // CloudMailin retries when it doesn't receive a 200 within its timeout.
+    // If we've already processed this exact email, return 200 immediately.
+    // Skipped when messageId is null (flat test format, manual triggers).
+    if (messageId) {
+      const { data: dupInteraction } = await supabase
+        .from('interactions')
+        .select('id')
+        .eq('recruiter_id', recruiterId)
+        .eq('message_id', messageId)
+        .maybeSingle()
+      if (dupInteraction) {
+        return res.status(200).json({ ok: true, skipped: 'duplicate_message_id', interaction_id: dupInteraction.id })
+      }
+    }
+
     // ── Guard 1: self-send ───────────────────────────────────────────────────
     // Protects against forwarding loops and the recruiter emailing themselves.
     if (recruiter.email && from.email === recruiter.email.toLowerCase()) {
@@ -563,6 +584,7 @@ export default async function handler(req, res) {
         body,
         from,
         occurredAt,
+        messageId,
         host: req.headers.host || 'localhost:3000',
       })
       return res.status(200).json({ ok: true, gemini_notes: true, ...result })
@@ -716,6 +738,7 @@ export default async function handler(req, res) {
         subject:      subject || null,
         body:         body   || null,
         occurred_at:  occurredAt,
+        message_id:   messageId || null,
         meta: {
           from_name:         from.name  || null,
           from_email:        from.email || null,
