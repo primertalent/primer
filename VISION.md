@@ -102,6 +102,10 @@ The recruiter's first action on any signal is judgment, never data entry. "Which
 
 This principle resolves design decisions by elimination. When in doubt: which path requires less from the recruiter? That path is the right one.
 
+**Wren matches before it asks. Wren acts on high confidence.** When call notes, calendar invites, or candidate communication mention explicit context — company names, role titles, tech stack, mutual connections — Wren matches that context against active state in the system. If match confidence is high (90%+), Wren acts: assigns the candidate to the role, creates the pipeline, generates the submittal. The recruiter arrives at the Desk to find the work done. If match confidence is below the threshold, Wren proposes the match with one-click confirmation rather than asking the recruiter to pick from a dropdown. The recruiter's first action is always judgment (confirm, override, dismiss), never data entry.
+
+This is the operational form of "the recruiter never types data Wren already has." The threshold prevents Wren from making bad autonomous decisions while letting it execute the high-conviction ones without friction.
+
 ---
 
 ## The surfaces

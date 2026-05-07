@@ -87,3 +87,23 @@ Everything marked "Resolves in strip down" above disappears because:
 - Actions table becomes the primary Desk surface — invisible agent output is exposed
 - Zone A/B/C static buttons are replaced by contextual action cards — redundant chips go away
 - Dashboard deal list replaced by action cards — SaaS-pattern page structure goes away
+
+---
+
+## Piece 4 Priorities
+> Identified 2026-05-07 during Build 2 Piece 3 real-use testing. These are the highest-leverage frictions surfaced by daily use. Sequence after Build 3 (approval-based send) unless a blocker surfaces first.
+
+**P4-1 — Auto-match candidate to active role from Gemini Notes context.**
+When notes body contains explicit role or company signal with high confidence (90%+ threshold), Wren acts: creates the pipeline, queues the submittal. Below threshold: proposes match with one-click confirm. Drives the "Wren matches before it asks" operating principle added to VISION.md. Current behavior: recruiter must manually tap "Add to a role" after every Gemini Notes card.
+
+**P4-2 — Auto-extract expected comp from call notes.**
+`motivation_summary` and `notes_body` captured via Haiku already contain comp signals. Wren has the data but still asks the recruiter to set comp manually via chip on the action card. Fix: on candidate-pipeline creation, extract comp signal from notes and write to `pipeline.expected_comp` without asking. Recruiter overrides if wrong; doesn't enter if right.
+
+**P4-3 — `intake_notes_ready` card auto-upgrades when pipeline created later.**
+Currently if an `intake_notes_ready` card exists and a pipeline is created for that candidate afterward, the card doesn't flip to `submittal_draft_ready`. Recruiter has to manually retrigger. Fix: subscribe to pipeline INSERT events and update matching `intake_notes_ready` action rows with the new `pipeline_id` in context, then re-surface as `submittal_draft_ready`.
+
+**P4-4 — "Add to a role" button reliability across all entry points.**
+4c15b25 improved picker visibility (Pipeline section now expands, autoScreen state opens picker on arrival). However buttons across the Desk action card chip, DealStatusBar, and sidebar still don't reliably trigger the full flow. Root cause undiagnosed — likely a state timing issue between `openRoles` load and picker render. Workaround: scroll to Pipeline section inside candidate page. Needs a focused debugging session with network tab open.
+
+**P4-5 — `pipeline` table naming convention.**
+Table is singular (`pipeline`) when Supabase convention is plural (`pipelines`). Will cause confusion in raw SQL and future migrations. Rename migration needed before beta. Any query hardcoding `pipeline` as a table name breaks on rename — audit before executing.
