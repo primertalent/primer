@@ -560,31 +560,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Guard 1: self-send ───────────────────────────────────────────────────
-    // Protects against forwarding loops and the recruiter emailing themselves.
-    if (recruiter.email && from.email === recruiter.email.toLowerCase()) {
-      return res.status(200).json({ ok: true, skipped: 'self_send' })
-    }
-
-    // ── Guard 2: domain blocklist ────────────────────────────────────────────
-    // Hard-coded noise sources — skip classifier API call entirely.
-    if (isBlocklistedAddress(from.email)) {
-      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'blocklist', req.body)
-      return res.status(200).json({ ok: true, skipped: 'blocklist' })
-    }
-
-    // ── Guard 3: List-Unsubscribe header ─────────────────────────────────────
-    // Newsletters and marketing emails almost always include this header.
-    if (listUnsubscribe) {
-      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'unsubscribe_header', req.body)
-      return res.status(200).json({ ok: true, skipped: 'unsubscribe_header' })
-    }
-
-    // ── Guard 4: Gemini Notes → capture path (pre-classifier) ────────────────
-    // gemini-notes@google.com is an automated sender the Haiku classifier would
-    // classify as noise and discard. Intercept here on the deterministic address.
-    // Draft generation does NOT happen here — only capture + action card insert.
-    // The recruiter triggers draft generation explicitly via "Draft submittal" chip.
+    // ── Guard 1: Gemini Notes → capture path ────────────────────────────────
+    // Must run before the self-send guard: when Ryan manually forwards a Gemini
+    // Notes email to CloudMailin, the from address is ryan@primertalent.com.
+    // The self-send guard would silently discard it. Gemini Notes detection
+    // runs first so forwarded meet recap emails are always processed.
     if (isGeminiNotesEmail(from.email, subject, body)) {
       const result = await handleGeminiNotesPath({
         recruiterId,
@@ -596,6 +576,26 @@ export default async function handler(req, res) {
         host: req.headers.host || 'localhost:3000',
       })
       return res.status(200).json({ ok: true, gemini_notes: true, ...result })
+    }
+
+    // ── Guard 2: self-send ───────────────────────────────────────────────────
+    // Protects against forwarding loops and the recruiter emailing themselves.
+    if (recruiter.email && from.email === recruiter.email.toLowerCase()) {
+      return res.status(200).json({ ok: true, skipped: 'self_send' })
+    }
+
+    // ── Guard 3: domain blocklist ────────────────────────────────────────────
+    // Hard-coded noise sources — skip classifier API call entirely.
+    if (isBlocklistedAddress(from.email)) {
+      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'blocklist', req.body)
+      return res.status(200).json({ ok: true, skipped: 'blocklist' })
+    }
+
+    // ── Guard 4: List-Unsubscribe header ─────────────────────────────────────
+    // Newsletters and marketing emails almost always include this header.
+    if (listUnsubscribe) {
+      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'unsubscribe_header', req.body)
+      return res.status(200).json({ ok: true, skipped: 'unsubscribe_header' })
     }
 
     // ── Classify email (Haiku — fast, cheap) ────────────────────────────────
