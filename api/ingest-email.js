@@ -229,7 +229,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         recruiter_id:    recruiterId,
         first_name,
         last_name:       last_name !== '—' ? last_name : null,
-        source:          'intake_call',
+        source:          'inbound',
         current_title:   extracted.current_title   || null,
         current_company: extracted.current_company || null,
         location:        extracted.location        || null,
