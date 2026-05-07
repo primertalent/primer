@@ -51,9 +51,14 @@ export default function Desk() {
         table: 'actions',
         filter: `recruiter_id=eq.${recruiter.id}`,
       }, payload => {
+        const n = payload.new
+        let candidateId = null, pipelineId = null, roleId = null
+        if      (n.linked_entity_type === 'candidate') candidateId = n.linked_entity_id ?? null
+        else if (n.linked_entity_type === 'pipeline')  pipelineId  = n.linked_entity_id ?? null
+        else if (n.linked_entity_type === 'role')      roleId      = n.linked_entity_id ?? null
         setHasAnyHistory(true)
         setPersistedActions(prev => [
-          { ...payload.new, entityName: null, entitySubtitle: null, candidateId: null, pipelineId: null, roleId: null },
+          { ...n, entityName: null, entitySubtitle: null, candidateId, pipelineId, roleId },
           ...prev,
         ])
       })
