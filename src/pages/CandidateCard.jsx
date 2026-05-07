@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRecruiter } from '../hooks/useRecruiter'
 import AppLayout from '../components/AppLayout'
@@ -1246,6 +1246,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   const { id: paramId } = useParams()
   const id = idProp ?? paramId
   const navigate = useNavigate()
+  const location = useLocation()
   const { recruiter } = useRecruiter()
   const { fireResponse, registerAction, unregisterAction } = useAgent()
 
@@ -1497,8 +1498,19 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   }, [candidate?.id])
 
 
+  // Auto-open picker when arriving via screen_against_role dispatch (location.state.autoScreen set).
+  // Fires once after openRoles loads so the picker list is ready to render.
+  useEffect(() => {
+    if (openRoles === null) return
+    if (location.state?.autoScreen === undefined) return
+    setCollapsePipeline(false)
+    setPickerOpen(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRoles])
+
   function handleOpenPicker() {
     setAddError(null)
+    setCollapsePipeline(false)
     setPickerOpen(prev => !prev)
   }
 
