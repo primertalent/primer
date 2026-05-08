@@ -1330,6 +1330,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
 
   // New layout state
   const autoParseFiredRef = useRef(false)
+  const pickerRef = useRef(null)
   const [showAllInteractions, setShowAllInteractions] = useState(false)
   const [collapseResume, setCollapseResume] = useState(true)
   const [collapseAllDebriefs, setCollapseAllDebriefs] = useState(true)
@@ -1500,18 +1501,25 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
 
   // Auto-open picker when arriving via screen_against_role dispatch (location.state.autoScreen set).
   // Fires once after openRoles loads so the picker list is ready to render.
+  // Property-presence guard (not value comparison) — undefined is a valid autoScreen value when no role is pre-selected.
   useEffect(() => {
     if (openRoles === null) return
-    if (location.state?.autoScreen === undefined) return
+    if (!location.state || !('autoScreen' in location.state)) return
     setCollapsePipeline(false)
     setPickerOpen(true)
+    requestAnimationFrame(() => {
+      pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRoles])
 
   function handleOpenPicker() {
     setAddError(null)
     setCollapsePipeline(false)
-    setPickerOpen(prev => !prev)
+    setPickerOpen(true)
+    requestAnimationFrame(() => {
+      pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   async function handleScreen() {
@@ -2111,6 +2119,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
       } else {
         setAddError('Couldn\'t add to pipeline. Try again.')
       }
+      setAddingRoleId(null)
     } else {
       setPipelines(prev => [...prev, entry])
       setPickerOpen(false)
@@ -2680,11 +2689,11 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
             badge={pipelines.length > 0 ? `${pipelines.length} role${pipelines.length > 1 ? 's' : ''}` : null}
             onToggle={handleExpandPipelineHistory}
           >
-            <button className="btn-ghost btn-sm" onClick={handleOpenPicker} style={{ marginBottom: 12 }}>
+            <button className="btn-ghost btn-sm" onClick={() => pickerOpen ? setPickerOpen(false) : handleOpenPicker()} style={{ marginBottom: 12 }}>
               {pickerOpen ? 'Cancel' : '+ Add to Role'}
             </button>
             {pickerOpen && (
-              <div className="role-picker">
+              <div className="role-picker" ref={pickerRef}>
                 {openRoles?.length === 0 ? (
                   <p className="muted" style={{ padding: '10px 0' }}>No open roles.</p>
                 ) : (
