@@ -6,6 +6,19 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 24 — 2026-05-12
+**P4-1: Auto-match candidate to active role from Gemini Notes. Commit 5758274.**
+
+- New file `api/_lib/matchRoleFromNotes.js`: two-pass matcher (DB pre-filter + Haiku fallback). Pass 1 normalizes company names (strip legal suffixes, leading "The", comma qualifiers), exact equality first, ≥6-char substring fallback. Confidence 95 for single open role at matched client, 98 when role title also appears in notes body. Pass 2: Haiku bounded at 200 tokens, 1500-char notes excerpt, for ambiguous or no-company cases.
+- `api/ingest-email.js` Outcome B now branches three ways: ≥90 confidence → auto-create pipeline, action card born with `pipeline_id` and `auto_matched: true`; 60–89 → proposed match with "Confirm [Role]" + "Different role" buttons; no match or exception → existing "Add to a role" behavior unchanged.
+- Calibration fields in `actions.context` on every match event: `auto_matched`, `auto_match_confidence`, `auto_match_type`, `proposed_match`, `matched_at`, `confirmed_at` (recruiter confirmations). Seed for V2 confidence calibration loop.
+- `ActionCard.jsx` `intake_notes_ready` block extended from 2-way to 3-way ternary. Auto-matched state adds "Wrong role" undo affordance. Proposed-match state shows "Confirm [Role Title]" as primary action.
+- `Desk.jsx` registers `confirm_role_match` (creates pipeline, flips card in-place) and `undo_auto_match` (deletes pipeline, reverts card in-place). Pipeline delete relies on `interactions.pipeline_id ON DELETE SET NULL` to preserve interaction record.
+- `AgentContext.jsx` `REQUIRED_IDS` updated for both new actions.
+- Validated on real intake call same day.
+
+---
+
 ## Session 23 — 2026-05-01
 **Cleanup session. Dead code removed — no features added or changed.**
 
