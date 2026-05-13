@@ -6,6 +6,16 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 26 — 2026-05-13
+**Strategic doc capture. No code. Principles and state captured before they evaporate.**
+
+- **VISION.md:** Two new operating principles added. Email autonomy is tiered, not binary — routine sends one tap on phone, considered sends through desk, never autonomous for submittals/comp/late-stage regardless of preference, power users earn autonomous send over time. Cards are commentary, not tasks — three-part card shape (insight, senior action, Wren's draft), buttons like "Log interaction" are SaaS shape, "Approve and send" is agent shape, convert toward agent shape across card types.
+- **FRICTION.md created:** Live friction log going forward (date/stage/what/tag format). April 16–23 real-use audit preserved as `FRICTION_2026_04_audit.md`.
+- **FEEDBACK.md created:** Customer voice capture. Four verbatims from Ryan (May 13 daily use + strategic session): task-creator anti-pattern, ambient help ideal, submittal as considered send vs. candidate communication as routine send, human-in-the-loop as default with earned autonomy path.
+- **WREN.md:** Phase 4 Gmail send slice marked shipped (commit 3d577d2) in build plan. Agent loop cron failure noted in known limitations (5+ consecutive failures, May 12 evening, diagnosis deferred). DB cleared noted (5 candidates, 1 role, 13 clients, stale test data). What's next updated: agent loop failure elevated as blocking, card shape conversion pass added to queue.
+
+---
+
 ## Session 25 — 2026-05-13
 **P4-2: Auto-extract expected comp from Gemini Notes. Commit c29f037.**
 

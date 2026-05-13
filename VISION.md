@@ -90,9 +90,15 @@ Wren handles the operational work an entry-level recruiter would handle, with se
 
 **Three-tier autonomy.** Wren operates on three tiers. Acts on high-confidence reversible moves. Drafts for approval on judgment moves. Surfaces moments without drafting when the recruiter should decide whether the work is worth doing. The recruiter sees everything Wren did, approves what Wren proposed, and commissions what Wren noticed.
 
+**Email autonomy is tiered, not binary.** Email is a Wren capability, not a card type. Routine sends complete in one tap on phone. Considered sends route through the desk for review. The recruiter never navigates to compose. Wren drafts where it has signal; voice initiates the rest.
+
+Autonomy is tiered. Default is approval required. Power users earn autonomous send on routine sends through demonstrated trust. Some moments (submittals, comp negotiation, late-stage client communication) are never autonomous regardless of preference. Wren refuses to do dumb things even when asked.
+
 **Wren is invisible to candidates.** The recruiter introduces Wren once as their assistant during the relationship's intro stage. Every message Wren sends goes out in the recruiter's voice, signed by the recruiter, indistinguishable in tone from messages the recruiter wrote themselves. The recruiter sees everything Wren did and stays the relationship-of-record. Wren earns trust through invisibility, not announcement.
 
 **The testable product principle.** Wren earns its place by showing up with context the recruiter didn't enter. Every time Wren asks the recruiter for data the recruiter has already produced somewhere else, Wren is a tool. Every time Wren arrives knowing what happened, Wren is a coworker. Ingestion is not a feature. Ingestion is what makes the product real.
+
+**Cards are commentary, not tasks.** Every action card has three parts: (1) the insight Wren noticed, (2) the action a senior recruiter would take, (3) Wren's draft of that action. Cards are not tasks. Cards are commentary on the state of the deal with the next move drafted. The recruiter approves, edits, or rejects. The recruiter never types unless they choose to. Buttons like "Log interaction" are SaaS shape. Buttons like "Approve and send" are agent shape. Convert toward agent shape on every card type.
 
 **Wren enhances the life the recruiter already lives.** The recruiter is the user, but their attention is the product. They're a skilled operator running on tight margins where every minute of admin work is friction tax on billable hours. Assume they will not type, click, paste, or maintain anything that Wren could do itself.
 
