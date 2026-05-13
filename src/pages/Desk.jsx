@@ -300,6 +300,57 @@ export default function Desk() {
       }
     })
 
+    // Phase 4 sliced: send approved submittal via recruiter's Gmail
+    registerAction('send_submittal', async (ctx) => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { setToast('Session expired. Refresh and try again.'); return }
+
+        const res = await fetch('/api/gmail-send', {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            to:           ctx.to_email,
+            subject:      ctx.subject,
+            body:         ctx.content,
+            draft_id:     ctx.draft_id,
+            pipeline_id:  ctx.pipeline_id  ?? null,
+            candidate_id: ctx.candidate_id ?? null,
+          }),
+        })
+        const result = await res.json()
+
+        if (result.error === 'auth_required') {
+          // Gmail not connected or token revoked — initiate OAuth
+          const params = new URLSearchParams({
+            client_id:     import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID,
+            redirect_uri:  `${window.location.origin}/auth/google/callback`,
+            response_type: 'code',
+            scope:         'https://www.googleapis.com/auth/gmail.send',
+            access_type:   'offline',
+            prompt:        'consent',
+          })
+          window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+          return
+        }
+
+        if (!result.success) throw new Error(result.error ?? 'send_failed')
+
+        // Success: complete the action card
+        setPersistedActions(prev => prev.filter(a => a.id !== ctx.action_id))
+        await supabase.from('actions')
+          .update({ acted_on_at: new Date().toISOString() })
+          .eq('id', ctx.action_id)
+        setToast('Sent via Gmail.')
+      } catch (err) {
+        console.error('[Desk] send_submittal failed:', err)
+        setToast('Send failed. Try again or use Approve & copy.')
+      }
+    })
+
     // P4-1: Recruiter rejected Wren's auto-match → delete pipeline, revert card to add-to-role state
     registerAction('undo_auto_match', async (ctx) => {
       try {
@@ -354,6 +405,7 @@ export default function Desk() {
       unregisterAction('discard_submittal')
       unregisterAction('confirm_role_match')
       unregisterAction('undo_auto_match')
+      unregisterAction('send_submittal')
     }
   }, [recruiter?.id, registerAction, unregisterAction])
 
@@ -496,6 +548,7 @@ export default function Desk() {
                       onComplete={null}
                       onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
                       onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
+                      gmailConnected={!!recruiter?.gmail_access_token}
                     />
                   ))}
                 </div>
@@ -521,6 +574,7 @@ export default function Desk() {
                         onComplete={() => handleComplete(action)}
                         onChipClick={(actionId, ctx) => dispatch(actionId, ctx)}
                         onCardClick={(action.candidateId || action.roleId) ? () => openPanel(action) : undefined}
+                        gmailConnected={!!recruiter?.gmail_access_token}
                       />
                     ))}
                   </div>

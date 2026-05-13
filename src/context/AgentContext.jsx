@@ -27,6 +27,7 @@ const REQUIRED_IDS = {
   approve_submittal:       ['draft_id', 'action_id'],
   save_submittal_edits:    ['draft_id', 'content'],
   discard_submittal:       ['draft_id', 'action_id'],
+  send_submittal:          ['draft_id', 'action_id', 'to_email'],
 }
 
 function parseJson(text) {

@@ -50,7 +50,7 @@ function renderNotesSections(body) {
   )
 }
 
-export default function ActionCard({ action, onDismiss, onSnooze, onComplete, onChipClick, onCardClick }) {
+export default function ActionCard({ action, onDismiss, onSnooze, onComplete, onChipClick, onCardClick, gmailConnected }) {
   // intake_notes_ready state
   const [notesExpanded,      setNotesExpanded]      = useState(false)
   const [isGenerating,       setIsGenerating]        = useState(false)
@@ -58,6 +58,7 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
   // submittal_draft_ready state
   const [reviewExpanded, setReviewExpanded] = useState(false)
   const [draftText,      setDraftText]      = useState(() => action.context?.draft_text ?? '')
+  const [toEmail,        setToEmail]        = useState('')
 
   // When action transitions to submittal_draft_ready (via trigger_submittal_draft handler),
   // populate textarea with generated text and clear the generating loading state.
@@ -259,8 +260,29 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
                 onChange={e => setDraftText(e.target.value)}
                 rows={10}
               />
+              {/* Subject preview + To input — shown below textarea, above buttons */}
+              <div className="action-draft-meta">
+                <div className="action-draft-meta-row">
+                  <span className="action-draft-meta-label">Subject</span>
+                  <span className="action-draft-meta-value">
+                    {action.context?.candidate_name ?? 'Candidate'} &ndash; {action.context?.role_title ?? 'Role'}
+                  </span>
+                </div>
+                <div className="action-draft-meta-row">
+                  <span className="action-draft-meta-label">To</span>
+                  <input
+                    type="email"
+                    className="action-draft-to-input"
+                    placeholder="hiring.manager@company.com"
+                    value={toEmail}
+                    onChange={e => setToEmail(e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+
               <div className="action-draft-buttons">
-                {/* "Approve & copy" — DESIGN: --ink bg (primary), border-radius 0, NO --win */}
+                {/* "Approve & copy" — always available as the manual fallback */}
                 <button className="action-draft-btn action-draft-btn--primary"
                   onClick={() => {
                     navigator.clipboard.writeText(draftText)
@@ -273,6 +295,42 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
                   }}>
                   Approve &amp; copy
                 </button>
+                {/* "Approve & send" — sends via Gmail when connected, initiates OAuth when not */}
+                {gmailConnected ? (
+                  <button
+                    className="action-draft-btn"
+                    disabled={!toEmail.trim()}
+                    onClick={() => {
+                      const subject = `${action.context?.candidate_name ?? 'Candidate'} – ${action.context?.role_title ?? 'Role'}`
+                      onChipClick('send_submittal', {
+                        draft_id:     action.context?.draft_id,
+                        content:      draftText,
+                        action_id:    action.id,
+                        to_email:     toEmail.trim(),
+                        subject,
+                        pipeline_id:  action.context?.pipeline_id  ?? null,
+                        candidate_id: action.context?.candidate_id ?? null,
+                      })
+                    }}>
+                    Approve &amp; send
+                  </button>
+                ) : (
+                  <button
+                    className="action-draft-btn"
+                    onClick={() => {
+                      const params = new URLSearchParams({
+                        client_id:     import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID,
+                        redirect_uri:  `${window.location.origin}/auth/google/callback`,
+                        response_type: 'code',
+                        scope:         'https://www.googleapis.com/auth/gmail.send',
+                        access_type:   'offline',
+                        prompt:        'consent',
+                      })
+                      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+                    }}>
+                    Connect Gmail
+                  </button>
+                )}
                 <button className="action-draft-btn"
                   onClick={() => onChipClick('save_submittal_edits', {
                     draft_id:        action.context?.draft_id,

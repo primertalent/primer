@@ -6017,6 +6017,63 @@ select.field-input {
   gap: 8px;
 }
 
+/* ── submittal_draft_ready: subject + to fields ───────────────────────────────
+   DESIGN.md Rule 1: border-radius 0 on input.
+   DESIGN.md Rule 2: focus = border 2px solid --ink, no box-shadow.
+   DESIGN.md Rule 4: JetBrains Mono for labels, normal --ink for values. */
+
+.action-draft-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.action-draft-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-draft-meta-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+  flex-shrink: 0;
+  width: 52px;
+}
+
+.action-draft-meta-value {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.action-draft-to-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--hair);
+  border-radius: 0;                        /* Rule 1 */
+  background: var(--bg);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--ink);
+  outline: none;                           /* Rule 2: border carries focus */
+  box-sizing: border-box;
+}
+
+.action-draft-to-input:focus {
+  border: 2px solid var(--ink);           /* Rule 2: no box-shadow */
+}
+
+.action-draft-to-input::placeholder {
+  color: var(--mute);
+}
+
 /* ── Desk toast ───────────────────────────────────────────────────────────────
    DESIGN.md Rule 1: border-radius 0.
    DESIGN.md Rule 4: JetBrains Mono uppercase for operator label.

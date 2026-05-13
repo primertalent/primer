@@ -14,6 +14,7 @@ import RoleDetail from './pages/RoleDetail'
 import EditRole from './pages/EditRole'
 import EditCandidate from './pages/EditCandidate'
 import CallMode from './pages/CallMode'
+import GoogleAuthCallback from './pages/GoogleAuthCallback'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/desk" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
           <Route path="/desk" element={<ProtectedRoute><Desk /></ProtectedRoute>} />
           <Route path="/dashboard" element={<Navigate to="/desk" replace />} />
           <Route path="/network" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
