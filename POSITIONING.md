@@ -42,6 +42,12 @@ Alex from Super Recruiter built a 7-figure staffing firm by automating operation
 
 Wren puts that capability in the hands of solo independents who don't have a firm and never will. Same engine, different distribution, different ICP. Market is validated; execution is what's left.
 
+## Industry signal (file for outbound copy)
+
+The offer stage is where placements are won and lost. Industry signal (Metaview, 2026): top teams using captured conversation data to personalize the close see up to 20% higher offer acceptance rates. Wren brings this capability to solo independent recruiters who don't have a TA platform under them, codifying the close-stage judgment a senior recruiter would apply if they had time and the data at hand.
+
+This validates the build sequence: ship operational coverage to drive daily use, then build the closing motion on top of the accumulating data. Same thesis, confirmed by the market. Use this when writing real outbound copy — it's the external proof point for the moat layer, not just the operational layer.
+
 ---
 
 ---
