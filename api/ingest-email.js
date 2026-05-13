@@ -55,6 +55,7 @@ import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
 import { matchRoleFromNotes } from './_lib/matchRoleFromNotes.js'
+import { extractCompFromNotes } from './_lib/extractCompFromNotes.js'
 
 // ── Gemini Notes detection helpers ───────────────────────────────────────────
 
@@ -212,6 +213,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   let candidateId     = null
   let candidateRecord = null
   let candidateCreated = false
+  let motivationSummary = null
 
   let q = supabase
     .from('candidates')
@@ -229,6 +231,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   } else {
     // Not found — extract fields from notes body and create the record
     const extracted = await extractCandidateFieldsFromNotes(body)
+    motivationSummary = extracted.motivation_summary ?? null
     const enrichment = (extracted.motivation_summary || extracted.source_context)
       ? { intake_motivation: extracted.motivation_summary || null, source_context: extracted.source_context || null }
       : null
@@ -283,7 +286,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   // ── Active pipeline lookup (with role + client context for Outcome C) ────
   const { data: activePipelines } = await supabase
     .from('pipeline')
-    .select('id, roles(id, title, notes, target_comp_min, target_comp_max, clients(id, name))')
+    .select('id, expected_comp, roles(id, title, notes, target_comp_min, target_comp_max, clients(id, name))')
     .eq('candidate_id', candidateId)
     .eq('recruiter_id', recruiterId)
     .eq('status', 'active')
@@ -365,6 +368,24 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       }
     }
 
+    // ── P4-2: Auto-extract expected comp from call notes ──────────────────────
+    // Only fires when pipelineId exists (pipeline auto-created by P4-1 match).
+    // Skips when no pipeline — no row to write to, no orphan signal.
+    let compResult = null
+    if (pipelineId) {
+      compResult = await extractCompFromNotes({ anthropic, notesBody: body, motivationSummary })
+      if (compResult) {
+        try {
+          await supabase
+            .from('pipeline')
+            .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
+            .eq('id', pipelineId)
+        } catch (err) {
+          console.warn('[ingest-email] comp auto-write (B) failed:', err.message)
+        }
+      }
+    }
+
     const matchedRole = matchResult?.role ?? null
 
     // Build action copy and linked entity based on match state
@@ -411,6 +432,13 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
           auto_match_type:       matchType,
           proposed_match:        proposedMatch,
           matched_at:            matchResult ? new Date().toISOString() : null,
+          // P4-2 comp calibration — always present, even when extraction returned null
+          auto_comp_extracted:      !!compResult,
+          auto_comp_confidence:     compResult?.confidence      ?? null,
+          auto_comp_value_low:      compResult?.low             ?? null,
+          auto_comp_value_high:     compResult?.high            ?? null,
+          auto_comp_source_excerpt: compResult?.source_excerpt  ?? null,
+          auto_comp_pass:           compResult?.pass            ?? 'none',
         },
       })
     } catch (err) {
@@ -436,6 +464,23 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   // Link interaction to pipeline
   await supabase.from('interactions').update({ pipeline_id: pipeline.id }).eq('id', interaction.id)
 
+  // ── P4-2: Auto-extract expected comp from call notes (Outcome C) ──────────
+  // Only writes when pipeline.expected_comp IS NULL. Never overwrites.
+  let compResult = null
+  if (!pipeline.expected_comp) {
+    compResult = await extractCompFromNotes({ anthropic, notesBody: body, motivationSummary: null })
+    if (compResult) {
+      try {
+        await supabase
+          .from('pipeline')
+          .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
+          .eq('id', pipeline.id)
+      } catch (err) {
+        console.warn('[ingest-email] comp auto-write (C) failed:', err.message)
+      }
+    }
+  }
+
   try {
     await supabase.from('actions').insert({
       recruiter_id:        recruiterId,
@@ -458,6 +503,13 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         role_title:     roleTitle,
         client_name:    client?.name   ?? null,
         notes_body:     body           || '',
+        // P4-2 comp calibration — always present, even when extraction returned null
+        auto_comp_extracted:      !!compResult,
+        auto_comp_confidence:     compResult?.confidence      ?? null,
+        auto_comp_value_low:      compResult?.low             ?? null,
+        auto_comp_value_high:     compResult?.high            ?? null,
+        auto_comp_source_excerpt: compResult?.source_excerpt  ?? null,
+        auto_comp_pass:           compResult?.pass            ?? 'none',
       },
     })
   } catch (err) {
