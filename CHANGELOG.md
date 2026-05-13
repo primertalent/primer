@@ -6,6 +6,15 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 25 — 2026-05-13
+**P4-2: Auto-extract expected comp from Gemini Notes. Commit c29f037.**
+
+- New file `api/_lib/extractCompFromNotes.js`: two-pass extractor. Pass 1 regex scans `motivation_summary` (curated by intake Haiku, lower noise) then `notes_body` for explicit numeric comp signals within an 80-char keyword window; confidence 90. Three regex patterns in priority order: range (`150k-180k`), single with k-suffix (`$175k`), absolute dollar (`$175,000`). `normalizeCompNumber` handles `175k` / `175,000` / `175` → 175,000; rejects values outside $30k–$2M. Pass 2 Haiku fallback bounded at 120 tokens; auto-write threshold 80.
+- `api/ingest-email.js`: import added. `motivationSummary` hoisted to function scope (set in new-candidate else block; null for existing candidates). Outcome B: comp extraction fires after P4-1 match block only when `pipelineId` exists — skips proposed-match and no-match paths entirely. Outcome C: `expected_comp` added to pipeline select; comp extraction fires when `pipeline.expected_comp IS NULL`. Both outcomes write six calibration fields to `actions.context` unconditionally: `auto_comp_extracted`, `auto_comp_confidence`, `auto_comp_value_low`, `auto_comp_value_high`, `auto_comp_source_excerpt`, `auto_comp_pass` (`'regex'` | `'haiku'` | `'none'`). Manual `set_expected_comp` chip flow untouched.
+- Sequencing update: next build is Phase 4 sliced — Gmail send only, not read, no calendar. Build 3 (approval-based send as previously scoped) and LinkedIn extension both deferred.
+
+---
+
 ## Session 24 — 2026-05-12
 **P4-1: Auto-match candidate to active role from Gemini Notes. Commit 5758274.**
 

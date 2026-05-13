@@ -96,8 +96,8 @@ Everything marked "Resolves in strip down" above disappears because:
 **P4-1 — Auto-match candidate to active role from Gemini Notes context. ✅ Shipped 2026-05-12 (commit 5758274).**
 Two-pass matcher in `api/_lib/matchRoleFromNotes.js`. Pass 1: DB pre-filter on normalized company name (strips legal suffixes, leading "The", comma qualifiers), exact equality + ≥6-char substring fallback. Confidence 95 (single open role at matched client) or 98 (single role + role title in notes). Pass 2: Haiku for ambiguous or no-company cases. ≥90 → auto-create pipeline; 60–89 → proposed match with "Confirm [Role]" + "Different role"; no match → existing "Add to a role" unchanged. Calibration fields in `actions.context`. Validated on real intake call same day.
 
-**P4-2 — Auto-extract expected comp from call notes.**
-`motivation_summary` and `notes_body` captured via Haiku already contain comp signals. Wren has the data but still asks the recruiter to set comp manually via chip on the action card. Fix: on candidate-pipeline creation, extract comp signal from notes and write to `pipeline.expected_comp` without asking. Recruiter overrides if wrong; doesn't enter if right.
+**P4-2 — Auto-extract expected comp from call notes. ✅ Shipped 2026-05-13 (commit c29f037).**
+Two-pass extractor in `api/_lib/extractCompFromNotes.js`. Pass 1 regex on `motivation_summary` then `notes_body` within 80-char keyword window (confidence 90). Pass 2 Haiku fallback (threshold 80). Fires only when `pipelineId` exists; skips proposed-match and no-match paths. Never overwrites existing comp. Six calibration fields in `actions.context` (`auto_comp_*`). Manual chip untouched as fallback.
 
 **P4-3 — `intake_notes_ready` card auto-upgrades when pipeline created later. Reduced scope after P4-1.**
 P4-1 creates the pipeline at ingestion time for ≥90% confidence matches, so most Gemini Notes cards are born with `pipeline_id` set and never need the upgrade path. The upgrade path now only fires for manual "Add to a role" cases (recruiter opens candidate page and manually adds to a role after the `intake_notes_ready` card already exists). Still open, lower priority.
