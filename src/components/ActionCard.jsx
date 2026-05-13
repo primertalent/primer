@@ -163,37 +163,76 @@ export default function ActionCard({ action, onDismiss, onSnooze, onComplete, on
                 Read notes
               </button>
               {action.context?.pipeline_id ? (
-                isGenerating ? (
-                  /* Generating state — DESIGN: disabled opacity, no --win, no icon */
-                  <div className="action-generating">
-                    <button className="action-draft-btn" disabled>Generating…</button>
-                    {showGeneratingHint && (
-                      <p className="action-generating-hint">
-                        Drafting your submittal. This usually takes 10–15 seconds.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  /* "Draft submittal" — DESIGN: --bg bg, --hair border, --ink text, border-radius 0 */
-                  <button className="action-draft-btn"
-                    onClick={() => {
-                      setIsGenerating(true)
-                      onChipClick('trigger_submittal_draft', {
+                /* Pipeline exists — auto-matched by Wren or Outcome C (recruiter-added) */
+                <>
+                  {isGenerating ? (
+                    <div className="action-generating">
+                      <button className="action-draft-btn" disabled>Generating…</button>
+                      {showGeneratingHint && (
+                        <p className="action-generating-hint">
+                          Drafting your submittal. This usually takes 10–15 seconds.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <button className="action-draft-btn"
+                      onClick={() => {
+                        setIsGenerating(true)
+                        onChipClick('trigger_submittal_draft', {
+                          action_id:       action.id,
+                          candidate_id:    action.context?.candidate_id,
+                          pipeline_id:     action.context?.pipeline_id,
+                          role_id:         action.context?.role_id,
+                          interaction_id:  action.context?.interaction_id,
+                          notes_body:      action.context?.notes_body,
+                          candidate_name:  action.context?.candidate_name,
+                          current_context: action.context,
+                        })
+                      }}>
+                      Draft submittal
+                    </button>
+                  )}
+                  {action.context?.auto_matched && (
+                    /* Undo affordance — only on Wren-created pipelines, not recruiter-added */
+                    <button className="action-draft-btn"
+                      onClick={() => onChipClick('undo_auto_match', {
                         action_id:       action.id,
-                        candidate_id:    action.context?.candidate_id,
                         pipeline_id:     action.context?.pipeline_id,
-                        role_id:         action.context?.role_id,
-                        interaction_id:  action.context?.interaction_id,
-                        notes_body:      action.context?.notes_body,
+                        candidate_id:    action.context?.candidate_id,
                         candidate_name:  action.context?.candidate_name,
+                        interaction_id:  action.context?.interaction_id,
                         current_context: action.context,
-                      })
-                    }}>
-                    Draft submittal
+                      })}>
+                      Wrong role
+                    </button>
+                  )}
+                </>
+              ) : action.context?.proposed_match ? (
+                /* Proposed match — recruiter judges, Wren waits */
+                <>
+                  <button className="action-draft-btn action-draft-btn--primary"
+                    onClick={() => onChipClick('confirm_role_match', {
+                      action_id:       action.id,
+                      candidate_id:    action.context?.candidate_id,
+                      candidate_name:  action.context?.candidate_name,
+                      role_id:         action.context?.proposed_match?.role_id,
+                      role_title:      action.context?.proposed_match?.role_title,
+                      client_name:     action.context?.proposed_match?.client_name,
+                      interaction_id:  action.context?.interaction_id,
+                      notes_body:      action.context?.notes_body,
+                      current_context: action.context,
+                    })}>
+                    Confirm {action.context?.proposed_match?.role_title ?? 'role'}
                   </button>
-                )
+                  <button className="action-draft-btn"
+                    onClick={() => onChipClick('screen_against_role', {
+                      candidate_id: action.context?.candidate_id,
+                    })}>
+                    Different role
+                  </button>
+                </>
               ) : (
-                /* No pipeline — offer role attachment instead */
+                /* No match — standard add to role */
                 <button className="action-draft-btn"
                   onClick={() => onChipClick('screen_against_role', {
                     candidate_id: action.context?.candidate_id,

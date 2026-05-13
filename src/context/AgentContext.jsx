@@ -22,6 +22,8 @@ const REQUIRED_IDS = {
   draft_inbound_reply:     ['candidate_id'],
   // Gemini Notes / submittal flow
   trigger_submittal_draft: ['candidate_id', 'pipeline_id'],
+  confirm_role_match:      ['candidate_id', 'role_id'],
+  undo_auto_match:         ['candidate_id', 'pipeline_id'],
   approve_submittal:       ['draft_id', 'action_id'],
   save_submittal_edits:    ['draft_id', 'content'],
   discard_submittal:       ['draft_id', 'action_id'],

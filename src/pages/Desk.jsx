@@ -214,11 +214,146 @@ export default function Desk() {
       }
     })
 
+    // P4-1: Recruiter confirmed a proposed match → create pipeline, flip card to auto-matched state
+    registerAction('confirm_role_match', async (ctx) => {
+      try {
+        const { data: role, error: roleErr } = await supabase
+          .from('roles')
+          .select('id, title, process_steps, clients(name)')
+          .eq('id', ctx.role_id)
+          .single()
+        if (roleErr || !role) throw new Error('Role not found')
+
+        const firstStage = role.process_steps?.[0] ?? 'Sourced'
+        let pipelineId
+
+        const { data: newPipeline, error: pipelineErr } = await supabase
+          .from('pipeline')
+          .insert({
+            recruiter_id:  recruiter.id,
+            candidate_id:  ctx.candidate_id,
+            role_id:       ctx.role_id,
+            current_stage: firstStage,
+            status:        'active',
+          })
+          .select('id')
+          .single()
+
+        if (pipelineErr?.code === '23505') {
+          // Unique constraint: pipeline already exists — find the active one
+          const { data: existing } = await supabase
+            .from('pipeline')
+            .select('id')
+            .eq('candidate_id', ctx.candidate_id)
+            .eq('role_id', ctx.role_id)
+            .eq('status', 'active')
+            .maybeSingle()
+          pipelineId = existing?.id
+        } else if (pipelineErr) {
+          throw pipelineErr
+        } else {
+          pipelineId = newPipeline.id
+        }
+
+        if (!pipelineId) throw new Error('Could not create pipeline')
+
+        const updatedContext = {
+          ...(ctx.current_context ?? {}),
+          pipeline_id:           pipelineId,
+          role_id:               ctx.role_id,
+          role_title:            ctx.role_title,
+          client_name:           ctx.client_name,
+          auto_matched:          true,
+          auto_match_confidence: ctx.current_context?.proposed_match?.confidence ?? null,
+          auto_match_type:       'recruiter_confirmed',
+          // proposed_match preserved (calibration: what Wren guessed before recruiter confirmed)
+          confirmed_at:          new Date().toISOString(),
+          matched_at:            new Date().toISOString(),
+        }
+        const newWhy = `Intake call notes for ${ctx.candidate_name}, matched to ${ctx.role_title} at ${ctx.client_name ?? 'the client'} — pipeline created.`
+
+        await supabase.from('actions').update({
+          linked_entity_id:    pipelineId,
+          linked_entity_type:  'pipeline',
+          context:             updatedContext,
+          why:                 newWhy,
+          suggested_next_step: 'Read notes or draft the submittal',
+        }).eq('id', ctx.action_id)
+
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id
+            ? {
+                ...a,
+                pipelineId,
+                roleId:              ctx.role_id,
+                candidateId:         ctx.candidate_id,
+                entitySubtitle:      ctx.role_title,
+                context:             updatedContext,
+                why:                 newWhy,
+                suggested_next_step: 'Read notes or draft the submittal',
+              }
+            : a
+        ))
+      } catch (err) {
+        console.error('[Desk] confirm_role_match failed:', err)
+        setToast('Could not create pipeline. Try again.')
+      }
+    })
+
+    // P4-1: Recruiter rejected Wren's auto-match → delete pipeline, revert card to add-to-role state
+    registerAction('undo_auto_match', async (ctx) => {
+      try {
+        // ON DELETE SET NULL in schema clears interactions.pipeline_id automatically
+        await supabase.from('pipeline').delete().eq('id', ctx.pipeline_id)
+
+        const updatedContext = {
+          ...(ctx.current_context ?? {}),
+          pipeline_id:           null,
+          role_id:               null,
+          role_title:            null,
+          client_name:           null,
+          auto_matched:          false,
+          auto_match_confidence: null,
+          auto_match_type:       null,
+          proposed_match:        null,
+          matched_at:            null,
+        }
+        const newWhy = `Intake call notes captured for ${ctx.candidate_name}. Add to a role to draft the submittal.`
+
+        await supabase.from('actions').update({
+          linked_entity_id:    ctx.candidate_id,
+          linked_entity_type:  'candidate',
+          context:             updatedContext,
+          why:                 newWhy,
+          suggested_next_step: 'Read notes or add to a role',
+        }).eq('id', ctx.action_id)
+
+        setPersistedActions(prev => prev.map(a =>
+          a.id === ctx.action_id
+            ? {
+                ...a,
+                pipelineId:          null,
+                roleId:              null,
+                entitySubtitle:      null,
+                context:             updatedContext,
+                why:                 newWhy,
+                suggested_next_step: 'Read notes or add to a role',
+              }
+            : a
+        ))
+      } catch (err) {
+        console.error('[Desk] undo_auto_match failed:', err)
+        setToast('Could not undo. Try again.')
+      }
+    })
+
     return () => {
       unregisterAction('trigger_submittal_draft')
       unregisterAction('approve_submittal')
       unregisterAction('save_submittal_edits')
       unregisterAction('discard_submittal')
+      unregisterAction('confirm_role_match')
+      unregisterAction('undo_auto_match')
     }
   }, [recruiter?.id, registerAction, unregisterAction])
 

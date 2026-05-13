@@ -54,6 +54,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
+import { matchRoleFromNotes } from './_lib/matchRoleFromNotes.js'
 
 // ── Gemini Notes detection helpers ───────────────────────────────────────────
 
@@ -293,37 +294,137 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   const candidateFullName = [candidateRecord.first_name, candidateRecord.last_name].filter(Boolean).join(' ')
 
   // ── Outcome B: candidate found, no active pipeline ───────────────────────
+  // P4-1: attempt role match before writing the action card.
+  // Match result determines three states: auto-create (≥90), propose (60-89), no match.
   if (!activePipelines?.length) {
+    const matchResult = await matchRoleFromNotes({
+      supabase,
+      anthropic,
+      recruiterId,
+      notesBody:       body,
+      candidateFields: {
+        current_company: candidateRecord.current_company,
+        current_title:   candidateRecord.current_title,
+      },
+    })
+
+    let pipelineId    = null
+    let autoMatched   = false
+    let proposedMatch = null
+    let matchType     = null
+    let matchConf     = null
+
+    if (matchResult) {
+      const { role: matchedRole, confidence, matchType: mType } = matchResult
+      matchType = mType
+      matchConf = confidence
+
+      if (confidence >= 90) {
+        // Dedup: unique constraint on (candidate_id, role_id) — check before insert.
+        const { data: existingPipeline } = await supabase
+          .from('pipeline')
+          .select('id')
+          .eq('candidate_id', candidateId)
+          .eq('role_id', matchedRole.id)
+          .maybeSingle()
+
+        if (!existingPipeline) {
+          const firstStage = matchedRole.process_steps?.[0] ?? 'Sourced'
+          const { data: newPipeline, error: pipelineErr } = await supabase
+            .from('pipeline')
+            .insert({
+              recruiter_id:  recruiterId,
+              candidate_id:  candidateId,
+              role_id:       matchedRole.id,
+              current_stage: firstStage,
+              status:        'active',
+            })
+            .select('id')
+            .single()
+
+          if (!pipelineErr && newPipeline) {
+            pipelineId  = newPipeline.id
+            autoMatched = true
+          }
+        }
+        // existingPipeline found: unique constraint would fire — skip auto-create,
+        // fall through to no-match (add to role) behavior.
+      } else {
+        // 60-89: propose with one-click confirm
+        proposedMatch = {
+          role_id:     matchedRole.id,
+          role_title:  matchedRole.title,
+          client_name: matchedRole.clients?.name ?? null,
+          confidence,
+        }
+      }
+
+      // Link the interaction to the new pipeline if created
+      if (pipelineId) {
+        await supabase.from('interactions').update({ pipeline_id: pipelineId }).eq('id', interaction.id)
+      }
+    }
+
+    const matchedRole = matchResult?.role ?? null
+
+    // Build action copy and linked entity based on match state
+    let why, suggestedNextStep
+    const linkedEntityId   = pipelineId ?? candidateId
+    const linkedEntityType = pipelineId ? 'pipeline' : 'candidate'
+
+    if (autoMatched && matchedRole) {
+      why               = `Intake call notes for ${candidateFullName}, matched to ${matchedRole.title} at ${matchedRole.clients?.name ?? 'the client'} — pipeline created.`
+      suggestedNextStep = 'Read notes or draft the submittal'
+    } else if (proposedMatch) {
+      why               = `Intake call notes for ${candidateFullName}. Looks like ${proposedMatch.role_title} at ${proposedMatch.client_name ?? 'the client'} — right role?`
+      suggestedNextStep = 'Confirm to create the pipeline, or choose a different role'
+    } else {
+      why               = `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`
+      suggestedNextStep = 'Read notes or add to a role'
+    }
+
     try {
       await supabase.from('actions').insert({
         recruiter_id:        recruiterId,
         action_type:         'intake_notes_ready',
-        linked_entity_id:    candidateId,
-        linked_entity_type:  'candidate',
+        linked_entity_id:    linkedEntityId,
+        linked_entity_type:  linkedEntityType,
         urgency:             'today',
-        why:                 `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`,
-        suggested_next_step: 'Read notes or add to a role',
+        why,
+        suggested_next_step: suggestedNextStep,
         confidence:          'high',
         content_hash:        crypto.createHash('sha256')
-          .update(`${recruiterId}:${candidateId}:intake_notes_ready:${interaction.id}`)
+          .update(`${recruiterId}:${linkedEntityId}:intake_notes_ready:${interaction.id}`)
           .digest('hex'),
         context: {
           interaction_id: interaction.id,
           candidate_id:   candidateId,
           candidate_name: candidateFullName,
-          pipeline_id:    null,
-          role_id:        null,
-          role_title:     null,
-          client_name:    null,
+          pipeline_id:    pipelineId   ?? null,
+          role_id:        matchedRole?.id    ?? null,
+          role_title:     matchedRole?.title ?? null,
+          client_name:    matchedRole?.clients?.name ?? null,
           notes_body:     body || '',
+          // P4-1 match calibration — seed for V2 confidence calibration loop
+          auto_matched:          autoMatched,
+          auto_match_confidence: matchConf,
+          auto_match_type:       matchType,
+          proposed_match:        proposedMatch,
+          matched_at:            matchResult ? new Date().toISOString() : null,
         },
       })
     } catch (err) {
-      console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message)
+      console.warn('[ingest-email] intake_notes_ready (B+match) action insert failed:', err.message)
     }
 
     triggerLoop(host, recruiterId)
-    return { outcome: 'B', candidate_id: candidateId, candidate_name: candidateFullName }
+    return {
+      outcome:        'B',
+      candidate_id:   candidateId,
+      candidate_name: candidateFullName,
+      auto_matched:   autoMatched,
+      proposed_match: proposedMatch ?? null,
+    }
   }
 
   // ── Outcome C: candidate found + active pipeline ─────────────────────────
