@@ -68,6 +68,8 @@ This recruiter is leaving money on the table because they can't scale further wi
 - No ATS or actively avoiding heavyweight ATS
 - Already competent at the close. Knows their rate. Feels the ceiling on deal volume.
 
+**Behavioral profile.** The Wren ICP has already experimented with Claude, ChatGPT, and free AI workflows. They've commented on LinkedIn marketer posts to get prompt guides. They've tried to integrate AI into their recruiting work themselves. Most have hit a wall around persistent state, proactive surfacing, and operational integration. They are curious, informed, price-anchored to free AI tools, and skeptical of half-baked promises. Wren's differentiation against this baseline is not access to AI but codified senior recruiter judgment plus the agent loop that runs without supervision. The first week of Wren must demonstrate value the recruiter can attribute specifically to Wren, not to AI in general.
+
 **The pitch is leverage, not coaching.**
 
 "You're already good at this. Wren lets you do it ten times instead of three. Like hiring an entry-level recruiter who's already trained on your judgment."
@@ -87,6 +89,10 @@ Recruiters billing under $150k typically have a deal flow problem (sourcing, BD)
 - Recruiter newsletters (Recruiting Brainfood, Hung Lee, Tech Recruiter, Boolean Black Belt)
 - BountyJobs and similar marketplaces
 - Recruiter-only podcasts and Discord servers
+
+**Quality over volume.** The Wren ICP doesn't need access to a bigger candidate universe. They need their existing relationships made actionable. A solo recruiter with 15 years of experience has 200-500 candidates they've actually worked with closely. That curated set is the asset. Wren prioritizes signal density over network size. Onboarding captures interaction-rich relationships from Gmail and Calendar, not surface-level LinkedIn connections. The pitch is not "manage your network." The pitch is "remember everyone you've actually worked with."
+
+**External validation.** Industry signal (Metaview, 2026) indicates top in-house teams using captured conversation data to personalize the close see up to 20% higher offer acceptance rates. Wren brings this capability to solo independent recruiters who don't have a TA platform under them, codifying the close-stage judgment a senior recruiter would apply if they had time and the data at hand.
 
 **Not the user:**
 

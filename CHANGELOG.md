@@ -6,6 +6,11 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 27 — 2026-05-14
+**Strategic refinement session (no code). Captured architectural philosophy that explains and reinforces existing operating principles. Six new principles to VISION.md (deference to recruiter judgment, two-interface architecture, recruiter's brain as the asset, Wren as raw-thought destination, candidate tiering, elimination system). Two additions to POSITIONING.md (ICP behavioral profile, quality-over-volume). Seven V2/V3 build targets to WREN.md (Mode 3 raw dump, unified outbound, tier system, elimination system, referral chain, network compounding surfaces, onboarding philosophy). New SKILLS_REFERENCE directory with five worked examples that serve as specs for future build prompts. Five customer voice quotes captured in FEEDBACK.md. Verdict: refinement, not pivot. ICP, pricing, distribution, sequencing, and 30-day execution lock all unchanged. V2 build targets queued; current build sequence (OAuth validation, real onboarding, friction-driven next builds) holds.**
+
+---
+
 ## Session 26 — 2026-05-13
 **Strategic doc capture. No code. Principles and state captured before they evaporate.**
 

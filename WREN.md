@@ -1159,5 +1159,21 @@ Recruiter settings page shows accuracy trends for recruiter_confidence vs ai_con
 **WREN DESIGN PRINCIPLE:**
 "Good recruiters know when they add value. Great recruiters know when they don't." Wren recommends the right action, not just the right words. AI in the middle does not mean AI does all the talking. Sometimes the best move is human.
 
+**CAPTURE AND NETWORK INTELLIGENCE (V2/V3 targets):**
+
+*Mode 3 raw dump parsing.* Multi-intent voice/text input where the recruiter dumps unstructured thoughts. Wren parses entities, structured updates, action items, and free-form context in a single call. Uses Sonnet for parsing depth. Confidence thresholds determine auto-write vs. confirmation-required. Free-form residue stored as notes on relevant entities. Canonical end-of-day dump pattern: recruiter offloads everything in 60-120 seconds, Wren absorbs and structures, recruiter walks away with the work staged.
+
+*Unified outbound interface (Path C).* One compose surface for all Wren drafts, not card-specific compose UIs. Phone surface is voice and action cards only (no keyboard composition). Desktop surface is action cards plus typed WrenCommand for considered composition. Submittal sends remain desk-grade. Routine sends (resume chase, confirmations, info sends) are phone-grade with one-tap approval.
+
+*Candidate tier system.* Wren proposes a tier (S/A/B/C) for every candidate after intake plus resume plus first interaction. Recruiter confirms or overrides via voice or text. Tier stored on candidate row. Surfacing logic reads tier and adjusts proactive output accordingly. Initial prompt set evaluates career signals: companies worked at, role trajectory, quantified output, skills relative to role demand, years-level fit, pedigree, recent track record.
+
+*Elimination system.* Three severity tiers: soft pass, hard pass, permanent red flag. Voice/text capture parses candidate plus reason plus severity plus affected client. Surfacing logic reads elimination state across intake, sourcing, referrals, pipeline reactivation. Permanent red flags surface as warnings on any future system encounter. Client-specific eliminations stay scoped; severity-3 flags travel across all clients with reason context preserved.
+
+*Referral chain tracking.* When a candidate enters via intro from an existing S/A-tier candidate, the referral source is captured on the new candidate row. Network graph compounds: who referred whom, what came of it, attribution preserved. Surfacing logic uses referral signal: candidates from S-tier intros get elevated priority by default. The recruiter sees the chain when working any candidate.
+
+*Network compounding surfaces.* Three distinct proactive surfaces: (1) new-fit-for-old-candidates when a new role lands and Wren matches against the network; (2) BD moments when external signals indicate a client-side opportunity; (3) check-back-in moments when time decay plus tier rating plus motivation signal warrant re-engagement. All three are tier-aware and elimination-aware.
+
+*Onboarding philosophy.* Wren's value compounds with data. Onboarding flow must populate the memory layer with minimum effort from the recruiter. Three layers of capture maturity: zero-effort Workspace OAuth scans Gmail and Calendar history to create candidate existence rows automatically with a first report "I found X candidates in your network"; light-effort WrenCommand accepts CSV, spreadsheet, name list, or resume folder with auto-detected format and routing; real-work manual profile updates and tagging is the last resort, not the first ask. Progressive enrichment: existence rows fire first, context fills in via background enrichment, signal accumulates through use. The first surfacing magic moment is the onboarding success metric. LinkedIn is not integrated: LinkedIn API is closed to small tools, bulk export is limited, and Gmail plus Calendar is the higher-signal data source anyway.
+
 **KNOWLEDGE TENSION TO RESOLVE LATER:**
 Niche depth vs demand following. Both approaches work for different recruiters. Wren should serve the recruiter's strategy, not pick a side. Future setting: weight niche depth or demand signals in role scoring.

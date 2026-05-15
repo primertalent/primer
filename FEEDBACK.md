@@ -29,3 +29,35 @@ Context: Distinguishing which send moments need desk-level review vs. which can 
 > "In time, most will just let fly and reply automatically in high confidence situations. But until it's widely accepted, I want human in the loop to be in place. But for power users, we can have Wren auto reply if they are comfortable."
 
 Context: On the path from default approval-required to earned autonomy. Default is human in the loop. Trust is demonstrated over time and explicit preference. Some moments stay gated regardless.
+
+---
+
+## May 14, 2026 — Ryan (morning brain dump session)
+
+> "We will lose our users if wren isn't able to adjust with live feedback. They will either think wren got it right, or got it wrong. If they feel like it's wrong, with no way to push back and iterate, we lose them."
+
+Context: On the necessity of Wren's deference principle — the agent must execute recruiter direction and iterate, not resist. Drove the "Wren defers to recruiter judgment. Always." operating principle in VISION.md.
+
+---
+
+> "I don't want wren to feel like a task creator, where we are doing things just to satisfy it and not what actually matters."
+
+Context: Reinforcement of the card shape principle from May 13. Agent-shaped cards drive recruiter judgment on real work. SaaS-shaped cards create busywork. The distinction is the product.
+
+---
+
+> "Your LinkedIn network isn't the best for wren. We don't need 10,000 duds. Rather have 100 great profiles."
+
+Context: On onboarding data sources. Gmail and Calendar surface interaction-rich relationships. LinkedIn exports surface surface-level connections. Quality over volume as a design constraint — not just a marketing line. Drove the "Quality over volume" ICP addition in POSITIONING.md.
+
+---
+
+> "A human brain can only remember and handle so much, especially when the most important thing is closing the next candidate. Especially when we think sourcing will be commoditized and this intelligence layer will matter the most."
+
+Context: On the compounding value of the memory layer when sourcing becomes free. Recruiter cognitive capacity is finite. The intelligence layer's job is to extend that capacity at the moments that matter.
+
+---
+
+> "The recruiter is still the best data source. The easier we make it to pull from their brain into Wren, the better we become."
+
+Context: On Mode 3 raw dump as the highest-leverage capture pattern. The recruiter holds the signal. Wren's job is to reduce capture friction to near zero so that signal flows in constantly and compounds over time.
