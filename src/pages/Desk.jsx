@@ -294,6 +294,24 @@ export default function Desk() {
               }
             : a
         ))
+
+        // P4-2 gap: ingest-email.js only runs comp extraction for auto-matches.
+        // Fire it here for recruiter-confirmed proposed matches — action row is
+        // already updated so the endpoint's context merge won't race.
+        if (ctx.current_context?.notes_body) {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session) return
+            fetch('/api/extract-comp', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+              body:    JSON.stringify({
+                pipeline_id: pipelineId,
+                notes_body:  ctx.current_context.notes_body,
+                action_id:   ctx.action_id,
+              }),
+            }).catch(() => {})
+          })
+        }
       } catch (err) {
         console.error('[Desk] confirm_role_match failed:', err)
         setToast('Could not create pipeline. Try again.')
