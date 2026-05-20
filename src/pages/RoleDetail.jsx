@@ -395,7 +395,7 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function RoleDetail({ id: idProp, onClose, openFee, openAgreement }) {
+export default function RoleDetail({ id: idProp, onClose, openFee, openAgreement, onActionsCompleted }) {
   const { id: paramId } = useParams()
   const id              = idProp ?? paramId
   const navigate        = useNavigate()
@@ -620,6 +620,7 @@ export default function RoleDetail({ id: idProp, onClose, openFee, openAgreement
     if (!feePanelValue) return
     setFeePanelSaving(true)
     setFeePanelError(null)
+    let saved = false
     try {
       const update = feePanelType === 'pct'
         ? { placement_fee_pct: Number(feePanelValue) / 100, placement_fee_flat: null }
@@ -629,10 +630,26 @@ export default function RoleDetail({ id: idProp, onClose, openFee, openAgreement
       setRole(prev => ({ ...prev, ...update }))
       setActivePill(null)
       setFeePanelValue('')
+      saved = true
     } catch {
       setFeePanelError('Save failed. Try again.')
     } finally {
       setFeePanelSaving(false)
+    }
+    if (saved && onActionsCompleted) {
+      const { data: rows } = await supabase
+        .from('actions').select('id')
+        .eq('recruiter_id', recruiter.id)
+        .eq('linked_entity_id', id)
+        .eq('linked_entity_type', 'role')
+        .eq('action_type', 'add_fee')
+        .is('acted_on_at', null)
+        .is('dismissed_at', null)
+      const ids = (rows ?? []).map(r => r.id)
+      if (ids.length) {
+        await supabase.from('actions').update({ acted_on_at: new Date().toISOString() }).in('id', ids)
+        onActionsCompleted(ids)
+      }
     }
   }
 

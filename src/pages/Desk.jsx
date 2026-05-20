@@ -683,6 +683,7 @@ export default function Desk() {
             <RoleDetail
               id={panel.id}
               onClose={closePanel}
+              onActionsCompleted={handleActionsCompleted}
               {...(panel.initialState ?? {})}
             />
           )}

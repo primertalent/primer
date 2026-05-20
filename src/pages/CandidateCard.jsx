@@ -1897,7 +1897,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted,
 
       // Auto-complete overdue follow-up actions for this pipeline
       if (pipelines[0]?.id) {
-        autoCompleteActions(pipelines[0].id, 'pipeline', ['follow_up_overdue'])
+        autoCompleteActions(pipelines[0].id, 'pipeline', ['follow_up_overdue', 'stage_check', 'relationship_warm'])
           .then(ids => { if (ids.length) onActionsCompleted?.(ids) })
       }
     }
