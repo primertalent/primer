@@ -74,19 +74,34 @@ function isGeminiNotesEmail(fromEmail, subject, body) {
 }
 
 // Extracts the candidate's name from a Gemini Notes subject line.
-// Expected pattern: "Notes: ... between [Recruiter Name] and [Candidate Name] [date?]"
-// The second person after "and" is the candidate.
-// Strips Fw:/Fwd:/Re: prefixes before matching so forwarded subjects work correctly.
-function extractCandidateNameRegex(subject) {
+// Captures BOTH persons from "between X and Y". When recruiterNameHint is provided
+// (the forwarder's display name for forwarded emails), filters out the recruiter and
+// returns the other person. Falls back to the second person when no hint is available.
+//
+// Known limitation: direct Gemini delivery (from gemini-notes@google.com) has no
+// recruiter hint — the second person in the subject is assumed to be the candidate.
+// If Google ever reverses the name order for a meeting type, the wrong name is extracted.
+function extractCandidateNameRegex(subject, recruiterNameHint) {
   const normalized = (subject || '').replace(/^(Fwd?:|Re:)\s*/gi, '').trim()
-  const m = /between\s+(?:[A-Z]\S+(?:\s+[A-Z]\S+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i.exec(normalized)
+  const stripDate = s => s.replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d).*$/i, '').trim()
+  // Capture both persons; name1 allows single-word, name2 requires at least two parts.
+  const m = /between\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i.exec(normalized)
   if (!m) return null
-  // Strip trailing date tokens (e.g. "May 6, 2026" or "5/6/2026")
-  return m[1].replace(/\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d).*$/i, '').trim() || null
+  const name1 = stripDate(m[1])
+  const name2 = stripDate(m[2])
+  if (!name1 || !name2) return name2 || name1 || null
+  if (recruiterNameHint) {
+    // First-name comparison is sufficient — handles "Ryan McGuinness" matching "Ryan".
+    const recruiterFirst = (recruiterNameHint.split(' ')[0] || '').toLowerCase()
+    if (recruiterFirst && name1.toLowerCase().startsWith(recruiterFirst)) return name2
+    if (recruiterFirst && name2.toLowerCase().startsWith(recruiterFirst)) return name1
+    // Neither matched the hint — ordering ambiguous; fall through to second-person default.
+  }
+  return name2 // default: second person is the candidate
 }
 
-async function extractCandidateNameFromSubject(subject) {
-  const fromRegex = extractCandidateNameRegex(subject)
+async function extractCandidateNameFromSubject(subject, recruiterNameHint) {
+  const fromRegex = extractCandidateNameRegex(subject, recruiterNameHint)
   if (fromRegex) return fromRegex
 
   // Haiku fallback for non-standard subject formats (quoted titles, missing "between", etc.)
@@ -154,7 +169,13 @@ ${(notesBody || '').slice(0, 3000)}`,
 //   C — candidate resolved + active pipeline → intake_notes_ready (full pipeline context)
 
 async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, messageId, host }) {
-  const candidateName = await extractCandidateNameFromSubject(subject)
+  // For forwarded Gemini Notes the From: display name is the recruiter, not the candidate.
+  // Pass it as a hint so extractCandidateNameRegex can filter the recruiter out when both
+  // persons appear in the "between X and Y" subject. For direct delivery from
+  // gemini-notes@google.com the hint is null — second-person default applies.
+  const isForwarded = (from.email || '').toLowerCase() !== 'gemini-notes@google.com'
+  const recruiterNameHint = isForwarded ? (from.name || null) : null
+  const candidateName = await extractCandidateNameFromSubject(subject, recruiterNameHint)
 
   // ── Outcome A (safety net): name extraction completely failed ────────────
   // Both regex and Haiku returned null — no structured signal to work with.
