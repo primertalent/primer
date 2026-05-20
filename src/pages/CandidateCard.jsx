@@ -1242,7 +1242,7 @@ function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipel
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function CandidateCard({ id: idProp, onClose, onActionsCompleted }) {
+export default function CandidateCard({ id: idProp, onClose, onActionsCompleted, openDebrief, openLog, openCompFor, autoScreen, autoOpenSubmission }) {
   const { id: paramId } = useParams()
   const id = idProp ?? paramId
   const navigate = useNavigate()
@@ -1329,7 +1329,11 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   const [clearingCareer, setClearingCareer] = useState(false)
 
   // New layout state
-  const autoParseFiredRef = useRef(false)
+  const autoParseFiredRef          = useRef(false)
+  const openLogFiredRef            = useRef(false)
+  const openDebriefFiredRef        = useRef(false)
+  const openCompForFiredRef        = useRef(false)
+  const autoOpenSubmissionFiredRef = useRef(false)
   const pickerRef = useRef(null)
   const [showAllInteractions, setShowAllInteractions] = useState(false)
   const [collapseResume, setCollapseResume] = useState(true)
@@ -1499,12 +1503,46 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted 
   }, [candidate?.id])
 
 
-  // Auto-open picker when arriving via screen_against_role dispatch (location.state.autoScreen set).
-  // Fires once after openRoles loads so the picker list is ready to render.
-  // Property-presence guard (not value comparison) — undefined is a valid autoScreen value when no role is pre-selected.
+  // ── Prop-based auto-open (panel mode — location.state is not available) ────
+  // Each effect fires at most once via a ref guard. Props are passed by Desk.jsx
+  // when opening a side panel; location.state equivalents are the navigation fallbacks.
+
+  useEffect(() => {
+    if (!openLog || openLogFiredRef.current) return
+    openLogFiredRef.current = true
+    setLogOpen(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!openDebrief || openDebriefFiredRef.current || !pipelines.length) return
+    openDebriefFiredRef.current = true
+    setDebriefModal(prev => ({ ...prev, open: true, pipelineId: pipelines[0]?.id ?? '' }))
+  }, [pipelines]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!openCompFor || openCompForFiredRef.current || !pipelines.length) return
+    openCompForFiredRef.current = true
+    const entry = pipelines.find(p => p.id === openCompFor) ?? pipelines[0] ?? null
+    if (!entry) return
+    setCompModal({ open: true, entry, nextStage: '', comp: '', saving: false })
+  }, [pipelines]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!autoOpenSubmission || autoOpenSubmissionFiredRef.current || !pipelines.length || openRoles === null) return
+    autoOpenSubmissionFiredRef.current = true
+    setSubModal({
+      open: true, phase: 'pick', format: 'email', mode: null,
+      roleId: pipelines[0]?.role_id ?? '', text: '', error: null,
+    })
+  }, [pipelines, openRoles]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open picker when arriving via screen_against_role dispatch.
+  // Props (panel mode) take precedence; location.state (navigation mode) is the fallback.
+  // Property-presence check on location.state — undefined is a valid autoScreen value.
   useEffect(() => {
     if (openRoles === null) return
-    if (!location.state || !('autoScreen' in location.state)) return
+    const triggered = autoScreen !== undefined || (location.state && 'autoScreen' in location.state)
+    if (!triggered) return
     setCollapsePipeline(false)
     setPickerOpen(true)
     requestAnimationFrame(() => {

@@ -395,7 +395,7 @@ function PipelineColumn({ stage, entries, stages, onAdvance, onGoBack, onDraftSu
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function RoleDetail({ id: idProp, onClose }) {
+export default function RoleDetail({ id: idProp, onClose, openFee, openAgreement }) {
   const { id: paramId } = useParams()
   const id              = idProp ?? paramId
   const navigate        = useNavigate()
@@ -449,6 +449,7 @@ export default function RoleDetail({ id: idProp, onClose }) {
 
   // JD auto-format
   const jdAutoFormatFiredRef  = useRef(false)
+  const openPillFiredRef      = useRef(false)
   const [jdAutoFormatting, setJdAutoFormatting] = useState(false)
   const [formattedJd, setFormattedJd]           = useState(null)
 
@@ -460,6 +461,16 @@ export default function RoleDetail({ id: idProp, onClose }) {
   const [savingToQueue, setSavingToQueue] = useState(false)
   const [savedToQueue, setSavedToQueue]   = useState(false)
   const textareaRef = useRef(null)
+
+  // ── Prop-based pill auto-open (panel mode) ───────────────
+  // Fires once when role data loads. Props are passed by Desk.jsx when opening a
+  // side panel; they replicate what clicking the health pill directly would do.
+  useEffect(() => {
+    if (openPillFiredRef.current || !role) return
+    if (openFee)        { openPillFiredRef.current = true; setActivePill('fee_not_set') }
+    else if (openAgreement) { openPillFiredRef.current = true; setActivePill('agreement_missing') }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role?.id])
 
   // ── Primary fetch ───────────────────────────────────────
 
