@@ -440,6 +440,41 @@ export default function Desk() {
     }
   }, [registerAction, unregisterAction])
 
+  // ── Tier 2 inline handlers ───────────────────────────────────────────────────
+  // prep_call / prep_for_interview: CandidateCard registers its own prep_call handler
+  // when mounted, but the panel isn't open yet when the chip fires from the Desk.
+  // Open the panel; the recruiter lands in the candidate view with Zone A visible.
+  // draft_inbound_reply / queue_follow_up / draft_urgency_note: no dedicated modal
+  // exists yet — panel opens at top. Refine per-action flows in a future session.
+  useEffect(() => {
+    registerAction('prep_for_interview', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: {} })
+    })
+    registerAction('prep_call', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: {} })
+    })
+    registerAction('draft_outreach', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { autoOpenOutreach: true } })
+    })
+    registerAction('queue_follow_up', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: {} })
+    })
+    registerAction('draft_urgency_note', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: {} })
+    })
+    registerAction('draft_inbound_reply', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: {} })
+    })
+    return () => {
+      unregisterAction('prep_for_interview')
+      unregisterAction('prep_call')
+      unregisterAction('draft_outreach')
+      unregisterAction('queue_follow_up')
+      unregisterAction('draft_urgency_note')
+      unregisterAction('draft_inbound_reply')
+    }
+  }, [registerAction, unregisterAction])
+
   async function loadActions() {
     // Check if agent loop has ever run for this recruiter
     const { count } = await supabase

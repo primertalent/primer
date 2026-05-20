@@ -1242,7 +1242,7 @@ function ZoneCMenu({ candidate, pipelines, onEdit, onCallMode, onRemoveFromPipel
 
 // ── Main page ─────────────────────────────────────────────
 
-export default function CandidateCard({ id: idProp, onClose, onActionsCompleted, openDebrief, openLog, openCompFor, autoScreen, autoOpenSubmission }) {
+export default function CandidateCard({ id: idProp, onClose, onActionsCompleted, openDebrief, openLog, openCompFor, autoScreen, autoOpenSubmission, autoOpenOutreach }) {
   const { id: paramId } = useParams()
   const id = idProp ?? paramId
   const navigate = useNavigate()
@@ -1334,6 +1334,7 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted,
   const openDebriefFiredRef        = useRef(false)
   const openCompForFiredRef        = useRef(false)
   const autoOpenSubmissionFiredRef = useRef(false)
+  const autoOpenOutreachFiredRef   = useRef(false)
   const pickerRef = useRef(null)
   const [showAllInteractions, setShowAllInteractions] = useState(false)
   const [collapseResume, setCollapseResume] = useState(true)
@@ -1535,6 +1536,12 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted,
       roleId: pipelines[0]?.role_id ?? '', text: '', error: null,
     })
   }, [pipelines, openRoles]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!autoOpenOutreach || autoOpenOutreachFiredRef.current || openRoles === null) return
+    autoOpenOutreachFiredRef.current = true
+    setOutreachModal({ open: true, phase: 'pick', roleId: '', result: null, error: null })
+  }, [openRoles]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-open picker when arriving via screen_against_role dispatch.
   // Props (panel mode) take precedence; location.state (navigation mode) is the fallback.
