@@ -26,7 +26,7 @@ export default function Desk() {
   const [hasAnyHistory, setHasAnyHistory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [intakeOpen, setIntakeOpen] = useState(false)
-  const [panel, setPanel] = useState({ type: null, id: null })
+  const [panel, setPanel] = useState({ type: null, id: null, initialState: {} })
   const [toast, setToast] = useState(null)
   const loadedRef = useRef(false)
 
@@ -38,11 +38,11 @@ export default function Desk() {
   }, [toast])
 
   function openPanel(action) {
-    if (action.candidateId) setPanel({ type: 'candidate', id: action.candidateId })
-    else if (action.roleId)  setPanel({ type: 'role',      id: action.roleId })
+    if (action.candidateId) setPanel({ type: 'candidate', id: action.candidateId, initialState: {} })
+    else if (action.roleId)  setPanel({ type: 'role',      id: action.roleId,      initialState: {} })
   }
 
-  function closePanel() { setPanel({ type: null, id: null }) }
+  function closePanel() { setPanel({ type: null, id: null, initialState: {} }) }
 
   useEffect(() => {
     if (!recruiter?.id || loadedRef.current) return
@@ -409,6 +409,37 @@ export default function Desk() {
     }
   }, [recruiter?.id, registerAction, unregisterAction])
 
+  // ── Tier 1 inline handlers — open side panel instead of navigating ──────────
+  // Registered once on mount. setPanel is a stable useState setter; no deps needed.
+  useEffect(() => {
+    registerAction('log_interaction', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { openLog: true } })
+    })
+    registerAction('log_debrief', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { openDebrief: true } })
+    })
+    registerAction('draft_submission', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { autoOpenSubmission: true } })
+    })
+    registerAction('set_expected_comp', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { openCompFor: ctx.pipeline_id ?? null } })
+    })
+    registerAction('screen_against_role', (ctx) => {
+      if (ctx.candidate_id) setPanel({ type: 'candidate', id: ctx.candidate_id, initialState: { autoScreen: ctx.role_id } })
+    })
+    registerAction('add_fee', (ctx) => {
+      if (ctx.role_id) setPanel({ type: 'role', id: ctx.role_id, initialState: { openFee: true } })
+    })
+    return () => {
+      unregisterAction('log_interaction')
+      unregisterAction('log_debrief')
+      unregisterAction('draft_submission')
+      unregisterAction('set_expected_comp')
+      unregisterAction('screen_against_role')
+      unregisterAction('add_fee')
+    }
+  }, [registerAction, unregisterAction])
+
   async function loadActions() {
     // Check if agent loop has ever run for this recruiter
     const { count } = await supabase
@@ -606,10 +637,19 @@ export default function Desk() {
       {panel.id && (
         <SidePanel onClose={closePanel}>
           {panel.type === 'candidate' && (
-            <CandidateCard id={panel.id} onClose={closePanel} onActionsCompleted={handleActionsCompleted} />
+            <CandidateCard
+              id={panel.id}
+              onClose={closePanel}
+              onActionsCompleted={handleActionsCompleted}
+              {...(panel.initialState ?? {})}
+            />
           )}
           {panel.type === 'role' && (
-            <RoleDetail id={panel.id} onClose={closePanel} />
+            <RoleDetail
+              id={panel.id}
+              onClose={closePanel}
+              {...(panel.initialState ?? {})}
+            />
           )}
         </SidePanel>
       )}
