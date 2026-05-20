@@ -13,6 +13,7 @@ import { buildScorecardMessages } from '../lib/prompts/candidateScorecard'
 import { buildOutreachEmailMessages } from '../lib/prompts/candidateOutreachEmail'
 import { buildLinkedInMessageMessages } from '../lib/prompts/linkedinMessageGenerator'
 import { buildDebriefExtractorMessages } from '../lib/prompts/debriefExtractor'
+import { runBackgroundDebrief as runBackgroundDebriefLib } from '../../api/_lib/runBackgroundDebrief.js'
 import { buildInterviewQuestionMessages } from '../lib/prompts/interviewQuestionGenerator'
 import { buildCallPrepMessages } from '../lib/prompts/callPrep'
 import { buildConfidenceScoreMessages } from '../lib/prompts/confidenceScore'
@@ -1778,65 +1779,38 @@ export default function CandidateCard({ id: idProp, onClose, onActionsCompleted,
 
   async function runBackgroundDebrief(savedInteraction) {
     if (!candidate || !savedInteraction.body?.trim()) return
-    const pipeline = pipelines[0] ?? null
-    const role = pipeline?.roles ?? null
-    const stage = pipeline?.current_stage ?? null
     try {
-      const messages = buildDebriefExtractorMessages(candidate, role, stage, debriefs, savedInteraction.body)
-      const raw = await generateText({ messages, maxTokens: 2048 })
-      const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
-      const extracted = JSON.parse(cleaned)
+      const result = await runBackgroundDebriefLib({
+        supabase,
+        generateFn:    (messages, { maxTokens }) => generateText({ messages, maxTokens }),
+        recruiterId:   recruiter.id,
+        candidateId:   candidate.id,
+        pipelineId:    pipelines[0]?.id    ?? null,
+        interactionId: savedInteraction.id,
+        notesBody:     savedInteraction.body,
+      })
+      if (!result) return
+      const { debrief, completedActionIds } = result
 
-      const resolvedPipelineId = pipeline?.id ?? null
-      const payload = {
-        recruiter_id:           recruiter.id,
-        candidate_id:           id,
-        pipeline_id:            resolvedPipelineId,
-        role_id:                pipeline?.role_id ?? null,
-        interaction_id:         savedInteraction.id,
-        outcome:                'neutral',
-        feedback_raw:           savedInteraction.body,
-        summary:                extracted.summary ?? '',
-        motivation_signals:     extracted.motivation_signals ?? [],
-        competitive_signals:    extracted.competitive_signals ?? [],
-        risk_flags:             extracted.risk_flags ?? [],
-        positive_signals:       extracted.positive_signals ?? [],
-        hiring_manager_signals: extracted.hiring_manager_signals ?? [],
-        objections:             extracted.risk_flags ?? [],
-        strengths:              extracted.positive_signals ?? [],
-        next_action:            extracted.next_action ?? '',
-        questions_to_ask_next:  extracted.questions_to_ask_next ?? [],
-        updates_to_record:      extracted.updates_to_record ?? [],
-      }
-
-      const { data: saved, error: saveErr } = await supabase.from('debriefs').insert(payload).select().single()
-      if (saveErr) { console.warn('[auto-debrief] save failed:', saveErr.message); return }
-
-      setDebriefs(prev => [saved, ...prev])
-
-      if (resolvedPipelineId && saved.next_action) {
-        await supabase.from('pipeline').update({ next_action: saved.next_action }).eq('id', resolvedPipelineId)
+      // UI-only side effects — state updates and ephemeral card
+      setDebriefs(prev => [debrief, ...prev])
+      if (debrief.next_action && pipelines[0]?.id) {
         setPipelines(prev => prev.map(p =>
-          p.id === resolvedPipelineId ? { ...p, next_action: saved.next_action } : p
+          p.id === pipelines[0].id ? { ...p, next_action: debrief.next_action } : p
         ))
       }
-
       fireResponse('debrief_saved', {
         candidate: { id: candidate?.id, name: candidate ? `${candidate.first_name} ${candidate.last_name}` : null },
         debrief: {
-          summary:             saved.summary,
-          risk_flags:          saved.risk_flags ?? [],
-          motivation_signals:  saved.motivation_signals ?? [],
-          competitive_signals: saved.competitive_signals ?? [],
-          next_action:         saved.next_action,
+          summary:             debrief.summary,
+          risk_flags:          debrief.risk_flags          ?? [],
+          motivation_signals:  debrief.motivation_signals  ?? [],
+          competitive_signals: debrief.competitive_signals ?? [],
+          next_action:         debrief.next_action,
         },
-        pipeline: pipeline ? { id: pipeline.id, role_title: pipeline.roles?.title, current_stage: pipeline.current_stage } : null,
+        pipeline: pipelines[0] ? { id: pipelines[0].id, role_title: pipelines[0].roles?.title, current_stage: pipelines[0].current_stage } : null,
       })
-
-      if (resolvedPipelineId) {
-        autoCompleteActions(resolvedPipelineId, 'pipeline', ['risk_flag', 'sharpening_ask'])
-          .then(ids => { if (ids.length) onActionsCompleted?.(ids) })
-      }
+      if (completedActionIds?.length) onActionsCompleted?.(completedActionIds)
     } catch (err) {
       console.warn('[auto-debrief] extraction failed silently:', err.message)
     }

@@ -56,6 +56,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
 import { matchRoleFromNotes } from './_lib/matchRoleFromNotes.js'
 import { extractCompFromNotes } from './_lib/extractCompFromNotes.js'
+import { runBackgroundDebrief } from './_lib/runBackgroundDebrief.js'
 
 // ── Gemini Notes detection helpers ───────────────────────────────────────────
 
@@ -466,6 +467,28 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       console.warn('[ingest-email] intake_notes_ready (B+match) action insert failed:', err.message)
     }
 
+    // ── Background debrief extraction (Outcome B) ────────────────────────────
+    // Fires when notes are substantive. pipelineId is set for auto-matches (≥90%),
+    // null for proposed matches — debrief still saves, next_action skipped when null.
+    try {
+      await runBackgroundDebrief({
+        supabase,
+        generateFn: async (messages, { maxTokens }) => {
+          const resp = await anthropic.messages.create({
+            model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages,
+          })
+          return resp.content.find(b => b.type === 'text')?.text ?? ''
+        },
+        recruiterId,
+        candidateId,
+        pipelineId:    pipelineId ?? null,
+        interactionId: interaction.id,
+        notesBody:     body,
+      })
+    } catch (err) {
+      console.warn('[ingest-email] background debrief (B) failed:', err.message)
+    }
+
     triggerLoop(host, recruiterId)
     return {
       outcome:        'B',
@@ -535,6 +558,26 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     })
   } catch (err) {
     console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message)
+  }
+
+  // ── Background debrief extraction (Outcome C) ────────────────────────────
+  try {
+    await runBackgroundDebrief({
+      supabase,
+      generateFn: async (messages, { maxTokens }) => {
+        const resp = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages,
+        })
+        return resp.content.find(b => b.type === 'text')?.text ?? ''
+      },
+      recruiterId,
+      candidateId,
+      pipelineId:    pipeline.id,
+      interactionId: interaction.id,
+      notesBody:     body,
+    })
+  } catch (err) {
+    console.warn('[ingest-email] background debrief (C) failed:', err.message)
   }
 
   triggerLoop(host, recruiterId)
