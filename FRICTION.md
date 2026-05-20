@@ -10,6 +10,8 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
+5/20 | desk_handlers | Partial fix on Tier 2 chips: prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter stays on /desk URL but still has to find the relevant action inside the panel. Future session needs dedicated modals or wiring to existing surfaces. | shape_problem
+
 5/20 | submittal_draft | STRATEGIC. Submittal drafting must be multi-turn collaboration, not one-shot generation. Recruiter spent a full Claude session iterating on a real submittal as back-and-forth refinement to get it right. The submittal is Wren's highest-stakes output and the moat moment — treating it as fire-and-forget breaks the product promise. | feature_pattern
 5/20 | intake | Candidate 2 re-attempt produced the same name parse failure after discard and re-forward — same bad output, no recovery path. | bug
 5/20 | intake | Candidate 2 Gemini Notes contained a very limited summary; likely root cause of parse failure. | missing_data
