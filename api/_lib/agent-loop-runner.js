@@ -137,41 +137,84 @@ export async function runLoopForRecruiter(recruiterId, sourceRunId) {
   ]
 
   // ── Write to actions table (idempotent via content_hash) ──
-  let written = 0
-  for (const action of allActions) {
-    const hashStr     = `${recruiterId}:${action.linked_entity_id ?? ''}:${action.action_type}:${action.suggested_next_step ?? ''}`
-    const contentHash = crypto.createHash('sha256').update(hashStr).digest('hex')
+  //
+  // Batched dedup: one upfront SELECT replaces N per-action SELECTs, cutting
+  // up to 18 sequential DB round-trips (for 6 actions) down to 3.
+  //
+  // Two dedup checks:
+  //   1. Content hash  — skip if any undismissed row (including acted-on) has the same hash.
+  //      Preserves the invariant that completed actions block re-generation.
+  //   2. Pipeline urgency — for pipeline-linked actions, skip if an active undismissed/
+  //      non-snoozed row at equal-or-higher urgency already exists; delete it if incoming
+  //      is strictly higher. One stale row deleted per pipeline_id at most.
+  //   3. Pending hash  — catch within-run duplicates before they reach the DB.
+  //      The prompt enforces one action per pipeline row but that is a model instruction,
+  //      not a guarantee. Haiku could return malformed output that parses into duplicates.
 
-    const { data: hashMatch } = await supabase
-      .from('actions')
-      .select('id')
-      .eq('content_hash', contentHash)
-      .is('dismissed_at', null)
-      .maybeSingle()
+  const nowIso = new Date().toISOString()
 
-    if (hashMatch) continue
+  // Compute all content hashes upfront (no DB).
+  const actionsWithHashes = allActions.map(action => ({
+    ...action,
+    contentHash: crypto.createHash('sha256')
+      .update(`${recruiterId}:${action.linked_entity_id ?? ''}:${action.action_type}:${action.suggested_next_step ?? ''}`)
+      .digest('hex'),
+  }))
 
+  // One SELECT: all undismissed rows for this recruiter.
+  // Includes acted-on rows so the content hash check can suppress re-generation of completed cards.
+  const { data: existingActions, error: fetchErr } = await supabase
+    .from('actions')
+    .select('id, content_hash, linked_entity_id, linked_entity_type, urgency, acted_on_at, snoozed_until')
+    .eq('recruiter_id', recruiterId)
+    .is('dismissed_at', null)
+
+  if (fetchErr) {
+    console.warn('[agent-loop-runner] existing actions fetch error:', fetchErr.message)
+  }
+
+  // Build lookup structures from the fetched rows.
+  const existingHashSet = new Set((existingActions || []).map(r => r.content_hash).filter(Boolean))
+
+  // For pipeline urgency dedup: only active rows (not acted-on, not currently snoozed).
+  const existingPipelineMap = new Map() // linked_entity_id → row
+  for (const row of (existingActions || [])) {
+    if (row.acted_on_at) continue
+    if (row.snoozed_until && row.snoozed_until > nowIso) continue
+    if (row.linked_entity_type === 'pipeline' && row.linked_entity_id) {
+      const prior = existingPipelineMap.get(row.linked_entity_id)
+      if (!prior || (URGENCY_RANK[row.urgency] ?? 0) > (URGENCY_RANK[prior.urgency] ?? 0)) {
+        existingPipelineMap.set(row.linked_entity_id, row)
+      }
+    }
+  }
+
+  // Walk incoming actions and decide what to delete / insert.
+  const staleIdsToDelete = []
+  const rowsToInsert     = []
+  const pendingHashes    = new Set() // within-run duplicate guard
+
+  for (const action of actionsWithHashes) {
+    // Check 1: content hash dedup (DB rows + already-queued rows this run).
+    if (existingHashSet.has(action.contentHash)) continue
+    if (pendingHashes.has(action.contentHash))   continue
+
+    // Check 2: pipeline urgency dedup.
     if (action.linked_entity_type === 'pipeline' && action.linked_entity_id) {
-      const nowIso = new Date().toISOString()
-      const { data: existingRow } = await supabase
-        .from('actions')
-        .select('id, urgency')
-        .eq('linked_entity_id', action.linked_entity_id)
-        .eq('linked_entity_type', 'pipeline')
-        .is('dismissed_at', null)
-        .is('acted_on_at', null)
-        .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`)
-        .maybeSingle()
-
+      const existingRow = existingPipelineMap.get(action.linked_entity_id)
       if (existingRow) {
         const incomingRank = URGENCY_RANK[action.urgency] ?? 0
         const existingRank = URGENCY_RANK[existingRow.urgency] ?? 0
         if (incomingRank <= existingRank) continue
-        await supabase.from('actions').delete().eq('id', existingRow.id)
+        staleIdsToDelete.push(existingRow.id)
+        // Update the map so a second incoming action on the same pipeline_id
+        // sees the new state rather than the now-stale DB row.
+        existingPipelineMap.set(action.linked_entity_id, { ...existingRow, urgency: action.urgency })
       }
     }
 
-    const { error: insertErr } = await supabase.from('actions').insert({
+    pendingHashes.add(action.contentHash)
+    rowsToInsert.push({
       recruiter_id:        recruiterId,
       action_type:         action.action_type,
       linked_entity_id:    action.linked_entity_id ?? null,
@@ -180,15 +223,36 @@ export async function runLoopForRecruiter(recruiterId, sourceRunId) {
       why:                 action.why ?? null,
       suggested_next_step: action.suggested_next_step ?? null,
       confidence:          action.confidence ?? null,
-      content_hash:        contentHash,
+      content_hash:        action.contentHash,
       source_run_id:       sourceRunId,
       build_version:       BUILD_VERSION,
     })
+  }
 
+  // Batch DELETE stale lower-urgency pipeline rows (0 or 1 query).
+  if (staleIdsToDelete.length > 0) {
+    const { error: deleteErr } = await supabase
+      .from('actions')
+      .delete()
+      .in('id', staleIdsToDelete)
+    if (deleteErr) {
+      console.warn('[agent-loop-runner] batch delete error:', deleteErr.message)
+    }
+  }
+
+  // Batch INSERT new rows (0 or 1 query).
+  // Atomic: all rows succeed or all fail. On failure, log per-row context so
+  // the offending row can be identified without re-running.
+  let written = 0
+  if (rowsToInsert.length > 0) {
+    const { error: insertErr } = await supabase.from('actions').insert(rowsToInsert)
     if (insertErr) {
-      console.warn('[agent-loop-runner] insert error:', insertErr.message)
+      const rowSummary = rowsToInsert.map(r =>
+        `{type:${r.action_type} pipeline:${r.linked_entity_id ?? 'none'} hash:${r.content_hash?.slice(0, 8)}}`
+      ).join(', ')
+      console.warn(`[agent-loop-runner] batch insert error: ${insertErr.message} | rows: ${rowSummary}`)
     } else {
-      written++
+      written = rowsToInsert.length
     }
   }
 
