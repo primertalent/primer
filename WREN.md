@@ -534,6 +534,18 @@ If any answer is wrong, redesign or defer.
   - Ephemeral state (`AgentContext.jsx`): changed from append-array to keyed object map (`pipelineId ?? candidateId ?? roleId`). Same entity replaces old card rather than stacking.
   - Auto-debrief (`CandidateCard.jsx`): `runBackgroundDebrief()` fires automatically on every interaction save with notes content. Extracts debrief, saves to DB, updates pipeline next_action, fires `debrief_saved` response, auto-completes risk/sharpening actions. User pastes once, Wren does both.
 
+- **Handler registry pattern (session 28 — 2026-05-20):** 18 chip actions across 10 action types now resolve inline instead of navigating off-Desk to /network or /roles. Desk.jsx registers handlers that call `setPanel` with `initialState`; CandidateCard and RoleDetail accept initialState props that auto-open the relevant flow. `useRef` fire-once guards prevent re-trigger on re-render.
+  - Tier 1 (6): `log_interaction`→openLog, `log_debrief`→openDebrief, `draft_submission`→autoOpenSubmission, `set_expected_comp`→openCompFor, `screen_against_role`→autoScreen, `add_fee`→openFee on role panel.
+  - Tier 2 (6): `draft_outreach`, `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` all open the candidate panel without a specific auto-open state (relevant flow must be found inside panel — future wiring tracked in FRICTION.md).
+  - Deferred: `find_network_fits`, `match_candidate`.
+
+- **Card lifecycle reliability (session 28 — 2026-05-20):** Five fixes shipped to make Wren feel reliable during real desk use.
+  - **add_fee auto-resolve:** Fee save in RoleDetail stamps `acted_on_at` on matching action rows and calls `onActionsCompleted`. Card removed from Desk immediately. Interaction auto-complete expanded: `follow_up_overdue`, `stage_check`, `relationship_warm` all auto-complete on interaction save (was only `follow_up_overdue`).
+  - **runBackgroundDebrief shared lib:** Extracted to `api/_lib/runBackgroundDebrief.js`. `generateFn` abstraction keeps the lib transport-agnostic — browser passes `/api/ai` transport, server (`ingest-email.js`) passes Anthropic SDK directly. Gemini Notes Outcome B + C now fire debrief extraction after interaction write. Previously only the CandidateCard UI save path fired it.
+  - **build_version filter:** `src/lib/buildVersion.js` (BUILD_VERSION = 1). Migration adds `build_version` column to `actions` (default 1). All insert sites stamp BUILD_VERSION. Desk `loadActions` filters to current build — ghost cards from prior builds excluded without DB cleanup. Bump BUILD_VERSION + deploy to obsolete future ghost cards.
+  - **P4-2 on proposed matches:** `api/extract-comp.js` JWT-authed endpoint. `confirm_role_match` handler fires it fire-and-forget after pipeline creation. Comp extraction now runs for both auto-matched (≥90%) and recruiter-confirmed proposed matches (60–89%), not only auto-matches.
+  - **Forwarded Gemini Notes name fix:** `extractCandidateNameRegex` captures both participants in "between X and Y" patterns; `recruiterNameHint` (from.name) threads through for forwarded emails and is filtered from candidate candidates. Recruiter's own name no longer becomes the candidate name.
+
 **What's been cut:**
 - Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
 - Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
@@ -577,7 +589,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - ⬜ **Build 3:** Deferred. Phase 4 sliced delivered the approval-gated send path.
 
 **Known limitations / tech debt:**
-- Candidate name extraction reads the email `from` header only. Does not read body signatures, so a forwarded email may create a candidate under the forwarder's name rather than the actual sender's.
+- Candidate name extraction reads the email `from` header only for general inbound emails. For forwarded Gemini Notes specifically, the recruiter hint mechanism now filters the forwarder's name — recruiter's own name no longer becomes the candidate. Body signature parsing for general emails remains unimplemented.
 - The `drafts` table first consumer shipped in Build 2 Piece 3 (Gemini Notes capture + explicit draft trigger — 2026-05-07).
 - **`/api/ai` has no auth gate.** Any POST with a valid messages body bills the Anthropic key. Pre-existing condition, not introduced by Piece 3. Harden before any beta user signs up: add a Supabase JWT check or shared secret to the route. Piece 3 does not worsen the exposure — `fireResponse` in AgentContext already uses this endpoint.
 - **Discard chip on `intake_notes_ready` writes `acted_on_at`, which suppresses re-generation.** Semantically the field name is wrong (the recruiter didn't act, they declined). The behavior is right (recruiter explicitly declining shouldn't surface again on next loop). Future fix is loop-level: distinguish "declined to act" dismissal from "snooze" dismissal. Park until field-name confusion actually causes a debugging issue.
@@ -619,8 +631,11 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 
 **What's next (immediate):**
 - **✅ Phase 4 sliced — Gmail send only (shipped 2026-05-13):** Foundation in place. Next validation: send a real submittal to a client from the Desk card.
+- **✅ Handler registry + card lifecycle reliability (shipped 2026-05-20):** 18 chip actions resolve inline. Five lifecycle fixes: add_fee auto-resolve, debrief extractor on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded name parse fix.
 - **Agent loop cron failure (blocking, diagnose next):** 5+ consecutive failures starting May 12 evening. Loop output (action cards) not generating. Diagnosis deferred from build sessions; needs investigation before next feature build.
-- **Card shape conversion pass (queued, not next):** Audit every action card type for SaaS-shape buttons ("Log interaction", "Draft check-in", etc.) and convert to agent-shape drafts where Wren proposes the next move with one-click approval. Driven by friction log entries collected during daily use. Not a single build; a refactoring lens applied across card types. Prioritize against other work after friction data accumulates.
+- **Submittal draft as multi-turn collaboration (high priority, session 28 friction):** One-shot generation breaks down on real submittals. Recruiter needs back-and-forth refinement with Wren to reach the right output. Highest-stakes Wren output — the moat moment. See FRICTION.md strategic entry 5/20.
+- **Tier 2 chip wiring (partial fix gap, session 28):** prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter still has to find the action inside the panel. Future build: dedicated modals or wiring to existing prep/outreach surfaces.
+- **Card shape conversion pass (queued):** Audit every action card type for SaaS-shape buttons and convert to agent-shape drafts. Driven by friction log. Not a single build; a refactoring lens. Prioritize after friction data accumulates.
   - *Audit prompt when this build comes up:* "Audit all action card types and classify each one as agent-shaped or SaaS-shaped. Agent-shaped = Wren noticed something, explains the senior recruiter move, drafts/proposes the action, and lets the recruiter approve/edit/reject. SaaS-shaped = asks the recruiter to navigate, log, configure, pick, or generate manually. Do not rewrite anything. Return a table: action_type, current card behavior, agent-shaped or SaaS-shaped, recommended one-motion action, priority."
 - **P4-3 (lower priority, open):** `intake_notes_ready` auto-upgrade on manual pipeline insert — fires only for manual "Add to a role" cases. See COLLISION_AUDIT.md.
 - **P4-4 (lower priority, open):** "Add to a role" button reliability — root cause still undiagnosed. Workaround: scroll to Pipeline section in candidate page.

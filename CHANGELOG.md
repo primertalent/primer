@@ -6,6 +6,20 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 28 — 2026-05-20
+**Handler registry fix + card lifecycle reliability bundle. Real-use friction from May 20 session. 21 FRICTION.md entries logged.**
+
+**Handler registry (3 commits):** 18 chip actions across 10 action types previously navigated the recruiter off-Desk to /network or /roles. Fixed by registering handlers in Desk.jsx that call `setPanel` with `initialState`; CandidateCard and RoleDetail accept `initialState` props that auto-open the relevant flow via `useRef` fire-once guards. Tier 1 (6 handlers): `log_interaction`→openLog, `log_debrief`→openDebrief, `draft_submission`→autoOpenSubmission, `set_expected_comp`→openCompFor, `screen_against_role`→autoScreen, `add_fee`→openFee on role panel. Tier 2 (6 handlers): `draft_outreach`, `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` open candidate panel (no specific auto-open state — partial fix, tracked in FRICTION.md). Deferred: `find_network_fits`, `match_candidate`.
+
+**Card lifecycle bundle (5 fixes, 5 commits):**
+- **Fix 1 — add_fee auto-resolve:** Fee save in RoleDetail stamps `acted_on_at` on matching action rows, calls `onActionsCompleted`. Card removed from Desk immediately. Interaction auto-complete expanded: `follow_up_overdue`, `stage_check`, `relationship_warm` (was only `follow_up_overdue`).
+- **Fix 2 — debrief extractor on ingest path:** `runBackgroundDebrief` extracted into `api/_lib/runBackgroundDebrief.js`. `generateFn` abstraction: browser passes `/api/ai` transport, server passes Anthropic SDK directly. Gemini Notes Outcome B + C now fire debrief extraction after interaction write — previously only CandidateCard UI save path fired it.
+- **Fix 3 — ghost card prevention:** `scripts/cleanup_ghost_actions.sql` one-time cleanup (Query 1 + Query 2 review gates, DELETE commented out). `src/lib/buildVersion.js` constant (BUILD_VERSION = 1). Migration `20260520000001_actions_build_version.sql` adds `build_version` column (default 1). All insert sites stamp BUILD_VERSION. Desk `loadActions` filters `.eq('build_version', BUILD_VERSION)`. `src/lib/` placement (not `api/_lib/`) keeps Vite module boundary clean.
+- **Fix 4 — P4-2 on proposed matches:** `api/extract-comp.js` JWT-authed POST endpoint. `confirm_role_match` handler in Desk calls it fire-and-forget after pipeline creation. Comp extraction now runs for recruiter-confirmed proposed matches (60–89%) in addition to auto-matches (≥90%). Six `auto_comp_*` calibration fields merged into action context.
+- **Fix 5 — forwarded Gemini Notes name parse:** `extractCandidateNameRegex` captures both participants in "between X and Y" patterns. `recruiterNameHint` (from.name) threads through for forwarded emails; filtered from candidate set. Recruiter's own name no longer becomes the candidate name.
+
+---
+
 ## Session 27 — 2026-05-14
 **Strategic refinement session (no code). Captured architectural philosophy that explains and reinforces existing operating principles. Six new principles to VISION.md (deference to recruiter judgment, two-interface architecture, recruiter's brain as the asset, Wren as raw-thought destination, candidate tiering, elimination system). Two additions to POSITIONING.md (ICP behavioral profile, quality-over-volume). Seven V2/V3 build targets to WREN.md (Mode 3 raw dump, unified outbound, tier system, elimination system, referral chain, network compounding surfaces, onboarding philosophy). New SKILLS_REFERENCE directory with five worked examples that serve as specs for future build prompts. Five customer voice quotes captured in FEEDBACK.md. Verdict: refinement, not pivot. ICP, pricing, distribution, sequencing, and 30-day execution lock all unchanged. V2 build targets queued; current build sequence (OAuth validation, real onboarding, friction-driven next builds) holds.**
 
