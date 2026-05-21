@@ -57,6 +57,7 @@ import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundE
 import { matchRoleFromNotes } from './_lib/matchRoleFromNotes.js'
 import { extractCompFromNotes } from './_lib/extractCompFromNotes.js'
 import { runBackgroundDebrief } from './_lib/runBackgroundDebrief.js'
+import { BUILD_VERSION } from '../src/lib/buildVersion.js'
 
 // ── Gemini Notes detection helpers ───────────────────────────────────────────
 
@@ -216,6 +217,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         confidence:          'high',
         content_hash:        crypto.createHash('sha256').update(`${recruiterId}:null:notes_pending_match:${interaction.id}`).digest('hex'),
         context: { interaction_id: interaction.id, subject: subject || null, extracted_name: null },
+        build_version:       BUILD_VERSION,
       })
     } catch (err) {
       console.warn('[ingest-email] notes_pending_match action insert failed:', err.message)
@@ -462,6 +464,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
           auto_comp_source_excerpt: compResult?.source_excerpt  ?? null,
           auto_comp_pass:           compResult?.pass            ?? 'none',
         },
+        build_version:       BUILD_VERSION,
       })
     } catch (err) {
       console.warn('[ingest-email] intake_notes_ready (B+match) action insert failed:', err.message)
@@ -555,6 +558,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         auto_comp_source_excerpt: compResult?.source_excerpt  ?? null,
         auto_comp_pass:           compResult?.pass            ?? 'none',
       },
+      build_version:       BUILD_VERSION,
     })
   } catch (err) {
     console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message)
@@ -1001,6 +1005,7 @@ export default async function handler(req, res) {
           subject:        subject || null,
           intent:         classification?.candidate_intent ?? null,
         },
+        build_version:       BUILD_VERSION,
       })
     } catch (actionErr) {
       console.warn('[ingest-email] new_inbound action insert failed:', actionErr.message)

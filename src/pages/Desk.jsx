@@ -10,6 +10,7 @@ import { useAgent } from '../context/AgentContext'
 import { supabase } from '../lib/supabase'
 import { generateText } from '../lib/ai'
 import { buildSubmittalFromMeetNotesMessages } from '../lib/prompts/submissionDraft'
+import { BUILD_VERSION } from '../lib/buildVersion.js'
 
 const URGENCY_RANK = { now: 0, today: 1, this_week: 2 }
 
@@ -509,6 +510,7 @@ export default function Desk() {
       .eq('recruiter_id', recruiter.id)
       .is('dismissed_at', null)
       .is('acted_on_at', null)
+      .eq('build_version', BUILD_VERSION)
       .or(`snoozed_until.is.null,snoozed_until.lt.${now}`)
       .order('created_at', { ascending: false })
       .limit(50)

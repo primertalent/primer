@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { buildAgentLoopMessages } from '../../src/lib/prompts/agentLoop.js'
+import { BUILD_VERSION } from '../../src/lib/buildVersion.js'
 
 // Shared supabase + anthropic instances for server-side loop execution.
 // Service role key bypasses RLS — never expose client-side.
@@ -181,6 +182,7 @@ export async function runLoopForRecruiter(recruiterId, sourceRunId) {
       confidence:          action.confidence ?? null,
       content_hash:        contentHash,
       source_run_id:       sourceRunId,
+      build_version:       BUILD_VERSION,
     })
 
     if (insertErr) {
