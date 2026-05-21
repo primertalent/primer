@@ -10,6 +10,8 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
+5/21 | agent_loop | RESOLVED. Loop failures from 5/20 traced to Vercel Hobby 10s timeout with real data in the DB. Fix A (batched dedup in agent-loop-runner.js, commit 8ab4efc) brought execution under the ceiling. Pro upgrade deferred. Watch for re-occurrence as data grows. | bug
+
 5/20 | desk_handlers | Partial fix on Tier 2 chips: prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter stays on /desk URL but still has to find the relevant action inside the panel. Future session needs dedicated modals or wiring to existing surfaces. | shape_problem
 
 5/20 | submittal_draft | STRATEGIC. Submittal drafting must be multi-turn collaboration, not one-shot generation. Recruiter spent a full Claude session iterating on a real submittal as back-and-forth refinement to get it right. The submittal is Wren's highest-stakes output and the moat moment — treating it as fire-and-forget breaks the product promise. | feature_pattern
