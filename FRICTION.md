@@ -4,11 +4,17 @@ Live log of friction encountered during real use. Capture, don't fix mid-session
 
 Format: `Date | Stage | What happened | Tag`
 
-Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / `feature_pattern`
+Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / `feature_pattern` / `external_limitation`
 
 ---
 
 <!-- Append new entries below, newest at top -->
+
+5/21 | all | RESOLVED. Session 2 card lifecycle fixes validated in real use on Gemini Notes intake smoke test: P4-1 auto-match, P4-2 comp extract on confirmed matches, debrief auto-fire on ingestion path, Tier 1 and Tier 2 inline chip handlers all working. No navigation off Desk observed. | bug
+
+5/21 | intake | Gemini Notes email body contains summaries only, not full transcripts. Full meeting content sits behind "Open meeting notes" link in Google Docs. Wren extracts what it has but signal quality is limited by Gemini's email surface. Not a Wren bug — Gemini is the wrong tool for transcript-quality intake. Path forward: recommend Fathom/Granola/Otter in onboarding materials, or build Google Docs OAuth + fetch (V2+). | external_limitation
+
+5/21 | submittal_draft | "Save to queue" button appears after submittal draft creation but no queue exists — queue was deleted per Phase 2 strip-down. Dead button or stale label mapped to a removed surface. Needs diagnosis: either remove the button or remap to a current surface. | bug
 
 5/21 | agent_loop | RESOLVED. Loop failures from 5/20 traced to Vercel Hobby 10s timeout with real data in the DB. Fix A (batched dedup in agent-loop-runner.js, commit 8ab4efc) brought execution under the ceiling. Pro upgrade deferred. Watch for re-occurrence as data grows. | bug
 
