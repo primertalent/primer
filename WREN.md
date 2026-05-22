@@ -3,6 +3,19 @@
 
 ---
 
+## Current State (updated 2026-05-21)
+
+**Shipped recently:**
+- (to be filled in)
+
+**Actively broken or flaky:**
+- (to be filled in)
+
+**Next in queue:**
+- (to be filled in)
+
+---
+
 ## Product Framing (locked)
 
 **Wren is the entry-level recruiter you can't hire.**
@@ -13,7 +26,7 @@ Domain: hirewren.com. Pitch: "Hire Wren."
 
 Internal architecture description: Wren is the deal desk for solo recruiters. The deal desk is the wedge into a broader operational coverage layer. The agent runs continuously, handles communication and routine operations, and surfaces judgment moments to the recruiter.
 
-For the founder vision document, see `VISION.md`. For GTM, founder story, objection handling, and messaging, see `POSITIONING.md`. This file (`WREN.md`) is the codebase context.
+For the founder vision document, see `VISION.md`. For GTM, founder story, objection handling, and messaging, see `POSITIONING.md`. Working-with-Claude-Code patterns live in `WORKFLOW.md`. This file (`WREN.md`) is the codebase context.
 
 The questions Wren answers for every active deal:
 - Is this candidate closeable?
