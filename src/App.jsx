@@ -4,6 +4,7 @@ import { AgentProvider } from './context/AgentContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
+import Wren from './pages/Wren'
 import Desk from './pages/Desk'
 import CandidateCard from './pages/CandidateCard'
 import Roles from './pages/Roles'
@@ -22,7 +23,8 @@ export default function App() {
       <AuthProvider>
         <AgentProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/desk" replace />} />
+          <Route path="/" element={<Navigate to="/wren" replace />} />
+          <Route path="/wren" element={<ProtectedRoute><Wren /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />

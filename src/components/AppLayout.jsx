@@ -14,6 +14,12 @@ export default function AppLayout({ children, fullBleed = false }) {
         </div>
         <nav className="app-nav">
           <NavLink
+            to="/wren"
+            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
+          >
+            Wren
+          </NavLink>
+          <NavLink
             to="/desk"
             className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
           >

@@ -17,15 +17,15 @@
 - Phase 2.5 Build 2 complete (2026-05-05 through 2026-05-13): CloudMailin ingestion, classifier-first reorder, new_inbound action cards, Gemini Notes flow (intake_notes_ready → recruiter-triggered submittal_draft_ready → review/approve-copy/approve-and-send).
 
 **Actively broken:**
-- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Hard blocker before any beta user. Fix: add Supabase JWT check or shared secret.
+- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Pre-beta security blocker. Next PR after `/wren` ships. Fix: add Supabase JWT check or shared secret.
 - "Add to a role" buttons broken across Desk chip, DealStatusBar, and sidebar candidate view. Root cause undiagnosed. Workaround: Pipeline section inside candidate page has a working inline button.
 - Tier 2 chip wiring incomplete: `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` open the candidate panel but no specific flow auto-opens inside. Recruiter still has to find the action manually.
-- Submittal draft is one-shot generation — breaks on real submittals that need refinement. Highest-stakes output. Needs multi-turn collaboration.
+- Submittal draft is one-shot generation on Desk — fixed in /wren via multi-turn conversation.
 - `pipeline` table is singular — rename to `pipelines` before beta. Will break any raw SQL using old name.
 
 **Next in queue:**
-- Build `/wren` conversation surface (decided architecture priority — `conversations` table migration, route, shell, streaming agent endpoint with tool use, `wrenAgent.js` system prompt).
-- `/api/ai` auth gate (hard pre-beta blocker, scope is small).
+- `/api/ai` auth gate — next PR after /wren ships (pre-beta security blocker).
+- `/wren` conversation history is currently unbounded — bound to last 20 messages or the full current draft thread (whichever is longer) before beta, per cost-discipline principle.
 - Submittal as multi-turn collaboration — first real test of the conversation surface, most important moat moment.
 - Tier 2 chip wiring: dedicated modals or flow wiring for prep/outreach/follow-up chip actions.
 - P4-3 (lower priority): `intake_notes_ready` auto-upgrade on manual pipeline insert.

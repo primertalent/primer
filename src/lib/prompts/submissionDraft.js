@@ -1,5 +1,6 @@
 // format: 'email' | 'bullet'
-export function buildSubmissionMessages(candidate, role, fitScore, format = 'email') {
+// voiceSamples: optional [{ channel, subject, body }] from voice_samples table — calibrates tone to the recruiter's style.
+export function buildSubmissionMessages(candidate, role, fitScore, format = 'email', voiceSamples = []) {
   const skills = candidate.skills?.join(', ') || 'None listed'
   const comp = formatComp(role.comp_min, role.comp_max, role.comp_type)
 
@@ -23,13 +24,21 @@ export function buildSubmissionMessages(candidate, role, fitScore, format = 'ema
     ? `\nJOB DESCRIPTION:\n${role.notes}`
     : ''
 
+  const voiceSection = voiceSamples.length
+    ? `\nRECRUITER VOICE — write in this recruiter's style, not a generic recruiter's style:\n${
+        voiceSamples.map((s, i) =>
+          `Example ${i + 1}${s.subject ? ` (subject: "${s.subject}")` : ''}:\n${s.body.slice(0, 400)}`
+        ).join('\n\n')
+      }\n\nCalibrate sentence length, word choice, and tone to match these samples. Do not copy them. The examples are voice reference, not templates.`
+    : ''
+
   const HUMAN_WRITING_RULES = `Writing rules — this must read like a sharp recruiter wrote it, not AI:
 - No em dashes (—), en dashes (–), or dashes used as punctuation breaks. Use a period or comma instead.
 - No: "excited to present", "pleased to introduce", "strong track record", "passionate", "self-starter", "results-driven", "dynamic", "leveraged", "spearheaded", "proven ability"
 - No: "Additionally", "Furthermore", "It is worth noting", "In conclusion"
 - Active voice always. "Grew revenue 40%" not "Was responsible for growing revenue"
 - Write how a recruiter talks to a hiring manager, not how someone writes a cover letter
-- Short sentences. Vary length. Every sentence earns its place.`
+- Short sentences. Vary length. Every sentence earns its place.${voiceSection}`
 
   const formatInstructions = format === 'bullet'
     ? `Write a structured bullet-format submission. Use plain text bullets (no markdown). Keep each bullet under 15 words. Total under 150 words.

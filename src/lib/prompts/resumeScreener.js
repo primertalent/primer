@@ -1,4 +1,7 @@
-export function buildScreenerMessages(candidate, role) {
+// clientHistory: optional { recent_debriefs: [{ candidate_name, outcome, summary, risk_flags, date }] }
+// When provided, the screen output explicitly flags whether this candidate shares patterns
+// that caused prior candidates to fail at this client — this is the quality gate for /wren.
+export function buildScreenerMessages(candidate, role, clientHistory = null) {
   const skills = candidate.skills?.join(', ') || 'None listed'
   const cv = candidate.cv_text
     ? `\n\nFULL CV / RESUME TEXT:\n${candidate.cv_text}`
@@ -6,7 +9,21 @@ export function buildScreenerMessages(candidate, role) {
   const jd = role.notes
     ? `\n\nJOB DESCRIPTION:\n${role.notes}`
     : ''
-  const steps = role.process_steps?.join(' → ') || 'Not specified'
+  const steps = Array.isArray(role.process_steps)
+    ? role.process_steps.join(' → ')
+    : (role.process_steps || 'Not specified')
+
+  const clientHistorySection = clientHistory?.recent_debriefs?.length
+    ? `\n\nCLIENT OBJECTION HISTORY — ${role.clients?.name ?? 'this client'} (last ${clientHistory.recent_debriefs.length} candidate(s)):\n${
+        clientHistory.recent_debriefs.map(d =>
+          `- ${d.candidate_name} (${d.date ?? 'unknown date'}): outcome=${d.outcome ?? 'unknown'}${d.summary ? ` — ${d.summary.slice(0, 250)}` : ''}${
+            Array.isArray(d.risk_flags) && d.risk_flags.length
+              ? `\n  Risk flags: ${d.risk_flags.join(', ')}`
+              : ''
+          }`
+        ).join('\n')
+      }\n\nIMPORTANT: In your evaluation, explicitly state whether this candidate shares any of the gaps or risk patterns from this history. Name the pattern and name the candidate's gap. Do not soften it. If this client has passed candidates for a specific reason before, say so directly in top_concerns or red_flags.`
+    : ''
 
   const prompt = `You are an expert technical recruiter with 20 years of experience evaluating candidates against job specifications.
 
@@ -22,7 +39,7 @@ Notes: ${candidate.notes || 'None'}${cv}
 ROLE SPECIFICATION
 Title: ${role.title}
 Client: ${role.clients?.name ?? 'Unknown'}
-Hiring Process: ${steps}${jd}
+Hiring Process: ${steps}${jd}${clientHistorySection}
 
 Return this exact JSON structure (use null for unknown, empty array [] for none found):
 {
