@@ -11,6 +11,7 @@
 - Handler registry (session 28, 2026-05-20): 18 chip actions across 10 action types resolve inline. CandidateCard and RoleDetail accept `initialState` props to auto-open flows. `useRef` fire-once guards prevent re-trigger on re-render.
 - Card lifecycle reliability (session 28): add_fee auto-resolve, `runBackgroundDebrief` extracted to shared lib and fired on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded Gemini Notes name fix.
 - Phase 4 sliced (commit 3d577d2, 2026-05-13): Gmail OAuth send live. `api/google-auth.js`, `api/gmail-send.js`, `GoogleAuthCallback` page. `submittal_draft_ready` card has subject preview, To field, Approve & send / Connect Gmail. `gmail_access_token`/`refresh_token`/`token_expiry` on recruiters row.
+- Google OAuth scaffolding and token storage shipped, send-scoped (commit 3d577d2). Read + Calendar is a scope expansion on the existing working flow — not a new build.
 - P4-2 auto-comp (commit c29f037, 2026-05-13): two-pass extractor writes `expected_comp` on high confidence. Fires when pipeline exists. Never overwrites existing comp.
 - P4-1 auto-match (commit 5758274, 2026-05-12): two-pass matcher. ≥90 auto-create pipeline; 60–89 propose with one-click confirm; <60 add-to-role. Wrong-role undo on auto-matched cards.
 - Phase 2.5 Build 2 complete (2026-05-05 through 2026-05-13): CloudMailin ingestion, classifier-first reorder, new_inbound action cards, Gemini Notes flow (intake_notes_ready → recruiter-triggered submittal_draft_ready → review/approve-copy/approve-and-send).
