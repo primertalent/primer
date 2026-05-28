@@ -3,16 +3,33 @@
 
 ---
 
-## Current State (updated 2026-05-21)
+## Current State (updated 2026-05-28)
 
 **Shipped recently:**
-- (to be filled in)
+- Surface decision (2026-05-28): conversation is the product. `/wren` is decided home. Desk, Tray, Zones, and candidate pages demoted to deep-review views. Not yet built — see "Conversation architecture" section.
+- Agent loop timeout fix (commit 8ab4efc, 2026-05-21): batched per-action dedup from up to 18 serial DB round-trips to 3. Clean run confirmed. Vercel Hobby 10s limit is the ceiling — watch as data volume grows.
+- Handler registry (session 28, 2026-05-20): 18 chip actions across 10 action types resolve inline. CandidateCard and RoleDetail accept `initialState` props to auto-open flows. `useRef` fire-once guards prevent re-trigger on re-render.
+- Card lifecycle reliability (session 28): add_fee auto-resolve, `runBackgroundDebrief` extracted to shared lib and fired on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded Gemini Notes name fix.
+- Phase 4 sliced (commit 3d577d2, 2026-05-13): Gmail OAuth send live. `api/google-auth.js`, `api/gmail-send.js`, `GoogleAuthCallback` page. `submittal_draft_ready` card has subject preview, To field, Approve & send / Connect Gmail. `gmail_access_token`/`refresh_token`/`token_expiry` on recruiters row.
+- P4-2 auto-comp (commit c29f037, 2026-05-13): two-pass extractor writes `expected_comp` on high confidence. Fires when pipeline exists. Never overwrites existing comp.
+- P4-1 auto-match (commit 5758274, 2026-05-12): two-pass matcher. ≥90 auto-create pipeline; 60–89 propose with one-click confirm; <60 add-to-role. Wrong-role undo on auto-matched cards.
+- Phase 2.5 Build 2 complete (2026-05-05 through 2026-05-13): CloudMailin ingestion, classifier-first reorder, new_inbound action cards, Gemini Notes flow (intake_notes_ready → recruiter-triggered submittal_draft_ready → review/approve-copy/approve-and-send).
 
-**Actively broken or flaky:**
-- (to be filled in)
+**Actively broken:**
+- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Hard blocker before any beta user. Fix: add Supabase JWT check or shared secret.
+- "Add to a role" buttons broken across Desk chip, DealStatusBar, and sidebar candidate view. Root cause undiagnosed. Workaround: Pipeline section inside candidate page has a working inline button.
+- Tier 2 chip wiring incomplete: `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` open the candidate panel but no specific flow auto-opens inside. Recruiter still has to find the action manually.
+- Submittal draft is one-shot generation — breaks on real submittals that need refinement. Highest-stakes output. Needs multi-turn collaboration.
+- `pipeline` table is singular — rename to `pipelines` before beta. Will break any raw SQL using old name.
 
 **Next in queue:**
-- (to be filled in)
+- Build `/wren` conversation surface (decided architecture priority — `conversations` table migration, route, shell, streaming agent endpoint with tool use, `wrenAgent.js` system prompt).
+- `/api/ai` auth gate (hard pre-beta blocker, scope is small).
+- Submittal as multi-turn collaboration — first real test of the conversation surface, most important moat moment.
+- Tier 2 chip wiring: dedicated modals or flow wiring for prep/outreach/follow-up chip actions.
+- P4-3 (lower priority): `intake_notes_ready` auto-upgrade on manual pipeline insert.
+- P4-4 (lower priority): "Add to a role" button root-cause diagnosis.
+- P4-5 (pre-beta): `pipeline` → `pipelines` table rename. Audit all raw SQL before executing.
 
 ---
 
@@ -131,23 +148,23 @@ For deeper GTM thinking — founder story, objection handling, market analysis, 
 
 ## When Wren engages
 
-Wren is a deal desk. Deal desks engage when there's a deal.
+**Wren is never dormant. The deal desk is.**
 
-**The trigger:** A candidate enters an active role's pipeline. That's the moment Wren wakes up on that candidate. Before that, Wren is dormant.
+The conversation is always live. From first contact, Wren ingests, screens, matches, drafts, and maintains context. That's not deal desk logic — that's the employee being present.
 
-Pre-pipeline activities (sourcing, intake, evaluating fit, deciding whether to pursue): the recruiter's work. Wren stores data and offers light intelligence (career timeline parsing, JD extraction, Network search, network match suggestions) but does not run deal desk logic.
+**The deal desk trigger:** A candidate enters an active role's pipeline. That's when deal desk logic activates: the agent loop monitors, stage-gate flows fire, risk surfaces, prioritized actions queue. A candidate you're still evaluating doesn't get cold-deal risk flags. One in an active pipeline does.
 
-Post-pipeline activation: Wren engages fully. The agent loop monitors. Stage-gate flows fire. Risk surfaces. Actions queue. The deal desk runs alongside the deal until placed or lost.
+The old framing conflated "Wren" with "the deal desk." They're different:
+- **Wren** — present and active always. Ingests input, drafts responses, answers recruiter questions, maintains the book. No pipeline needed.
+- **The deal desk** — activates on pipeline entry. Agent loop, risk flags, stage-gates, prioritized actions. All scoped to active pipeline rows only (`current_stage NOT IN (placed, lost)` and role is active).
 
 **Network match suggestions are the bridge.** When a candidate is added or a role is created, Wren surfaces:
 - "This candidate fits your active Inworld AE role. Start a pipeline?"
 - "5 people in your network match this new role. Add any to the pipeline?"
 
-The recruiter decides yes or no. If yes, the deal starts and Wren engages. If no, the candidate stays in Network and Wren goes quiet on them. Wren never forces deal desk logic on contacts that aren't committed to a deal.
+The recruiter decides. If yes, the deal starts and the deal desk engages. If no, the candidate stays in Network without deal desk monitoring. Wren never runs deal desk logic on contacts not committed to a deal.
 
-**Why this matters.** Wren feels off when used pre-deal. There's no deal to pressure-test, no close to run, no risk to surface. The product has nothing to do. Defining the trigger cleanly removes the pre-deal friction and lets every Wren surface assume "this is an active deal" by default.
-
-**Implication for build:** every Desk surface, every agent action, every risk flag operates on active pipeline rows only. Network candidates are searchable and matchable but not subject to deal desk logic. Roles without pipeline activity are stored but not actively monitored.
+**Implication for build:** the agent loop reads only active pipeline rows (`current_stage NOT IN (placed, lost)`, role active). Network candidates are searchable and matchable but not subject to deal desk monitoring. Roles without pipeline activity are stored but not actively monitored by the loop. Every loop action, risk flag, and stage-gate operates on active pipeline rows.
 
 ---
 
@@ -282,13 +299,44 @@ PWA, not native. Faster path, runs on the same React/Vite stack, service worker 
 
 ---
 
+## Conversation architecture (decided, not yet built)
+
+**The conversation is the product.** `/wren` is the home route. Wren speaks first, acts without being asked, and renders work inline. Deals, Network, and Desk are deep-review views the conversation opens or renders — not nav peers.
+
+**For Claude Code sessions:** `/wren` is the decided architecture but not yet built. The live primary surface remains `/desk` until the conversation surface ships. Sequence build plans against this target; do not assume the route exists.
+
+**The four flows:**
+
+**Ingestion** — the front door. Recruiter drops any input (URL, resume, paste, LinkedIn copy). Wren ingests, deduplicates, enriches, matches against open roles. Every other flow starts here. Core tools: `ingest_input`, `search_candidates`, `match_roles_against_candidate`.
+
+**Outreach and sequencing** — draft email + LinkedIn in parallel for a candidate on a role. Manual trigger in v1; 3-day and 7-day follow-ups queue on demand. Core tools: `generate_outreach_set`, `generate_followup`.
+
+**Reply handling** — recruiter pastes inbound reply. Wren classifies intent and drafts the appropriate response. Core tool: `generate_reply`.
+
+**Closing work** — the moat. Three sub-flows: (1) submission to client, calling `get_client_objection_history` before drafting so past rejections shape the pitch; (2) interview prep pack (HM context, talking points, candidate questions, risks); (3) debrief and objection capture, writing structured signal to `debriefs` and updating pipeline state. Core tools: `generate_submission`, `generate_interview_prep`, `capture_debrief`.
+
+**Inline components** rendered in the conversation: `CandidateCard` (compact deal view), `RoleCard` (compact role view), `SubmissionDraft` (editable, Copy/Save/Regenerate/Mark Sent), `DraftSet` (parallel email + LinkedIn drafts), `InterviewPrepCard` (collapsible sections), `DebriefSummary` (structured feedback + next-action suggestion).
+
+**New tables:**
+- `conversations` — `id`, `recruiter_id`, `title`, `created_at`, `updated_at`. RLS on `recruiter_id`.
+- `conversation_messages` — `id`, `conversation_id`, `recruiter_id`, `role` (user/assistant/tool), `content` (jsonb), `created_at`.
+
+**New files:**
+- `api/wren.js` — agent endpoint: Anthropic streaming with tool use. Text deltas relay to client; tool_use blocks execute server-side; results fed back until `end_turn`.
+- `src/pages/Wren.jsx` — left sidebar (conversation list, New conversation button), main message stream, composer at bottom.
+- `src/lib/prompts/wrenAgent.js` — Wren persona, four flows (brief, not procedural), tool use patterns (call read-only tools proactively, never ask permission to look something up), initiative pattern (on mount, call `list_attention()` + `list_active_submissions()` before first message). Keep under 1500 tokens.
+
+**LinkedIn enrichment:** Proxycurl is dead (LinkedIn lawsuit, July 2025). v1: recruiter pastes URL or profile text. If URL: `api/fetch-url.js` first, fall back to Apify LinkedIn Scrapers (~$0.005–0.01/profile). Build with `enrichProfile(url)` interface — provider is swappable.
+
+---
+
 ## What Wren is
 
 Wren is an agent that works the desk of a solo independent recruiter.
 
 It screens candidates, drafts submissions, flags what needs attention, and keeps the database current while the recruiter is on a call, with a client, or away from the desk. The recruiter opens the day with a brief, works their roles, closes with a queue of actions to review. The agent fills everything in between.
 
-Not an OS. Not a co-pilot. Not a chatbot. An agent with recruiter logic and a platform to execute and store it.
+Not an OS. Not a co-pilot. Not a passive chatbot — the interface is a conversation, but Wren speaks first, acts without being asked, and renders work inline. An agent with recruiter logic and a platform to execute and store it.
 
 **Two layers:**
 - **The agent** — recruiter logic encoded as prompt skills. Fires on events. Works without being asked.
@@ -349,13 +397,11 @@ Every feature should move one step toward the later version. The test on every b
 
 ## Core loop
 
-**The Desk → work the Deals → end-of-day review.**
+**The conversation is home. Wren speaks, acts, renders.**
 
-The Desk (home) answers three questions without scrolling: what's my pipeline worth, what needs attention now, what's happened recently. 90 seconds to read.
+The recruiter opens `/wren`. Wren orients: what's active, what's at risk, what's in queue. They talk, paste, or drop — Wren ingests, drafts, surfaces inline cards and panels on demand.
 
-In the middle, the recruiter works candidates and roles. Single-click advance. Single-click draft. Sticky Deal Status Bar so the next move is always visible.
-
-End of day is ambient via Actions Tray (future): surfaces what Wren flagged, what's overdue, what's drafted and awaiting send. Clear the tray. Close the laptop.
+End of day is ambient: drafted messages awaiting send, outstanding follow-ups, anything Wren flagged. The conversation has the context. Recruiter approves, edits, or dismisses.
 
 Everything outside this loop needs a strong case.
 
@@ -467,21 +513,21 @@ Active tables — all read and written by current code:
 ## Build rules
 
 **Before any feature, run this check:**
-- Does it serve the core loop (Desk → work → review)?
+- Does it serve the conversation or deepen a view it opens?
 - Does it fire on an event or require a button press? (Event is better.)
 - Can it be done in one motion?
 - Does it compound toward the autonomous agent?
 - Is it channel-agnostic?
-- Does it earn a place on Desk, Deals, or Network, or does it live inside one of those? (No new top-level nav items.)
+- Does it belong in the conversation, or in a view the conversation opens? (No new top-level nav items.)
 
 If any answer is wrong, redesign or defer.
 
 **Standing constraints:**
-- Three top-level surfaces only: Desk, Deals, Network. New functionality lives inside one of them, not in new nav.
-- WrenCommand is the highest-leverage surface. Do not complicate it.
+- One surface: the conversation at `/wren`. Deals, Network, and Desk are views the conversation opens or renders — not nav peers. No new top-level nav.
+- WrenCommand feeds the conversation (intake, paste, drop). Do not complicate it.
 - Everything persists. Ephemeral AI output is an antipattern.
 - One-click is the bar. More than one motion gets flagged for redesign.
-- The Desk's Pipeline Value and Actions Tray are the prioritization layer. That is the core loop, not a dashboard feature.
+- The conversation's action surface is the prioritization layer. That is the core loop, not a dashboard feature.
 - Recruiter score and AI score are separate permanent tracks. Don't collapse them.
 
 ---
@@ -560,7 +606,7 @@ If any answer is wrong, redesign or defer.
   - **Forwarded Gemini Notes name fix:** `extractCandidateNameRegex` captures both participants in "between X and Y" patterns; `recruiterNameHint` (from.name) threads through for forwarded emails and is filtered from candidate candidates. Recruiter's own name no longer becomes the candidate name.
 
 **What's been cut:**
-- Wren.jsx (chat page) — removed. Contradicted "agent, not chatbot" repositioning. `/api/wren` was a stub.
+- Wren.jsx (original chat page, removed session ~15) — removed because it was a stub with no real agent loop. Being rebuilt as the decided home architecture — see "Conversation architecture" section.
 - Clients.jsx / ClientDetail.jsx — removed. OS-pattern surfaces. Client context lives in RoleDetail.
 - Dashboard ActivityDigest / NeedsAttention / TodayPipeline — replaced by Desk action cards.
 - Daily Brief skill — removed. Redundant with Dashboard.
@@ -979,144 +1025,16 @@ Priority: V1. Likely builds Friday if Thursday's real use surfaces process-misma
 
 Not a user count threshold. A market signal threshold.
 
----
 
-## Positioning and Objection Handling
+> Positioning, founder story, and objection handling: see `POSITIONING.md`.
 
-**Founder story:**
-"I spent 15 years as a solo recruiter running on LinkedIn and spreadsheets. I was good at the start of the funnel. I was average at the close. I kept losing candidates I should have won. Wren is what I wish I'd had."
-
-**Core objection handling:**
-
-*"I do this already and my process is good."*
-"Perfect. Upload it. Wren turns your process into the floor, not the ceiling. You stay the closer. Wren makes sure every candidate gets your A game, not your Thursday afternoon game."
-
-*"I already use [ATS / Gem / Paraform]."*
-"Keep using it. Wren sits on top. Your ATS stores the record. Wren runs the deal."
-
-*"AI in recruiting is all hype."*
-"Most of it is. Wren isn't doing sourcing or outreach automation. Wren does the deal work between the calls you make. If you're losing closes you should be winning, that's what we fix."
-
-*"I don't have time to learn another tool."*
-"You paste your candidate, your notes, your JD. Wren does the rest. If it takes more than one motion it's broken. That's the bar."
-
-*"What about data security?"*
-"Everything is yours. Your candidates, your notes, your data. We don't sell data, don't share across users, don't train on your records."
-
-*"I'm a solo recruiter, I don't need enterprise tooling."*
-"Right. Wren is built for you specifically. No team features, no admin panels. One operator, one desk, one tool that respects your time."
-
----
-
-## Decisions log
-
-Architectural and product decisions that stand. Behavior here overrides intuition.
-
-- **Wren is an agent with a platform, not an OS.** The OS framing was technically accurate but wrong as a product concept. The agent is useless without the platform. The platform is just an ATS without the agent.
-- **Client submission, not Paraform submission.** Wren drafts the pitch. The recruiter chooses how to deliver it. Never build for a specific platform.
-- **Skills fire on events, not buttons.** Every skill behind a button press is a candidate for event-based automation.
-- **The skill prompts are the brain.** Built on recruiter logic from real recruiters. This is the moat.
-- **Recruiter score and AI score are separate permanent tracks.** `pipeline.recruiter_score` and `pipeline.recruiter_note` are never touched by AI reruns. Both visible. Delta is calibration data.
-- **Inline confirm is the delete pattern.** No modals. One click surfaces Yes / Cancel inline.
-- **× button appears on hover.** Clean UI without sacrificing discoverability.
-- **Regenerate vs. Clear.** Regenerate = overwrite in place, no confirm. Clear = wipe from DB, requires confirm.
-- **Save All confirmation.** After successful save, action button replaced by static "Saved ✓" label.
-- **AI calls are server-side only.** All Anthropic calls go through `api/ai.js`. Non-negotiable.
-- **JSONB for flexible data.** Career timeline, signals, process steps, screener results, scorecard results, interview guide.
-- **Agent response fires after save, not during.** Save must commit before agentResponse is called. If agentResponse fails, save is already committed. WrenResponse renders error state: "Saved. Wren hit a branch generating next steps." User never loses data due to agent failure.
-- **WrenResponse renders in AppLayout as fixed bottom bar.** Lives above routes, persists across navigation. Thinking state sets before navigate; response fills in on the next page.
-- **Action dispatcher: page registry first, navigation fallback second.** Pages register handlers via `registerAction(actionId, fn)` on mount. `dispatch` checks registry before navigating. CandidateCard registers log_debrief, log_interaction, set_expected_comp.
-- **Pushback is honest observation, not blocking.** Action completes first. One pushback max per response. ~30-40% frequency. Never stacked.
-- **agentResponse voice rules.** 1-2 sentences. No em dashes. No "I have completed." Bird metaphors max every 4-5 responses. Banned verbs: tweet, fly, feather, nest, wings, egg, flutter, chirp. Never "you should" or "you need to."
-- **Save All removed from WrenCommand intake flow only.** CreateCandidate and CreateRole forms keep their submit buttons. Auto-save fires on IntakeResult/MultiScreenResult mount.
-- **Resume auto-parse: fires on drop only when no result is showing.** Single resume chip, no JD chips, no freeform text. Dedup: same name+size returns cached chip content, no re-fire.
-- **Pipeline value formula.** `placement_fee_flat` takes precedence. If null, `expected_comp * placement_fee_pct`. Stage probabilities: interviewing=0.25, offer=0.75, placed=1.00. Weighted = sum(fee * prob) across active entries in those stages.
-- **Expected comp is required for interview+ stages.** Blocking modal fires on stage advance to interviewing/offer/placed when `pipeline.expected_comp` is null. Soft prompt surfaces on load for existing entries missing comp.
-- **Placement fee defaults from recruiter profile.** `recruiters.default_placement_fee_pct` auto-fills `placement_fee_pct` on new role creation.
-- **No LinkedIn API.** Too locked down. Draft in Wren, copy to send.
-- **Document block pattern for multi-input AI calls.** Multiple inputs wrapped as labeled `<document>` blocks with type and name. Standard for all multi-input features.
-- **Classify calls are intentionally minimal.** 100 token max, 2000 char input slice. Speed over completeness. Never block the UI waiting on classification.
-- **Role matching is semantic, not string.** Intake prompt receives all existing open roles. Model matches by meaning. `role_id` in the result means match was found — use it directly, skip DB lookup.
-- **Single column beats multi-column for dense content.** If content length is unpredictable, don't put it in a fixed-width column.
-- **Event-based triggers ship first. Time-elapsed triggers later.** Event triggers fire synchronously off user actions, no new infra. Time-elapsed triggers need scheduled jobs (Supabase Edge Functions or cron). Don't build time-elapsed until event triggers are proven in real use.
-- **Full prompt lives in `src/lib/prompts/`.** `api/ai.js` is a passthrough only. No prompts hardcoded server-side. Single source of truth.
-- **CandidateCard is a deal view, not an ATS record.** Top-to-bottom order: what is this deal, what's at risk, what do I do next. Reference material (resume, full debrief list, career signals) lives collapsed below the fold.
-- **Zone A actions are state-based rules, not a prompt call.** Stage + last-interaction age + debrief-on-latest-interaction determines which 3 actions surface. Fast and deterministic. No API call on card load.
-- **Risk pills derive from debrief JSONB, not new capture.** `motivation_signals`, `competitive_signals`, `risk_flags` text is scanned for keywords at render time. Counter offer risk also fires on `career_signals` Long Tenure when passive indicators are present.
-- **Interaction editing preserves debrief link.** Edit modal patches `type` and `body` only. `debrief_id` is never touched. "Debrief linked" note shown in modal.
-- **Resume auto-parses on card load if cv_text exists but no career_timeline.** One-shot via ref guard — fires once per card load, not on every render.
-- **Call Prep module is a stub in Zone A.** "Prep for next interview", "Lock comp expectations", "Prep for counter offer" show a stub message until the Wednesday build replaces them.
-- **Zone B pitch and interview questions render inline below Zone B.** No separate modal needed for results. Copy button available. Dismiss button clears result.
-- **ICP locked as solo recruiter with no ATS, LinkedIn + spreadsheets + Paraform.** Secondary users (boutiques, Paraform network, frustrated agency recruiters) are eventually in scope but not the build focus now. Not the user: in-house TA, corporate recruiters, high-volume sourcing shops.
-- **Wren is positioned as the intelligence layer, not the system of record.** Coexists with any ATS or no ATS. `external_id` and `source` fields added to candidates, roles, and clients for future optionality. Wren-native records get `source = 'wren'`.
-- **Queue to be deleted, replaced by Actions Tray.** Queue is a passive inbox. Actions Tray is ambient, persistent, prioritized, and Wren-generated. Deletion happens after Actions Tray ships.
-- **Bulk import scoped for candidates, clients, roles, and agreements.** Agreements parsed via Claude — fee %, refund clauses, exclusivity, expiration. Raw PDF stored in Supabase Storage alongside structured extracted terms. User confirms before source of truth.
-- **ATS integrations deferred until market signal.** Trigger: 3+ prospects request the same integration, churn citing integration gap, or explicit willingness to pay. Not a user count threshold. Merge.dev considered as Unified API accelerator.
-- **`external_id` and `source` fields added to candidates, roles, clients schema.** Migration A. `source` defaults to `'wren'`. Future imports tag their own source. Intelligence layer data stays separate from source records.
-- **Nav renamed to Desk / Deals / Network.** Home → Desk (`/desk`), Roles → Deals (route stays `/roles` for URL stability), Candidates → Network (`/network`). Old paths redirect. Agent copy and recruiter-facing strings ("role", "candidate") unchanged — only nav-level naming. Three surfaces, each with one job. No new top-level nav items.
-- **Pipeline stages are per-role, not global.** Custom processes extracted from JD/intake notes via `processExtractor` or user-defined. Generic 6-stage fallback if skipped. Editable without losing candidate stage history.
-- **Stage type enum preserves semantic meaning across custom names.** `pre_pipeline`, `first_stage`, `middle_stage`, `late_stage`, `offer`, `accepted`, `placed`, `lost`. Pipeline value confidence derives from `stage_type`, not stage name. "Lunch with team" counts as whatever type `processExtractor` tags it.
-- **Pipeline value confidence weights default to Paraform-style discipline.** `pre_pipeline` and `first_stage` = 0 (don't count early-stage candidates). `middle_stage` = 0.30, `late_stage` = 0.55, `offer` = 0.80, `accepted` = 0.95, `placed` = 1.00. Overridable per recruiter in settings.
-- **Pipeline value UI makes framing explicit.** Label reads "Weighted pipeline (from middle stages onward)" so the recruiter knows what's being counted and why early-stage candidates don't inflate the number.
-- **Recruiter vs AI confidence is a V1 feature.** Two scores per pipeline row at two capture moments (pre-call and post-call). Stored separately. Displayed together. Divergence triggers agent pushback. Calibration view is V2 but data accumulates from day one.
-- **Stage-gate agent flows trigger automatically.** `late_stage`, `offer`, and `accepted` advancements fire stage-specific agentResponse flows that check critical signals and surface gaps. Inspired by Paraform's final-round template, but automated.
-- **Channel recommendation precedes content generation.** Wren recommends call / video / email / LinkedIn / text before drafting anything. Sometimes the right output is "pick up the phone" with prep, no drafted message.
-- **Wren raises the bar is a product principle.** The tool surfaces gaps in intake, motivation, and process. Pushes back when a recruiter is about to skip a step. Not gatekeeping — honesty.
-- **Cost optimization is a V1 discipline, not a V2 problem.** Prompt caching, model routing (Haiku/Sonnet/Opus by task stakes), Batch API for overnight work. Target 60%+ gross margin per user from day one.
-- **Founder-market fit is the bet.** 15 years as the exact ICP. The founder story leads with struggle, not expertise. Credibility comes from "I lost closes I should have won" more than from "I'm a recruiter."
-- **ICP refinement: the buyer is the good closer.** Solo recruiter, 5-20+ years, billing $150k-$1M+, already runs a process and knows their close rate. Wren is leverage, not coaching. Pitch is "do it ten times instead of three." Bad closers buying as a skill upgrade churn at 60 days because volume doesn't fix skill gap. Good closers stay because the floor under off days and the multiplier on best days both compound.
-- **Strategic thesis: build for the world where sourcing is solved.** AI commoditizes sourcing within 18 months. When recruiters have 500 candidates instead of 50, the bottleneck moves from finding to working. Wren is the layer that makes flooded pipelines actionable. Every feature assumes 10x candidate volume. Do not build features that compete with sourcing tools.
-- **Two-layer messaging is the GTM principle.** Top of funnel: felt pain (leverage, more deals, floor under bad weeks). Once engaged: contrarian truth (closing is the bottleneck, not sourcing). Sequence matters. Lead with leverage on cold outreach. Reframe to closing during the demo. The headline is leverage. The product is closing intelligence.
-- **POSITIONING.md is the GTM source of truth.** Founder story, objection handling, market analysis, messaging tests, and ICP segmentation live in `POSITIONING.md` at repo root. WREN.md stays focused on product and codebase context.
-- **When Wren engages: active candidate in active role.** That's the trigger. Pre-deal (sourcing, intake, evaluating fit) is the recruiter's work. Wren is dormant for that candidate until they enter an active role's pipeline. Network match suggestions bridge the gap: Wren can surface "this person fits an active role" at moments of new candidate or new role, but the recruiter decides whether to start a deal. Wren never forces deal desk logic on contacts that aren't committed to a deal.
-- **Three foundations replace the V1 priority queue framing.** Engine (continuous agent loop), Ingestion (data flowing in from where work happens), Onboarding (active recruiters productive in under 60 minutes). Build phases organized around these foundations, not feature lists. Each foundation makes the next one possible.
-- **Agent shape is the bar.** Every build decision tested against five criteria: agent has been working, interaction model is approve/edit/override, agent has a voice, time is asymmetric, user does less and product does more. Wren is currently SaaS-shaped with agent pieces. Goal is full agent shape over the next 8-12 weeks.
-- **Agent loop runs continuously, not on user action.** Scheduled job every 4 hours. Reads only active pipeline rows. Generates prioritized actions and sharpening data asks. Writes to `actions` table. The Desk surfaces agent output as the primary surface, replacing deal-list-as-Desk. This is the inversion from SaaS to agent.
-- **Wren coaches itself smarter.** Agent loop evaluates its own data poverty and surfaces specific data asks tied to specific deals or moments. Each ask is contextual with a felt payoff. Replaces traditional onboarding forms. The recruiter never asks "why am I doing this." Wren told them.
-- **Onboarding is three paths in order of leverage.** Pipeline paste (free-text describe active book, Wren parses) day one. Bulk file ingestion (CSVs, resumes, agreements) phase 3. Live integrations (Gmail, calendar, Granola/Fathom, Paraform) phase 3+. Active recruiter with active book gets to populated, useful Wren in under 60 minutes or they bounce.
-- **Manual feel comes from manual feeding, not bad UI.** Wren feels off because the recruiter pastes everything and Wren has no signal until then. UI polish doesn't fix this. Ingestion does. Email integration first, calendar second, call tools third. Each removes a manual step.
-- **Don't restart from scratch.** Codebase pivot debt is light. Prompts, schema, agent layer, debrief extraction, provider-agnostic AI all carry forward. Architecture inversion is additive (build the loop, build mobile, build ingestion) not destructive. Refactor frontend after the engine runs, not before.
-- **Product framing locked: Wren is the entry-level recruiter you can't hire.** Domain "hirewren.com" matches the pitch ("Hire Wren"). The deal desk thesis is the wedge into broader operational coverage. Internally Wren handles communication, scheduling, prep, signal capture, pipeline awareness, plus closing intelligence as the moat layer. Externally the pitch is "the entry-level recruiter you've always wanted to hire."
-- **Proof point: Alex from Super Recruiter.** Built a 7-figure staffing firm by automating operational work with AI for himself. The thesis is validated. Wren puts that capability in the hands of solo independents.
-- **Phone-first, browser-as-dashboard.** Phone (PWA) is the operational layer (push, voice, swipe-to-act). Browser is the dashboard (onboarding, configuration, deep review). Both surfaces read from the same agent loop. Soccer game test: see top action, act on one in under 10 seconds.
-- **PWA, not native app.** Faster path on existing React/Vite stack. Service worker for push, Web Speech API for voice. Native is a 6+ month decision deferred until product-market fit.
-- **Google Workspace is the priority integration.** One OAuth covers Gmail + Calendar + Meet transcripts. Most ICP recruiters live in Workspace. Meet is the primary intake surface (not phone). Gemini auto-transcripts in Drive make Meet ingestion essentially free.
-- **Pricing locked at $499/month standard, $199/month beta.** Math: $100k entry-level recruiter is $130-150k loaded. Wren handles 30-40% of that work at $6k/year. ROI is overwhelming for capacity-constrained solo billers ($500k-$1M).
-- **ICP refined within ICP: capacity-constrained solo billers ($500k-$1M) are the urgent buyer.** They can't scale further without help. They'll pay $499/month tomorrow if Wren works. Lower-billing recruiters ($200k-$500k) follow word-of-mouth.
-- **30-day execution lock.** No major framing pivots until 30 days of daily real use on Paraform candidates. The vision is good enough. Execution is what's missing. The 90-day arc: month 1 strip down, month 2 phone, month 3 first paying users.
-- **VISION.md added as the founder vision document.** Anchors everything else. WREN.md is codebase context. POSITIONING.md is GTM. VISION.md is why we're building this and what it ultimately is.
-- **COLLISION_AUDIT.md captured for Phase 2 source material.** 32 collisions identified. Most resolve via Phase 2 architecture inversion. Carry-forward data flow fixes woven into the strip down build (CF-1 through CF-7).
-- **Three Claude Code build contexts: WREN.md (codebase), VISION.md (founder vision), COLLISION_AUDIT.md (known frictions).** New sessions read all three. POSITIONING.md is for chat-level GTM thinking, not Claude Code sessions.
-- **Agent loop ships before any UI changes.** Engine first, surface second. Phase 1 is the foundation that makes Phase 2 (Actions Tray as Desk) possible. Do not build Actions Tray until the loop is producing reliable output.
-- **Cron runs on GitHub Actions, not Vercel cron.** Vercel Hobby tier doesn't support custom cron schedules. GitHub Actions is free and identical in behavior: scheduled workflow POSTs to `/api/agent-loop` with a shared secret. Switch to Vercel cron if/when on Pro. Workflow URL is `primer-rosy-two.vercel.app`. `hirewren.com` is owned but not yet wired to Vercel — follow-up in Phase 4 to configure the custom domain.
-- **Service role key uses the new `sb_secret_xxx` format.** Stored in Vercel as `SUPABASE_SERVICE_ROLE_KEY`. Bypasses RLS for the agent loop's cross-recruiter scan. Never expose this key client-side.
-- **Actions table is idempotent via content hash.** Hash is `sha256(recruiter_id:linked_entity_id:action_type:suggested_next_step)`. Cron retries and overlapping runs don't duplicate undismissed actions. `source_run_id` groups all actions from a single loop run.
-- **Agent loop prompt designed for graceful degradation.** Day-one user with one Sourced-stage candidate gets a useful `sharpening_ask`. Rich-data user gets pattern-aware actions. Same prompt scales with available context — no separate thin-data path needed.
-- **V3 design language: Fraunces + JetBrains Mono + warm parchment.** Fraunces (variable optical-size serif, 400-600 weight) for all editorial/Wren-voice elements. JetBrains Mono for all operator metadata (labels, timestamps, codes, urgency headers). Inter as body font. Three-typeface system, not two.
-- **V3 color hierarchy: darker ambient bg, lighter work surfaces.** `--color-bg: #ede8db` (the desk), `--color-surface: #f5f1e8` (cards/work surfaces lift from bg). Borders are hairline translucent `rgba(26,23,20,0.09)`. No white cards on colored bg — work surfaces are warm but reading-weight light.
-- **V3 corners: `--radius: 0px` everywhere.** Square corners are load-bearing to the operator aesthetic. Half-doing it looks wrong. `border-radius: 50%` preserved for circular elements (dots, spinners, avatars).
-- **Urgency sections replace urgency pills on persisted cards.** Desk groups action cards under `NOW / TODAY / THIS WEEK` ruled headers. Pills on individual cards are redundant when the section header already communicates urgency. Ephemeral (live) cards keep the blue pill since they aren't in a section.
-- **`build_search_strings` is never a manual chip.** It auto-fires on role creation. Showing it as a chip is redundant and clutters the action. Suppressed in ActionCard regardless of what the agent suggests.
-- **ActionCard filters chips by entity ID availability.** Role-only chip actions (`add_fee`, `build_search_strings`) are hidden when no `role_id` in context. Candidate-only chip actions hidden when no `candidate_id`. Prevents silent no-ops and irrelevant suggestions.
-- **WrenCommand must pass entity IDs into fireResponse context.** `candidateId` and `roleId` are available from `onSaved` callback — must be forwarded so ephemeral cards are clickable and chips can dispatch with the right IDs. Missing IDs = unclickable card + silent chip no-ops.
-- **Verify migrations landed with `information_schema.tables`, not just SQL Editor confirmations.** A migration appeared to succeed but the CREATE TABLE statement silently didn't apply — only the ALTER TABLE ran. After running any migration that creates a new table, confirm existence before shipping code that writes to it.
-- **Realtime payload consumers must extract all needed data from the row, not just routing fields.** Build 2 Piece 2 had a bug where the Desk realtime INSERT handler hardcoded entity IDs to null, breaking chip rendering and dispatch on newly-arrived cards. The bug was invisible in code review because the data was correct in the DB — it only surfaced when clicking a live card. When reviewing realtime consumers, verify they read `linked_entity_type`/`linked_entity_id` and derive downstream IDs, not only `recruiter_id`. Fixed in commit 5d0fa07.
-- **Gemini Notes guard must precede the self-send guard.** When a recruiter forwards a Gemini Notes email from their own Gmail address, the `from` header is their own address. If the self-send guard runs first, it returns 200 with no writes and the notes are silently discarded. Guard order is semantically load-bearing: Gemini Notes detection is Guard 1, self-send check is Guard 2. Any reordering of the guard chain in `api/ingest-email.js` must re-verify this invariant.
-- **Message-ID dedup via partial unique index on `interactions`.** Pattern: `UNIQUE (recruiter_id, message_id) WHERE message_id IS NOT NULL`. Handles webhook retries (CloudMailin retries on timeout) without blocking rows where `message_id` is null (manual interactions, pre-migration rows). Apply this pattern whenever an external service can retry a write endpoint.
-- **Submittal draft never auto-generates from Gemini Notes.** Explicit recruiter trigger only (`trigger_submittal_draft` chip on the `intake_notes_ready` card). The auto-draft model was rejected during design as a tier-3 autonomy violation — generating a submittal without the recruiter having read the notes first. `intake_notes_ready` captures, recruiter reviews notes, recruiter triggers draft. Preserves three-tier autonomy: act autonomously on high-confidence reversible moves, draft for approval on judgment moves.
-- **`run_in_background` shell commands can orphan processes.** `until curl ...; do sleep N; done` loops started via `run_in_background` can leave bash parent processes running after Claude Code considers the task complete. These orphaned loops generated a 401 flood in Vercel logs for hours during Build 2 debugging. Rule: always kill backgrounded processes by explicit PID at task end. Never assume the background task cleaned up. If a background task must poll, use `Monitor` instead.
-- **Auto-match confidence threshold is 90. Two-pass hybrid matcher.** Pass 1 is DB-only (no API call): normalize company names on both sides (strip legal suffixes Inc/LLC/Corp/Ltd/Co/GmbH/AG/S.A./Pty/Pte and variants, strip leading "The ", strip comma qualifiers), then exact equality comparison. Substring fallback only when normalized candidate string is ≥6 chars — prevents "AI" matching "OpenAI". If exactly 1 open role at the matched client, confidence is 95 (single role) or 98 (single role + role title appears in notes body). Pass 2 is Haiku (fires only when Pass 1 returns 0 or 2+ matches): full role list + candidate fields + 1500-char notes excerpt, bounded at 200 tokens, scores 0–100. ≥90 → auto-create pipeline. 60–89 → propose with one-click confirm. <60 → fall through to "Add to a role". Threshold of 90 chosen because a false positive (wrong role) is more damaging than a false negative (show confirm button). All match events write calibration data to `actions.context` (`auto_matched`, `auto_match_confidence`, `auto_match_type`, `proposed_match`, `matched_at`, `confirmed_at`). Three "Wrong role" taps in a week signals the normalization rules need tuning.
-- **proposed_match is preserved on recruiter confirmation (not cleared).** When a recruiter taps "Confirm [Role]" on a proposed-match card, `proposed_match` stays in `actions.context`. `auto_match_type` is set to `recruiter_confirmed` and `confirmed_at` is added. This preserves the calibration record of what Wren guessed before the recruiter confirmed. Clearing it would lose the signal that Wren was right but uncertain. Never wipe proposed_match on confirm — it is calibration data, not UI state.
-- **Candidate Lifecycle is the spine for sequencing future work.** Nine stages (sourcing → intake → resume → submittal draft → submittal sent → client feedback → process → closing motion → placement). Every build prompt should name which stage it touches. Two stacked layers: operational coverage (felt pain, drives adoption) and deal desk / closing motion (moat, built on top of data flow). Build operational coverage first; the moat compounds once daily use makes data accumulation inevitable.
+> Standing architectural and product decisions: see `DECISIONS.md`.
 
 ---
 
 ## How to start a session
 
-In Claude Code:
-```
-read WREN.md
-```
+Read Tier 1 at startup: WREN.md, VISION.md, DECISIONS.md. Pull Tier 2 files (POSITIONING, DESIGN, COLLISION_AUDIT, FRICTION, FRICTION_2026_04_audit, FEEDBACK, WORKFLOW, SKILLS_REFERENCE) only when the session touches their domain.
 
 If an `AUDIT.md` is present in the repo root, read that too — it's a session brief with specific work to do.
 
@@ -1124,7 +1042,7 @@ State what you're building. Full context, no re-briefing needed.
 
 **After each session:**
 - Update **Current state** if a new capability shipped or priorities shifted
-- Add new architectural decisions to **Decisions log**
+- Add new architectural decisions to `DECISIONS.md` (new decisions at the top)
 - Log the session in `CHANGELOG.md`
 
 ---

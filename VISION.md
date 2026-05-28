@@ -154,7 +154,7 @@ Felt pain first. Real moat second. Lead with leverage on cold outreach, reveal t
 
 - An ATS. Wren coexists with any system of record or none.
 - A sourcing tool. Sourcing is commoditizing. Wren doesn't compete there.
-- A chatbot. The agent runs on its own.
+- A passive chatbot. The interface is a conversation, but Wren speaks first, acts without being asked, and renders work inline. The recruiter doesn't prompt Wren into existence.
 - A senior recruiter. Doesn't replace your judgment on hard calls.
 - A team product. Solo only. Forever.
 - A candidate-facing surface. Candidates see emails, texts, calls, prep materials. Never see Wren directly.

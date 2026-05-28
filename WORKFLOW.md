@@ -6,9 +6,11 @@ How Ryan and Claude Code work together. Patterns that compound. Adjust deliberat
 
 ## Session startup
 
-Every Claude Code session begins by reading every .md file in the repo root plus SKILLS_REFERENCE/. This burns real context window before any code work begins. Mitigation:
+**Read Tier 1 only at session start. Pull Tier 2 on demand.**
 
-**Current State TL;DR at the top of WREN.md.** 40-60 lines that capture what's shipped recently, what's actively broken, what's next. Sufficient context for routine sessions. Full docs remain for sessions that need deeper context.
+**Tier 1 (read every session):** WREN.md, VISION.md, DECISIONS.md. The Current State TL;DR at the top of WREN.md (40-60 lines) is sufficient for most sessions.
+
+**Tier 2 (pull on demand):** POSITIONING.md, DESIGN.md, COLLISION_AUDIT.md, FRICTION.md, FRICTION_2026_04_audit.md, FEEDBACK.md, WORKFLOW.md, SKILLS_REFERENCE/. Read when the session touches their domain. Do not read all at startup.
 
 Maintainer note: update the TL;DR after every session that ships work. Treat it like a build-status dashboard.
 
@@ -52,7 +54,9 @@ Decision rule: if any function (not just agent loop) times out again on Hobby, u
 
 ## What gets captured where
 
-- **WREN.md** — build state, tech debt, decisions log, V2 build targets. Updated continuously.
+- **WREN.md** — build state, tech debt, V2 build targets. Updated continuously.
+- **DECISIONS.md** — standing architectural and product decisions. Append-only. New decisions go at the top.
+- **One fact, one file.** Where POSITIONING.md references pricing or ICP, it points to VISION.md rather than restating. Pricing ($499/$199 beta) and ICP one-liner live in VISION.md.
 - **VISION.md** — founder bet, operating principles. Updated rarely.
 - **POSITIONING.md** — GTM, ICP, pricing. Updated rarely.
 - **DESIGN.md** — visual system, lint rules. Non-negotiable.
