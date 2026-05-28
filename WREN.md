@@ -6,8 +6,10 @@
 ## Current State (updated 2026-05-28)
 
 **Shipped recently:**
-- Surface decision (2026-05-28): conversation is the product. `/wren` is decided home. Desk, Tray, Zones, and candidate pages demoted to deep-review views. Not yet built — see "Conversation architecture" section.
-- Agent loop timeout fix (commit 8ab4efc, 2026-05-21): batched per-action dedup from up to 18 serial DB round-trips to 3. Clean run confirmed. Vercel Hobby 10s limit is the ceiling — watch as data volume grows.
+- `/wren` reactive conversation surface (commit f18dce3, 2026-05-28): recruiter asks Wren to do recruiting tasks by text; Wren executes with full DB context, renders results inline, supports multi-turn refinement. Screen results and submittal drafts render as structured inline components. Client objection history unconditionally reaches the screener. Voice samples injected into submittal drafts when present. Working well in first real-use testing.
+- Agent loop cron fix (commit d9157eb, 2026-05-28): raised `--max-time` from 15s to 65s in GitHub Actions + upgraded to Vercel Pro (maxDuration: 60 now honored). Root cause was two-layer: Hobby 10s timeout and curl killing the connection at 15s regardless of Vercel's ceiling.
+- Surface decision (2026-05-28): conversation is the product. `/wren` is the home route. Desk, Tray, Zones, and candidate pages demoted to deep-review views.
+- Agent loop timeout fix (commit 8ab4efc, 2026-05-21): batched per-action dedup from up to 18 serial DB round-trips to 3. Clean run confirmed.
 - Handler registry (session 28, 2026-05-20): 18 chip actions across 10 action types resolve inline. CandidateCard and RoleDetail accept `initialState` props to auto-open flows. `useRef` fire-once guards prevent re-trigger on re-render.
 - Card lifecycle reliability (session 28): add_fee auto-resolve, `runBackgroundDebrief` extracted to shared lib and fired on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded Gemini Notes name fix.
 - Phase 4 sliced (commit 3d577d2, 2026-05-13): Gmail OAuth send live. `api/google-auth.js`, `api/gmail-send.js`, `GoogleAuthCallback` page. `submittal_draft_ready` card has subject preview, To field, Approve & send / Connect Gmail. `gmail_access_token`/`refresh_token`/`token_expiry` on recruiters row.
@@ -17,16 +19,16 @@
 - Phase 2.5 Build 2 complete (2026-05-05 through 2026-05-13): CloudMailin ingestion, classifier-first reorder, new_inbound action cards, Gemini Notes flow (intake_notes_ready → recruiter-triggered submittal_draft_ready → review/approve-copy/approve-and-send).
 
 **Actively broken:**
-- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Pre-beta security blocker. Next PR after `/wren` ships. Fix: add Supabase JWT check or shared secret.
+- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Pre-beta security blocker. Next PR. Fix: add Supabase JWT check or shared secret. (`/api/wren.js` is already gated via Supabase JWT; `api/ai.js` is the remaining exposure.)
 - "Add to a role" buttons broken across Desk chip, DealStatusBar, and sidebar candidate view. Root cause undiagnosed. Workaround: Pipeline section inside candidate page has a working inline button.
 - Tier 2 chip wiring incomplete: `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` open the candidate panel but no specific flow auto-opens inside. Recruiter still has to find the action manually.
 - Submittal draft is one-shot generation on Desk — fixed in /wren via multi-turn conversation.
 - `pipeline` table is singular — rename to `pipelines` before beta. Will break any raw SQL using old name.
 
 **Next in queue:**
-- `/api/ai` auth gate — next PR after /wren ships (pre-beta security blocker).
+- `/api/ai` auth gate — next PR (pre-beta security blocker). `/api/wren.js` is already JWT-gated; `api/ai.js` is the remaining exposure.
 - `/wren` conversation history is currently unbounded — bound to last 20 messages or the full current draft thread (whichever is longer) before beta, per cost-discipline principle.
-- Submittal as multi-turn collaboration — first real test of the conversation surface, most important moat moment.
+- Submittal as multi-turn collaboration — now possible via /wren conversation surface. First real test of the moat moment.
 - Tier 2 chip wiring: dedicated modals or flow wiring for prep/outreach/follow-up chip actions.
 - P4-3 (lower priority): `intake_notes_ready` auto-upgrade on manual pipeline insert.
 - P4-4 (lower priority): "Add to a role" button root-cause diagnosis.
@@ -304,7 +306,7 @@ PWA, not native. Faster path, runs on the same React/Vite stack, service worker 
 
 **The conversation is the product.** `/wren` is the home route. Wren speaks first, acts without being asked, and renders work inline. Deals, Network, and Desk are deep-review views the conversation opens or renders — not nav peers.
 
-**For Claude Code sessions:** `/wren` is the decided architecture but not yet built. The live primary surface remains `/desk` until the conversation surface ships. Sequence build plans against this target; do not assume the route exists.
+**For Claude Code sessions:** `/wren` is live (commit f18dce3, 2026-05-28). It is the home route. `/desk` remains accessible as a deep-review view. Build plans sequence against `/wren` as the primary surface.
 
 **The four flows:**
 
@@ -322,10 +324,12 @@ PWA, not native. Faster path, runs on the same React/Vite stack, service worker 
 - `conversations` — `id`, `recruiter_id`, `title`, `created_at`, `updated_at`. RLS on `recruiter_id`.
 - `conversation_messages` — `id`, `conversation_id`, `recruiter_id`, `role` (user/assistant/tool), `content` (jsonb), `created_at`.
 
-**New files:**
-- `api/wren.js` — agent endpoint: Anthropic streaming with tool use. Text deltas relay to client; tool_use blocks execute server-side; results fed back until `end_turn`.
-- `src/pages/Wren.jsx` — left sidebar (conversation list, New conversation button), main message stream, composer at bottom.
-- `src/lib/prompts/wrenAgent.js` — Wren persona, four flows (brief, not procedural), tool use patterns (call read-only tools proactively, never ask permission to look something up), initiative pattern (on mount, call `list_attention()` + `list_active_submissions()` before first message). Keep under 1500 tokens.
+**Files shipped (commit f18dce3):**
+- `api/wren.js` — agent endpoint: Anthropic SSE streaming with tool use + agentic loop. Tools: `get_role`, `search_candidate`, `screen_candidate`, `draft_submittal`, `draft_outreach`. Auth: Supabase JWT. `toolScreenCandidate` calls `toolGetRole` unconditionally as first step — client objection history always present. `toolDraftSubmittal` queries `voice_samples` and injects up to 3 samples into the prompt.
+- `src/pages/Wren.jsx` — SSE reader, `accText`/`accRenders` local vars (avoids React state closure issues), `draftSeenRef` for isLatest computation, most-recent conversation loaded on mount.
+- `src/lib/prompts/wrenAgent.js` — Wren agent system prompt. Lead with work, no re-greeting on prior-day sessions, no em dashes, no filler. Pasted-resume detection phrase locked.
+- `src/components/wren/ScreenResult.jsx` — score colored by value (≥7 win, ≥4 mute, else accent), rec pill, strengths/concerns, red flags. All DESIGN.md tokens.
+- `src/components/wren/SubmittalDraft.jsx` — `isLatest` prop controls expansion, collapsed drafts show "earlier draft" label, copy button. All revisions preserved in `conversation_messages`.
 
 **LinkedIn enrichment:** Proxycurl is dead (LinkedIn lawsuit, July 2025). v1: recruiter pastes URL or profile text. If URL: `api/fetch-url.js` first, fall back to Apify LinkedIn Scrapers (~$0.005–0.01/profile). Build with `enrichProfile(url)` interface — provider is swappable.
 
@@ -506,7 +510,12 @@ Active tables — all read and written by current code:
 | `CandidateCard.jsx` | Candidate deal view. Deal Status Bar (sticky, replaces old context bar) + three-zone action panel + single-column scroll. Registers `log_debrief`, `log_interaction`, `set_expected_comp` action handlers. |
 | `RoleDetail.jsx` | **Deals** — Role-level deal cockpit. Role Status Bar with potential deal value, health pills, next action + three-zone action panel + JD auto-format. Route stays `/roles` for URL stability. |
 | `Candidates.jsx` | **Network** — Find past candidates by stage, signal, skill, fit score, recency. Deal history, not inventory. Route: `/network`. |
-| `api/ai.js` | Server-side Anthropic passthrough. |
+| `api/ai.js` | Server-side Anthropic passthrough (existing skills). |
+| `api/wren.js` | Dedicated /wren agent endpoint: SSE streaming, agentic loop, tool execution, JWT auth. |
+| `src/pages/Wren.jsx` | `/wren` conversation surface. SSE reader, inline renders, conversation persistence. |
+| `src/components/wren/ScreenResult.jsx` | Inline screen result component rendered in the /wren thread. |
+| `src/components/wren/SubmittalDraft.jsx` | Inline submittal draft component. `isLatest` prop controls expansion. |
+| `src/lib/prompts/wrenAgent.js` | Wren agent system prompt. |
 | `src/lib/prompts/` | Every skill. |
 
 ---
@@ -578,7 +587,11 @@ If any answer is wrong, redesign or defer.
   - Reads only active pipeline rows (`current_stage NOT IN (placed, lost)`), joins candidate/role/client/recent interactions/debriefs/stage history
   - Writes prioritized actions to `actions` table with `source_run_id` grouping each cron run
   - Verified working: first run generated a `sharpening_ask` on a Sourced-stage candidate, correctly identified missing interaction data as the highest-leverage gap
-  - Hobby tier note: 10s function timeout. Sonnet typically fits in 5–8s. If timeouts recur, swap `claude-sonnet-4-6` for `claude-haiku-4-5-20251001` in `api/agent-loop.js`
+  - **Pro tier (upgraded 2026-05-28).** maxDuration: 60 now honored. `--max-time 65` in GitHub Actions cron (5s buffer). Prior Hobby 10s ceiling no longer applies.
+
+- **`/wren` reactive conversation surface (commit f18dce3, 2026-05-28):** Home route. Recruiter types a task, Wren executes with full DB context, renders structured components inline. SSE streaming. Multi-turn refinement. Client objection history unconditionally present in every screen. Voice samples injected into submittal drafts. All draft revisions preserved in `conversation_messages`. Conversations persisted across sessions (most-recent loaded on mount). Working well in first real-use testing.
+  - New: `api/wren.js`, `src/lib/prompts/wrenAgent.js`, `src/components/wren/ScreenResult.jsx`, `src/components/wren/SubmittalDraft.jsx`, `src/pages/Wren.jsx`
+  - Modified: `resumeScreener.js` (client objection history param + explicit naming instruction), `submissionDraft.js` (voice samples param), `App.jsx`, `AppLayout.jsx`, `index.css` (~301 lines)
 
 - **V3 design system (session 21 — partial, sessions 3+4 pending):**
   - Fonts: Fraunces (variable optical-size serif) for editorial voice, JetBrains Mono for operator labels, Inter for body. Loaded via Google Fonts.
@@ -661,7 +674,7 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 - **Existing `intake_notes_ready` cards do not auto-upgrade to `submittal_draft_ready`** when a pipeline is created for that candidate after the card was written. Recruiter must manually re-trigger the draft flow. Reduced scope after P4-1: auto-match creates the pipeline at ingestion time so most Gemini Notes cards are born with `pipeline_id` set. The upgrade path only fires for manual "Add to a role" cases. Still open, lower priority than pre-P4-1.
 - **`matchRoleFromNotes` company normalization may need tuning.** Suffix list covers common US/EU forms; edge cases (holdings companies, international suffixes, unusual abbreviations) will miss Pass 1 and fall to Haiku. Signal to watch: Pass 1 firing followed by "Wrong role" tap within an hour. Three instances in a week → revisit normalization rules or threshold. Calibration data in `actions.context` provides the signal without instrumentation.
 - **`extractCompFromNotes` regex keyword window may need tuning.** 80-char window is a first-pass calibration. Signal to watch: `auto_comp_pass: 'none'` rate in `actions.context` over the first week of real use. High miss rate → widen the window or add keywords. `auto_comp_pass: 'haiku'` doing most of the work → regex patterns too narrow, tighten them so the cheap path fires more.
-- **Agent loop cron failing.** 5+ consecutive failures starting May 12 evening. GitHub Actions cron fires but loop is not generating actions. Root cause undiagnosed. Until fixed, Desk action cards are not refreshing on schedule — only ephemeral cards (from user-triggered events) and persisted cards from the last successful run are visible. Diagnose before the next feature build.
+- **Agent loop cron fix shipped (commit d9157eb, 2026-05-28).** Root cause was two-layer: Vercel Hobby 10s function timeout + curl `--max-time 15` killing the HTTP connection at 15s regardless of Vercel's ceiling. Fixed: Vercel Pro upgrade (maxDuration: 60 honored) and `--max-time` raised to 65s. Watch for re-occurrence as data volume grows beyond ~55s of processing time.
 - **DB cleared 2026-05-13.** 5 stale test candidates, 1 stale role, 13 stale clients deleted. Fresh slate for real onboarding from May 14 forward. Recruiter row and auth preserved.
 - **Intake call type classification not yet implemented.** Gemini Notes path treats every call as a candidate intake. Client intake calls (producing a role record, not a candidate record) are a distinct call type not yet classified. Router step needed in `handleGeminiNotesPath` to distinguish before extraction fires. Current behavior: a client intake call will produce a candidate record for the client contact, not a role record. Low frequency for now; becomes a problem when Workspace OAuth brings in all calendar events.
 
@@ -692,8 +705,9 @@ The pivot from SaaS shape to agent shape happens through three foundations, buil
 **What's next (immediate):**
 - **✅ Phase 4 sliced — Gmail send only (shipped 2026-05-13):** Foundation in place. Next validation: send a real submittal to a client from the Desk card.
 - **✅ Handler registry + card lifecycle reliability (shipped 2026-05-20):** 18 chip actions resolve inline. Five lifecycle fixes: add_fee auto-resolve, debrief extractor on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded name parse fix.
-- **Agent loop cron failure (blocking, diagnose next):** 5+ consecutive failures starting May 12 evening. Loop output (action cards) not generating. Diagnosis deferred from build sessions; needs investigation before next feature build.
-- **Submittal draft as multi-turn collaboration (high priority, session 28 friction):** One-shot generation breaks down on real submittals. Recruiter needs back-and-forth refinement with Wren to reach the right output. Highest-stakes Wren output — the moat moment. See FRICTION.md strategic entry 5/20.
+- **✅ Agent loop cron fix (shipped 2026-05-28, commit d9157eb):** --max-time 65s + Vercel Pro. Loop should run cleanly under current data load.
+- **✅ /wren reactive conversation surface (shipped 2026-05-28, commit f18dce3):** Home route live. Multi-turn submittal refinement now possible. Working well in testing.
+- **Submittal as multi-turn collaboration:** Now unblocked by /wren. First serious test of the moat moment — recruiter iterates on a real submittal via conversation until it's right.
 - **Tier 2 chip wiring (partial fix gap, session 28):** prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter still has to find the action inside the panel. Future build: dedicated modals or wiring to existing prep/outreach surfaces.
 - **Card shape conversion pass (queued):** Audit every action card type for SaaS-shape buttons and convert to agent-shape drafts. Driven by friction log. Not a single build; a refactoring lens. Prioritize after friction data accumulates.
   - *Audit prompt when this build comes up:* "Audit all action card types and classify each one as agent-shaped or SaaS-shaped. Agent-shaped = Wren noticed something, explains the senior recruiter move, drafts/proposes the action, and lets the recruiter approve/edit/reject. SaaS-shaped = asks the recruiter to navigate, log, configure, pick, or generate manually. Do not rewrite anything. Return a table: action_type, current card behavior, agent-shaped or SaaS-shaped, recommended one-motion action, priority."

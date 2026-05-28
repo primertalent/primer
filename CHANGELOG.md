@@ -6,6 +6,17 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 29 — 2026-05-28
+**Agent loop Pro fix + /wren reactive conversation surface shipped. Working well in testing.**
+
+**Agent loop cron fix (commit d9157eb):** Root cause was two-layer: Vercel Hobby had a 10s function timeout, and `--max-time 15` in GitHub Actions killed the HTTP connection at 15s regardless of Vercel's ceiling. Fix: upgraded to Vercel Pro (maxDuration: 60 now honored) and raised `--max-time` to 65s. No changes to `api/agent-loop.js` needed — it already had `maxDuration: 60`.
+
+**WREN_ARCHITECTURE.md committed (commit 43832ee):** Architecture doc dropped into repo root. TL;DR line added to WREN.md: Google OAuth scaffolding and token storage shipped send-scoped (3d577d2). Read + Calendar is a scope expansion on the existing working flow, not a new build.
+
+**`/wren` reactive conversation surface (commit f18dce3):** Recruiter asks Wren to do recruiting tasks by text; Wren executes with full DB context, renders results inline, supports multi-turn refinement. New files: `api/wren.js` (~230 lines, SSE streaming + Anthropic agentic loop, tools: `get_role`, `search_candidate`, `screen_candidate`, `draft_submittal`, `draft_outreach`), `src/lib/prompts/wrenAgent.js` (agent system prompt), `src/components/wren/ScreenResult.jsx`, `src/components/wren/SubmittalDraft.jsx`, `src/pages/Wren.jsx`. Modified: `resumeScreener.js` (client objection history 3rd param + explicit naming instruction), `submissionDraft.js` (voice samples 5th param), `App.jsx` (route + redirect), `AppLayout.jsx` (nav), `index.css` (~301 lines). Quality gates: `toolScreenCandidate` calls `toolGetRole` unconditionally as first step — client objection history always reaches screener regardless of prior model calls. `toolDraftSubmittal` queries `voice_samples` table and injects up to 3 samples. All draft revisions preserved in `conversation_messages`.
+
+---
+
 ## Session 28 — 2026-05-20
 **Handler registry fix + card lifecycle reliability bundle. Real-use friction from May 20 session. 21 FRICTION.md entries logged.**
 
