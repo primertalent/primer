@@ -1,5 +1,9 @@
+import { buildVoiceBlock, buildRuleZero } from './voiceRules.js'
+
+// voiceSamples: optional [{ channel, subject, body }] from voice_samples table.
+// Desk callers pass only (candidate, role) — voiceSamples defaults to [] and voice rules still apply.
 // Returns JSON: { subject: string, body: string }
-export function buildOutreachEmailMessages(candidate, role) {
+export function buildOutreachEmailMessages(candidate, role, voiceSamples = []) {
   const skills = candidate.skills?.join(', ') || 'None listed'
   const signals = candidate.career_signals ?? []
 
@@ -17,7 +21,6 @@ Client: ${role.clients?.name ?? 'Unknown'}${
       }${role.notes ? `\nJD Notes: ${role.notes.slice(0, 1500)}` : ''}`
     : ''
 
-  // Detect approach based on signals and seniority
   const isCompetitorHire = signals.includes('Promoted') || signals.includes('Fast Riser')
   const isSenior = /VP|Director|Head of|Chief|Principal|Partner/i.test(candidate.current_title ?? '')
   const hasQuota = signals.includes('Quota Buster') || signals.includes("President's Club")
@@ -28,22 +31,33 @@ Client: ${role.clients?.name ?? 'Unknown'}${
     ? `Use the Competitor/Achievement Approach: open by naming what they've done specifically. Frame this role as the natural next move given that track record. Confident CTA.`
     : `Use the Direct Approach: salary transparency in the first email, specific reference to their background, 3 perks, direct CTA like "Want to see the full JD?"`
 
-  const prompt = `You are an outreach email specialist who writes cold recruiting emails that get 25-35% reply rates (vs. 2-5% industry average). You know:
-- Salary transparency increases reply rates by 40%+
-- Short emails outperform long ones. 150 words maximum for the body.
-- Every email must reference something specific about the candidate, not generic praise
-- Specific numbers and role context beat vague pitches
-- Follow these rules absolutely:
-  - NO em dashes (—) or en dashes (–) or dashes used as punctuation breaks. Use periods or commas.
-  - NO corporate language ("exciting opportunity", "passionate", "self-starter", "results-driven", "leveraged", "spearheaded")
-  - NO generic openers ("I came across your profile and was impressed")
-  - NO AI writing tells: "Additionally", "Furthermore", "It is worth noting"
-  - Subject line must reference their work, their skill, or the salary. Never just "Opportunity at [Company]"
-  - CTA must be a single, specific, low-friction ask. One question, easy yes or no.
-  - 3 paragraphs max, each earning its place
-  - Write how a recruiter talks. Short sentences. Human voice.
+  const ruleZero = buildRuleZero()
+  const voiceBlock = buildVoiceBlock(null, voiceSamples)
+
+  // Motivation guard specific to outreach: use the candidate's actual signals as the hook.
+  // Never bridge to org-flattering language that wasn't expressed.
+  // If no motivation signal is available, lead with comp and role fit — do not invent alignment.
+  const motivationGuard = `Motivation and org-specific framing: reference only what is in the candidate's signals or the role data. Do not invent interest ("excited about the mission", "aligned with the culture") that is not grounded in a real signal. A direct comp and role fit hook is stronger than manufactured enthusiasm.`
+
+  const prompt = `You are an outreach email specialist writing cold recruiting emails in a specific recruiter's voice.
+
+${ruleZero}
+
+${voiceBlock}
+
+${motivationGuard}
 
 Approach to use: ${approachNote}
+
+Additional writing rules:
+- NO em dashes (—) or en dashes (–) or dashes used as punctuation breaks. Use periods or commas.
+- NO corporate language ("exciting opportunity", "passionate", "self-starter", "results-driven", "leveraged", "spearheaded")
+- NO generic openers ("I came across your profile and was impressed")
+- NO AI writing tells: "Additionally", "Furthermore", "It is worth noting"
+- Subject line must reference their work, their skill, or the salary. Never just "Opportunity at [Company]"
+- CTA must be a single, specific, low-friction ask. One question, easy yes or no.
+- 3 paragraphs max, each earning its place
+- Under 150 words for the body
 
 Subject line rules:
 - Include salary if available: "{{job_opening}} opportunity - $150-180k"

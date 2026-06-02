@@ -1,3 +1,187 @@
+import { buildVoiceBlock, buildRuleZero } from './voiceRules.js'
+
+// ─── /wren two-surface submittal ─────────────────────────────────────────────
+// Used exclusively by api/wren.js. Desk pages use buildSubmissionMessages below.
+//
+// mode: 'internal' — recruiter-facing breakdown, flags up, never sent
+// mode: 'external' — HM-ready, flags resolved, recruiter's voice
+// format: 'bulleted' | 'paragraph' | 'concise' (external only; internal is always structured sections)
+// resolvedFlags: string summary of what was resolved in the working session (external only)
+// voiceSamples: [{ channel, subject, body }] from voice_samples table
+export function buildSubmittalForWren(candidate, role, {
+  mode = 'internal',
+  format = 'bulleted',
+  fitScore = null,
+  resolvedFlags = '',
+  voiceSamples = [],
+} = {}) {
+  if (mode === 'internal') {
+    return buildInternalBreakdownMessages(candidate, role, fitScore, voiceSamples)
+  }
+  return buildExternalSubmittalMessages(candidate, role, fitScore, format, resolvedFlags, voiceSamples)
+}
+
+function buildInternalBreakdownMessages(candidate, role, fitScore, voiceSamples) {
+  const ruleZero = buildRuleZero()
+  const voiceBlock = buildVoiceBlock(null, voiceSamples)
+  const candidateSection = buildCandidateSection(candidate)
+  const roleSection = buildRoleSection(role)
+  const fitSection = fitScore != null ? `\nFit score against this role: ${Math.round(fitScore)}/100` : ''
+
+  const prompt = `You are a technical recruiter producing an internal candidate breakdown before deciding whether to submit.
+
+${ruleZero}
+
+${voiceBlock}
+
+This breakdown is for the recruiter only — never sent to the hiring manager. Name every flag plainly. Do not soften. The recruiter needs the truth to decide whether to submit, reframe, or pass.
+
+CANDIDATE
+${candidateSection}${fitSection}
+
+ROLE
+${roleSection}
+
+Produce exactly this structure, plain text, no markdown:
+
+HOOK
+One sentence, ~140 characters. The single most compelling concrete fact about this candidate for this role. Lead with a real number if one exists. If no strong quantified signal is available from the provided data: state the strongest grounded fact and append [NEEDS: <the specific fact that would strengthen this hook — e.g., "quota attainment from call">]
+
+WHY FIT
+Fact bullets mapped to real requirements in the role. Pull from resume, career timeline, notes, and any interactions. One signal per bullet. Use – dashes, not markdown. If a key role requirement has no candidate evidence in the available data, add a gap bullet:
+– [NEEDS: evidence for <requirement> — not found in available data]
+
+SCREENING ANSWERS
+For each make-or-break screen (comp expectations, availability/notice, motivation for leaving, and role-specific technical requirements from the JD):
+– <question>: <answer from notes, resume, or interactions, or [NOT CAPTURED — confirm before submitting]>
+If no call notes or interactions exist: write "No call data available. Confirm before submitting:" and list the key questions from the role. This is the expected pre-call format — not a failure, not a degraded mode.
+
+RISK
+The single most material gap, named plainly. No softening. Examples: "Experience cap: 3 years, role targets 5+." "Tenure flag: two roles under 18 months." "Pedigree miss: all mid-market, client wants enterprise." If no material risk is identifiable from available data: "No material risk identified from available data — confirm on call."
+POSSIBLE REFRAMES: How the recruiter could position this if proceeding — one or two lines.
+
+Output nothing else. No intro sentence, no closing commentary.`
+
+  return [{ role: 'user', content: prompt }]
+}
+
+function buildExternalSubmittalMessages(candidate, role, fitScore, format, resolvedFlags, voiceSamples) {
+  const ruleZero = buildRuleZero()
+  const voiceBlock = buildVoiceBlock(null, voiceSamples)
+  const candidateSection = buildCandidateSection(candidate)
+  const roleSection = buildRoleSection(role)
+  const fitSection = fitScore != null ? `\nFit score against this role: ${Math.round(fitScore)}/100` : ''
+
+  const resolvedFlagsSection = resolvedFlags
+    ? `\nRESOLVED FLAGS FROM WORKING SESSION:\n${resolvedFlags}\nTreat all resolved flags as decided. Write around them cleanly — no hedging, no risk language, no mention of the original flag.`
+    : ''
+
+  const motivationRule = `Candidate motivation is a primary closing signal — place it near the CTA. Use the candidate's actual stated reason for interest, verbatim in substance. "Wants an AE path because his current company has none" is real and usable. "Drawn to [Company]'s mission and culture" constructed from that is fabrication — never bridge the gap with invented alignment. If real motivation is not in the available data, write [NEEDS: candidate's stated reason for interest — confirm before sending]. That placeholder is more useful than a hollow alignment sentence a sharp HM will see through.`
+
+  const formatInstructions = buildExternalFormatInstructions(format)
+
+  const prompt = `You are an expert technical recruiter writing a candidate submission for a hiring manager.
+
+${ruleZero}
+
+${voiceBlock}
+
+This is the external, HM-ready version. No risk section appears in any format. The internal flags have been resolved per the recruiter's direction — write the output clean.${resolvedFlagsSection}
+
+${motivationRule}
+
+CANDIDATE
+${candidateSection}${fitSection}
+
+ROLE
+${roleSection}
+
+${formatInstructions}
+
+Write only the submission body. No subject line. No greeting unless the format explicitly includes one. No signature. No closing commentary.`
+
+  return [{ role: 'user', content: prompt }]
+}
+
+function buildExternalFormatInstructions(format) {
+  if (format === 'paragraph') {
+    return `Write a narrative paragraph submission. Third person, recruiter voice. Under 250 words.
+Structure:
+– Opening: who they are and the single sharpest reason they fit this role. One declarative sentence.
+– Body: 2-3 strengths mapped to role requirements, with real metrics from the data where available.
+– Motivation: candidate's actual stated reason for this org, near the close. Or [NEEDS: stated reason — confirm before sending] if absent.
+– CTA: one low-friction question. "Worth 30 minutes?" is the target energy.`
+  }
+
+  if (format === 'concise') {
+    return `Write the Slack-ready concise format. Under 80 words total. This is not the full submittal compressed — it is the HM-ready pitch stripped to the signal and the ask.
+Structure:
+Verdict: one declarative sentence. Who they are and the fit verdict.
+– [strongest quantified point]
+– [second strongest, only if genuinely strong — omit if not]
+– [key logistics: availability, location, comp if known]
+CTA: one line.
+No hook ceremony. No opening pleasantries. No risk. Just signal and ask.`
+  }
+
+  // Default: bulleted (Paraform format)
+  return `Write the bulleted submission format. Plain text — use – dashes, not markdown. Total under 150 words.
+Structure:
+[Candidate name] | [Role title at Company]
+
+Background: 1 sentence. Current title, company, years experience only if stated in the data. Facts only.
+Key fit:
+– [fact bullet 1, mapped to a role requirement, metric if real]
+– [fact bullet 2]
+– [fact bullet 3 only if genuinely strong — omit if not]
+Motivation: [candidate's actual stated reason, one clean sentence] OR [NEEDS: stated reason — confirm before sending]
+CTA: [one low-friction close. "Worth 30 minutes?" is the target energy.]`
+}
+
+function buildCandidateSection(candidate) {
+  const skills = candidate.skills?.join(', ') || 'None listed'
+
+  const timelineSection = candidate.career_timeline?.length
+    ? `\nCareer timeline:\n${candidate.career_timeline
+        .map(e => `– ${e.title} at ${e.company} (${e.start} – ${e.end ?? 'Present'})${
+          e.achievements?.length ? '\n  Achievements: ' + e.achievements.join(' | ') : ''
+        }`)
+        .join('\n')}`
+    : ''
+
+  const notesSection = candidate.notes
+    ? `\nNotes: ${candidate.notes.slice(0, 1000)}`
+    : ''
+
+  const interactionsSection = candidate.recent_interactions?.length
+    ? `\nRecent interactions:\n${candidate.recent_interactions
+        .map(i => `– ${i.type} (${i.direction ?? 'n/a'}) ${i.occurred_at?.slice(0, 10) ?? ''}: ${(i.body || '').slice(0, 600)}`)
+        .join('\n')}`
+    : ''
+
+  const cvSection = candidate.cv_text
+    ? `\nCV text:\n${candidate.cv_text.slice(0, 5000)}`
+    : ''
+
+  return `Name: ${candidate.first_name} ${candidate.last_name}
+Current: ${candidate.current_title ?? 'Unknown'} at ${candidate.current_company ?? 'Unknown'}
+Location: ${candidate.location ?? 'Not specified'}
+Skills: ${skills}${notesSection}${timelineSection}${interactionsSection}${cvSection}`
+}
+
+function buildRoleSection(role) {
+  const comp = formatComp(role.comp_min, role.comp_max, role.comp_type)
+  const steps = Array.isArray(role.process_steps)
+    ? role.process_steps.join(' → ')
+    : (role.process_steps || '')
+  const jdSection = role.notes ? `\nJD:\n${role.notes.slice(0, 3000)}` : ''
+
+  return `Title: ${role.title}
+Company: ${role.clients?.name ?? 'Unknown'}${comp ? `\nComp range: ${comp}` : ''}${steps ? `\nProcess: ${steps}` : ''}${jdSection}`
+}
+
+// ─── Desk callers (unchanged) ─────────────────────────────────────────────────
+
 // format: 'email' | 'bullet'
 // voiceSamples: optional [{ channel, subject, body }] from voice_samples table — calibrates tone to the recruiter's style.
 export function buildSubmissionMessages(candidate, role, fitScore, format = 'email', voiceSamples = []) {

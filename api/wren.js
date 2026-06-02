@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { buildWrenAgentSystem } from '../src/lib/prompts/wrenAgent.js'
 import { buildScreenerMessages } from '../src/lib/prompts/resumeScreener.js'
-import { buildSubmissionMessages } from '../src/lib/prompts/submissionDraft.js'
+import { buildSubmittalForWren } from '../src/lib/prompts/submissionDraft.js'
 import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreachEmail.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -229,14 +229,16 @@ function getToolDefinitions() {
     },
     {
       name: 'draft_submittal',
-      description: 'Draft a candidate submittal for a role. Always include the complete draft in your response. For revisions, pass prior_draft (full text from conversation history) and revision_instruction.',
+      description: 'Draft a candidate submittal for a role. Always include the complete draft in your response. mode "internal" produces the recruiter-facing breakdown (flags up, never sent). mode "external" produces the HM-ready version (flags resolved, sendable). For revisions of either surface, pass prior_draft (full text from conversation) and revision_instruction.',
       input_schema: {
         type: 'object',
         properties: {
           role_id: { type: 'string' },
           candidate_id: { type: 'string', description: 'If candidate is in the system.' },
           resume_text: { type: 'string', description: 'Raw resume text if candidate is not in the system.' },
-          format: { type: 'string', enum: ['bullet', 'email'], description: 'Default: bullet.' },
+          mode: { type: 'string', enum: ['internal', 'external'], description: 'Default: internal. Use external when the recruiter asks for the HM-ready version.' },
+          format: { type: 'string', enum: ['bulleted', 'paragraph', 'concise'], description: 'External surface only. Default: bulleted. concise = Slack-ready.' },
+          resolved_flags: { type: 'string', description: 'External mode only. Summarize what was resolved in this conversation before calling — e.g., "comp aligned per recruiter, tenure flag dropped, motivation: leaving because no AE path at current company".' },
           prior_draft: { type: 'string', description: 'Full text of the previous draft when revising.' },
           revision_instruction: { type: 'string', description: "The recruiter's instruction for revising the prior draft." },
         },
@@ -430,7 +432,7 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
   }
 }
 
-async function toolDraftSubmittal({ role_id, candidate_id, resume_text, format = 'bullet', prior_draft, revision_instruction }, recruiter) {
+async function toolDraftSubmittal({ role_id, candidate_id, resume_text, mode = 'internal', format = 'bulleted', resolved_flags = '', prior_draft, revision_instruction }, recruiter) {
   const roleData = await toolGetRole({ role_id }, recruiter)
   if (roleData.error) return roleData
 
@@ -443,7 +445,7 @@ async function toolDraftSubmittal({ role_id, candidate_id, resume_text, format =
       first_name: 'Candidate', last_name: '(pasted)',
       current_title: null, current_company: null, location: null,
       skills: [], cv_text: resume_text, career_timeline: [], notes: null,
-      _from_paste: true,
+      recent_interactions: [], _from_paste: true,
     }
   } else {
     return { error: 'Provide candidate_id or resume_text' }
@@ -461,18 +463,25 @@ async function toolDraftSubmittal({ role_id, candidate_id, resume_text, format =
     messages = buildRevisionMessages(prior_draft, revision_instruction)
   } else {
     const fitScore = candidateData.active_pipelines?.find(p => p.roles?.id === role_id)?.fit_score ?? null
-    messages = buildSubmissionMessages(candidateData, roleData, fitScore, format, voiceSamples || [])
+    messages = buildSubmittalForWren(candidateData, roleData, {
+      mode,
+      format,
+      fitScore,
+      resolvedFlags: resolved_flags,
+      voiceSamples: voiceSamples || [],
+    })
   }
 
   const aiRes = await anthropic.messages.create({
     model: process.env.AI_MODEL || 'claude-sonnet-4-6',
-    max_tokens: 1000,
+    max_tokens: 1500,
     messages,
   })
 
   const draft_text = aiRes.content[0]?.text ?? ''
   return {
     draft_text,
+    mode,
     format,
     from_paste: !!candidateData._from_paste,
     candidate_name: candidateData._from_paste
@@ -495,7 +504,7 @@ ${priorDraft}
 REVISION INSTRUCTION:
 ${instruction}
 
-Apply the instruction. Return only the revised draft — no intro, no "here's the revision:", just the draft. Preserve everything not mentioned in the instruction. Same format (bullet or paragraph). Same writing rules: no em dashes, no AI filler, recruiter voice, short sentences.`,
+Apply the instruction. Return only the revised draft — no intro, no "here's the revision:", just the draft. Preserve everything not mentioned in the instruction. Same format and surface type as the original. Same writing rules: no em dashes, no AI filler, recruiter voice, short sentences, facts not characterization. Do not introduce facts not present in the original draft or the revision instruction.`,
   }]
 }
 
@@ -509,7 +518,14 @@ async function toolDraftOutreach({ candidate_id, role_id }, recruiter) {
     if (!r.error) roleData = r
   }
 
-  const messages = buildOutreachEmailMessages(candidateData, roleData)
+  const { data: voiceSamples } = await supabase
+    .from('voice_samples')
+    .select('channel, subject, body')
+    .eq('recruiter_id', recruiter.id)
+    .in('channel', ['email', 'linkedin'])
+    .limit(3)
+
+  const messages = buildOutreachEmailMessages(candidateData, roleData, voiceSamples || [])
   const aiRes = await anthropic.messages.create({
     model: process.env.AI_MODEL || 'claude-sonnet-4-6',
     max_tokens: 500,
