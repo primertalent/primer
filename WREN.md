@@ -3,9 +3,10 @@
 
 ---
 
-## Current State (updated 2026-05-28)
+## Current State (updated 2026-06-02)
 
 **Shipped recently:**
+- Voice layer + two-surface submittal model (commit 85784ba, 2026-06-02): rule zero governs all generated claims — fabrication forbidden, motivation guard explicit, recruiter is first-class source, flag once then yield. Internal breakdown (hook, why-fit, screening answers, one named risk — for the recruiter, never sent) and external HM-ready surface (flags resolved, three formats: bulleted/paragraph/concise). Voice layer in `voiceRules.js`: 8 rules, per-recruiter hook, sample injection up to 700 chars. Alex's structural frameworks (pitch structure, objection mechanics) layered under Ryan's voice rules and rule zero — voice wins every conflict. SKILLS_REFERENCE seeding deferred: seeded from real use going forward, not batch-loaded from transcripts. Live voice test still pending — slice is built but not validated on a real candidate. Honest prediction: 80-85% of bar on first pass, tuning expected from real use.
 - `/wren` reactive conversation surface (commit f18dce3, 2026-05-28): recruiter asks Wren to do recruiting tasks by text; Wren executes with full DB context, renders results inline, supports multi-turn refinement. Screen results and submittal drafts render as structured inline components. Client objection history unconditionally reaches the screener. Voice samples injected into submittal drafts when present. Working well in first real-use testing.
 - Agent loop cron fix (commit d9157eb, 2026-05-28): raised `--max-time` from 15s to 65s in GitHub Actions + upgraded to Vercel Pro (maxDuration: 60 now honored). Root cause was two-layer: Hobby 10s timeout and curl killing the connection at 15s regardless of Vercel's ceiling.
 - Surface decision (2026-05-28): conversation is the product. `/wren` is the home route. Desk, Tray, Zones, and candidate pages demoted to deep-review views.
@@ -27,9 +28,10 @@
 
 **Next in queue:**
 - `/api/ai` auth gate — next PR (pre-beta security blocker). `/api/wren.js` is already JWT-gated; `api/ai.js` is the remaining exposure.
-- `/wren` conversation history is currently unbounded — bound to last 20 messages or the full current draft thread (whichever is longer) before beta, per cost-discipline principle.
+- Cost-controls pre-beta slice: (1) `/wren` conversation history unbounded — cap at last 20 messages or full current draft thread, whichever is longer. (2) Model tiering — Haiku for classification and thin-data routing, Sonnet for judgment and generation. (3) Per-user token visibility — recruiter-level usage tracking so cost per user is measurable before beta pricing locks in.
 - Submittal as multi-turn collaboration — now possible via /wren conversation surface. First real test of the moat moment.
 - Tier 2 chip wiring: dedicated modals or flow wiring for prep/outreach/follow-up chip actions.
+- Google OAuth read-scope verification — start this week. Restricted scopes (Gmail read, Calendar, Meet transcripts) trigger Google's app verification review, which takes calendar weeks. Start the submission now, run beta on the test-user allowlist in the meantime. Unblocks Stage 6 (client feedback parsing) and Stage 7 (transcript-driven submittals). Additive to the existing working send flow — not a new build.
 - P4-3 (lower priority): `intake_notes_ready` auto-upgrade on manual pipeline insert.
 - P4-4 (lower priority): "Add to a role" button root-cause diagnosis.
 - P4-5 (pre-beta): `pipeline` → `pipelines` table rename. Audit all raw SQL before executing.
@@ -1049,7 +1051,7 @@ Not a user count threshold. A market signal threshold.
 
 ## How to start a session
 
-Read Tier 1 at startup: WREN.md, VISION.md, DECISIONS.md. Pull Tier 2 files (POSITIONING, DESIGN, COLLISION_AUDIT, FRICTION, FRICTION_2026_04_audit, FEEDBACK, WORKFLOW, SKILLS_REFERENCE) only when the session touches their domain.
+Read Tier 1 at startup: WREN.md, VISION.md, DECISIONS.md. Pull Tier 2 files (POSITIONING, DESIGN, COLLISION_AUDIT, FRICTION, FRICTION_2026_04_audit, FEEDBACK, WORKFLOW, SKILLS_REFERENCE) only when the session touches their domain. SKILLS_REFERENCE is seeded from real use — when a submittal or outreach genuinely nails Ryan's voice, drop the sent example in full. Never reconstruct from transcripts or memory. Do not batch-load. Any excerpt promoted to the runtime `voice_samples` table gets candidate-specific facts (names, companies, comp numbers) scrubbed — tone calibration only, no real candidate data in the runtime path.
 
 If an `AUDIT.md` is present in the repo root, read that too — it's a session brief with specific work to do.
 
