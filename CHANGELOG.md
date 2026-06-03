@@ -6,6 +6,23 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 31 — 2026-06-03
+**Voice layer validated on real candidate. Cross-turn memory fix. search_db overhauled.**
+
+**Voice layer + two-surface submittal — first real test passed.** Architecture confirmed on Nick Bulow / Unit SDR. Internal breakdown with flags up, working-session transition, external HM-ready with risk section dropped all behaved as designed. Voice landed facts-first, declarative, quantified, clean close. Motivation guard fired correctly ([NEEDS] instead of invented alignment). Three quality bugs surfaced and logged in FRICTION.md: screen self-contradiction on same company (rule-zero reach), motivation data present in record but dropped from draft synthesis, combined "screen X against Y role" entry path failing despite individual lookups working.
+
+**Cross-turn memory fix + history bounding (commit 2743df3).** Root cause: `buildApiMessages` stripped all tool results from conversation history, losing entity IDs (role_id, candidate_id) between turns. Fix: `runAgentLoop` collects agentic loop steps as `turn_steps` rows in `conversation_messages` with truncated payloads (cv_text dropped, notes/JD capped at 300 chars, debrief summaries at 150 chars — risk_flags untouched). `buildApiMessages` type-discriminated: `turn_steps` expand into full Anthropic interleaved format. History bounded to 10 turn groups per request. Renders remain UI-only. DECISIONS.md corrected: prior "prose carries continuity" rule was wrong — entity IDs live in tool results, not prose.
+
+**search_db candidate full-name split (commit 2b89e88).** "Nick Bulow" returned empty because `.or()` matched the full string against each field independently. Fix: split query on whitespace, run (first, last) AND (last, first) AND queries in parallel; 3+ tokens each get a standalone search so no token is silently dropped.
+
+**search_db role status gate removal (commit 2b89e88).** `.eq('status', 'open')` removed from named role lookup — search must find roles regardless of status. Status returned in results so model flags non-open roles before drafting (OUTPUT RULE added to wrenAgent.js).
+
+**search_db role cross-field matching + model-side abbreviation expansion + fail-loud (commit 2f0c676).** Compound role queries ("Unit Sales Development") now run per-token against title AND per-token against client name in parallel, intersecting for cross-field hits. No hardcoded synonym map — model instructed to expand role abbreviations (SDR/AE/BDR/CSM/EM and the full recruiting tail) before calling search_db. New Rule 2 (general fail-loud): any empty search_db result asks for clarification rather than dead-ending silently. DECISIONS.md updated to distinguish render artifacts (UI, never in API) from tool-result data (must persist).
+
+**Docs.** FRICTION.md: 3 entries (screen self-contradiction / motivation dropout / search entry path). FEEDBACK.md: architecture validation entry. WREN.md: current state updated. CHANGELOG: this entry.
+
+---
+
 ## Session 29 — 2026-05-28
 **Agent loop Pro fix + /wren reactive conversation surface shipped. Working well in testing.**
 
