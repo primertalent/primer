@@ -32,6 +32,14 @@ Context: On the path from default approval-required to earned autonomy. Default 
 
 ---
 
+## June 3, 2026 — Ryan (first real-candidate test of voice + two-surface submittal)
+
+> "The two-surface submittal model worked end to end on a real candidate. Internal breakdown with flags up, working-session transition, external HM-ready version with risk section dropped. Voice landed, facts-first, declarative, quantified, clean close, matches the gold-standard examples. Motivation guard fired correctly ([NEEDS] instead of invented alignment). Risk resolution and reframe behaved as designed. Three correctness bugs surfaced (logged in FRICTION) but the architecture and voice are confirmed."
+
+Context: First real use of the voice layer and internal/external surface split against a live candidate (Nick Bulow, Unit SDR role). The architecture passed: two-surface model behaved as designed, voice rules produced facts-first declarative output matching the gold standard, motivation guard held (did not fabricate alignment, flagged the gap). Three quality bugs surfaced in the same session (screen self-contradiction, motivation data not flowing from record to draft, search path failure on first entry). Architecture confirmed; correctness bugs queued.
+
+---
+
 ## May 14, 2026 — Ryan (morning brain dump session)
 
 > "We will lose our users if wren isn't able to adjust with live feedback. They will either think wren got it right, or got it wrong. If they feel like it's wrong, with no way to push back and iterate, we lose them."

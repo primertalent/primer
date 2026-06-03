@@ -10,6 +10,12 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
+6/3 | intake | "Screen Nick Bulow against the Unit SDR role" returned empty on both candidate and role on first try. "View candidate Nick Bulow" then worked, and screening proceeded via the pipeline role ID. The screen-path search may not be applying the name-split and role-expansion fixes the same way the direct candidate lookup does, or deploy lag. Search fix confirmed at DB level (Nick stored first/last correctly, role is "Sales Development Representative" at client "Unit") but the combined screen-against-role entry path still failed first. | bug
+
+6/3 | candidate_enrichment | Motivation present in the candidate record but dropped from the submittal synthesis. The candidate-view surfaced "Nick is leaving due to organizational shifts and in-person office mandates, Unit is remote, clean motivation story," but the internal and external drafts both returned motivation as NOT CAPTURED / [NEEDS: stated reason]. The data exists in the record and did not flow into the draft. The motivation is the strongest external selling line and it got dropped. | missing_data
+
+6/3 | screen_evaluation | Screen contradicted itself on the same fact. For Nick Bulow against Unit SDR, the screen listed "no early-stage experience, Owner.com and Meltwater are established venture-backed companies" as a concern, then the internal submittal listed "Owner.com is an SMB/mid-market restaurant tech startup, early-stage, high-velocity" as a why-fit bullet. Same company, opposite claims. Rule-zero reach: Wren asserted a fit it had just flagged as a concern. | bug
+
 5/21 | all | RESOLVED. Session 2 card lifecycle fixes validated in real use on Gemini Notes intake smoke test: P4-1 auto-match, P4-2 comp extract on confirmed matches, debrief auto-fire on ingestion path, Tier 1 and Tier 2 inline chip handlers all working. No navigation off Desk observed. | bug
 
 5/21 | intake | Gemini Notes email body contains summaries only, not full transcripts. Full meeting content sits behind "Open meeting notes" link in Google Docs. Wren extracts what it has but signal quality is limited by Gemini's email surface. Not a Wren bug — Gemini is the wrong tool for transcript-quality intake. Path forward: recommend Fathom/Granola/Otter in onboarding materials, or build Google Docs OAuth + fetch (V2+). | external_limitation
