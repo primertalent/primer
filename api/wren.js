@@ -21,6 +21,65 @@ function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 }
 
+// Strip large text fields from tool results before persisting to conversation_messages.
+// Keeps all IDs, names, structured fields, and judgment-relevant facts.
+// Drops cv_text entirely (already extracted to timeline/skills).
+// Caps notes/JD at 300 chars, debrief summaries at 150 chars (preserve objection patterns).
+// The live agentic loop still gets full payloads; only persisted history is trimmed.
+function truncateForHistory(toolName, result) {
+  if (!result || result.error) return result
+  switch (toolName) {
+    case 'get_candidate': {
+      const { cv_text, ...rest } = result
+      return {
+        ...rest,
+        recent_interactions: (rest.recent_interactions || []).map(i => ({
+          ...i,
+          body: i.body ? i.body.slice(0, 200) : i.body,
+        })),
+      }
+    }
+    case 'get_role': {
+      return {
+        ...result,
+        notes: result.notes ? result.notes.slice(0, 300) : result.notes,
+        client_history: result.client_history ? {
+          ...result.client_history,
+          recent_debriefs: (result.client_history.recent_debriefs || []).map(d => ({
+            ...d,
+            summary: d.summary ? d.summary.slice(0, 150) : d.summary,
+          })),
+        } : result.client_history,
+      }
+    }
+    case 'draft_submittal': {
+      return {
+        ...result,
+        draft_text: result.draft_text ? result.draft_text.slice(0, 400) : result.draft_text,
+      }
+    }
+    default:
+      return result
+  }
+}
+
+// Group conversation rows into turn units and keep the last maxTurns.
+// A turn closes when a { type: 'message' } row is seen (final assistant response).
+// The current open turn (recruiter message not yet answered) is always kept as one slot.
+function boundHistory(rows, maxTurns = 10) {
+  const turns = []
+  let current = []
+  for (const row of rows) {
+    current.push(row)
+    if (row.content?.type === 'message') {
+      turns.push(current)
+      current = []
+    }
+  }
+  if (current.length) turns.push(current)
+  return turns.slice(-maxTurns).flat()
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -64,18 +123,28 @@ export default async function handler(req, res) {
       content: { type: 'text', text: message },
     })
 
-    // Load all messages — no truncation so draft threads never lose context (Q7)
-    const { data: history } = await supabase
+    const { data: rawHistory } = await supabase
       .from('conversation_messages')
       .select('role, content, created_at')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
 
-    const apiMessages = buildApiMessages(history || [])
+    // Bound to last 10 turn groups (9 complete prior turns + current open turn)
+    const apiMessages = buildApiMessages(boundHistory(rawHistory || []))
     const system = buildWrenAgentSystem(recruiter)
     const tools = getToolDefinitions()
 
-    const { fullText, renders } = await runAgentLoop(apiMessages, system, tools, recruiter, res)
+    const { fullText, renders, toolSteps } = await runAgentLoop(apiMessages, system, tools, recruiter, res)
+
+    // Save tool steps before the final message so created_at ordering is preserved
+    if (toolSteps.length > 0) {
+      await supabase.from('conversation_messages').insert({
+        conversation_id: convId,
+        recruiter_id: recruiter.id,
+        role: 'assistant',
+        content: { type: 'turn_steps', steps: toolSteps },
+      })
+    }
 
     const { data: savedMsg } = await supabase
       .from('conversation_messages')
@@ -102,36 +171,60 @@ export default async function handler(req, res) {
   }
 }
 
-// Reconstruct Anthropic messages array from history.
-// Only the text content is forwarded — renders and tool blocks are stripped.
-// The model's text narration carries context for multi-turn continuity.
-// Consecutive same-role messages are merged (handles error recovery gaps).
+// Reconstruct the Anthropic messages array from persisted conversation history.
+//
+// Content type dispatch:
+//   'text'       — recruiter prose → forwarded as string content
+//   'turn_steps' — agentic loop steps (tool_use + tool_result pairs + final text)
+//                  → expanded into the interleaved Anthropic format the API requires
+//   'message'    — final assistant response → forwarded as string content ONLY when
+//                  no turn_steps row preceded it (i.e. no tool calls that turn).
+//                  When turn_steps is present, the final text is already in the last
+//                  step's 'final' entry; the message row is UI-only in that case.
+//
+// Renders (ScreenResult, SubmittalDraft) live in message.renders and never reach here.
+// Tool-result data persists via turn_steps with truncated payloads.
 function buildApiMessages(history) {
   const msgs = []
+  let prevWasToolSteps = false
+
   for (const row of history) {
-    const text = row.content?.text || ''
-    if (!text || row.role === 'tool') continue
-    if (row.role === 'user' || row.role === 'assistant') {
-      msgs.push({ role: row.role, content: text })
+    const ct = row.content
+    if (!ct) continue
+
+    if (ct.type === 'text') {
+      if (ct.text) msgs.push({ role: row.role, content: ct.text })
+      prevWasToolSteps = false
+    } else if (ct.type === 'turn_steps') {
+      for (const step of (ct.steps || [])) {
+        if (step.type === 'tool_step') {
+          if (step.assistant?.length) msgs.push({ role: 'assistant', content: step.assistant })
+          if (step.user?.length)      msgs.push({ role: 'user',      content: step.user })
+        } else if (step.type === 'final') {
+          if (step.text) msgs.push({ role: 'assistant', content: step.text })
+        }
+      }
+      prevWasToolSteps = true
+    } else if (ct.type === 'message') {
+      // Skip when turn_steps already carried the final text for this turn
+      if (!prevWasToolSteps && ct.text) msgs.push({ role: 'assistant', content: ct.text })
+      prevWasToolSteps = false
     }
+    // Unknown types silently skipped (forward compat)
   }
-  const deduped = []
-  for (const m of msgs) {
-    if (deduped.length && deduped[deduped.length - 1].role === m.role) {
-      deduped[deduped.length - 1].content += '\n' + m.content
-    } else {
-      deduped.push({ ...m })
-    }
-  }
-  return deduped
+
+  return msgs
 }
 
 async function runAgentLoop(initialMessages, system, tools, recruiter, res) {
   const messages = [...initialMessages]
   const renders = []
+  const toolSteps = []  // persisted across-turn context; see turn_steps in conversation_messages
   let fullText = ''
 
   while (true) {
+    let iterText = ''  // text emitted by this loop iteration only
+
     const stream = anthropic.messages.stream({
       model: process.env.AI_MODEL || 'claude-sonnet-4-6',
       max_tokens: 4000,
@@ -142,16 +235,26 @@ async function runAgentLoop(initialMessages, system, tools, recruiter, res) {
 
     stream.on('text', (chunk) => {
       fullText += chunk
+      iterText += chunk
       sse(res, 'text', { text: chunk })
     })
 
     const finalMsg = await stream.finalMessage()
 
-    if (finalMsg.stop_reason === 'end_turn') break
+    if (finalMsg.stop_reason === 'end_turn') {
+      toolSteps.push({ type: 'final', text: iterText })
+      break
+    }
 
     if (finalMsg.stop_reason === 'tool_use') {
       messages.push({ role: 'assistant', content: finalMsg.content })
       const toolResults = []
+
+      // Index tool_use blocks by ID for truncation mapping
+      const blockById = {}
+      for (const block of finalMsg.content) {
+        if (block.type === 'tool_use') blockById[block.id] = block
+      }
 
       for (const block of finalMsg.content) {
         if (block.type !== 'tool_use') continue
@@ -167,13 +270,29 @@ async function runAgentLoop(initialMessages, system, tools, recruiter, res) {
       }
 
       messages.push({ role: 'user', content: toolResults })
+
+      // Build truncated version of tool results for persistence
+      const truncatedResults = toolResults.map(tr => {
+        const block = blockById[tr.tool_use_id]
+        let parsed
+        try { parsed = JSON.parse(tr.content) } catch { parsed = null }
+        const trimmed = block && parsed ? truncateForHistory(block.name, parsed) : parsed
+        return { ...tr, content: JSON.stringify(trimmed ?? {}) }
+      })
+
+      toolSteps.push({
+        type: 'tool_step',
+        assistant: finalMsg.content,  // tool_use blocks (+ any pre-call text)
+        user: truncatedResults,       // tool_result blocks with trimmed payloads
+      })
     } else {
-      // Unexpected stop reason — exit to avoid infinite loop
+      // Unexpected stop reason — capture text and exit
+      if (iterText) toolSteps.push({ type: 'final', text: iterText })
       break
     }
   }
 
-  return { fullText, renders }
+  return { fullText, renders, toolSteps }
 }
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
