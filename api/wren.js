@@ -395,27 +395,57 @@ async function executeTool(name, input, recruiter) {
 
 async function toolSearchDb({ entity_type, query }, recruiter) {
   if (entity_type === 'candidate') {
-    const { data } = await supabase
-      .from('candidates')
-      .select('id, first_name, last_name, current_title, current_company')
-      .eq('recruiter_id', recruiter.id)
-      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,current_company.ilike.%${query}%`)
-      .limit(5)
-    return { results: data || [] }
+    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2)
+    if (!tokens.length) return { results: [] }
+
+    if (tokens.length === 1) {
+      const { data } = await supabase
+        .from('candidates')
+        .select('id, first_name, last_name, current_title, current_company')
+        .eq('recruiter_id', recruiter.id)
+        .or(`first_name.ilike.%${tokens[0]}%,last_name.ilike.%${tokens[0]}%,current_company.ilike.%${tokens[0]}%`)
+        .limit(5)
+      return { results: data || [] }
+    }
+
+    // Multi-token: pair logic for first two tokens (forward + reversed) covers the
+    // standard "First Last" case. Each remaining token gets its own standalone search
+    // so 3+ token names (e.g. "Mary Jane Watson") always resolve by at least one token.
+    const [a, b] = tokens
+    const queries = [
+      supabase.from('candidates')
+        .select('id, first_name, last_name, current_title, current_company')
+        .eq('recruiter_id', recruiter.id).ilike('first_name', `%${a}%`).ilike('last_name', `%${b}%`).limit(5),
+      supabase.from('candidates')
+        .select('id, first_name, last_name, current_title, current_company')
+        .eq('recruiter_id', recruiter.id).ilike('first_name', `%${b}%`).ilike('last_name', `%${a}%`).limit(5),
+      ...tokens.slice(2).map(t =>
+        supabase.from('candidates')
+          .select('id, first_name, last_name, current_title, current_company')
+          .eq('recruiter_id', recruiter.id)
+          .or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%,current_company.ilike.%${t}%`)
+          .limit(5)
+      ),
+    ]
+    const settled = await Promise.all(queries)
+    const combined = settled.flatMap(r => r.data || [])
+    const unique = combined.filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i)
+    return { results: unique.slice(0, 5) }
   }
   if (entity_type === 'role') {
+    // No status filter — named lookup must find the role regardless of status.
+    // Status is returned in the result so the model can act on it.
+    // "Open roles only" filtering belongs in pipeline-matching paths, not here.
     const { data: byTitle } = await supabase
       .from('roles')
       .select('id, title, status, clients(name)')
       .eq('recruiter_id', recruiter.id)
-      .eq('status', 'open')
       .ilike('title', `%${query}%`)
       .limit(5)
     const { data: byClient } = await supabase
       .from('roles')
       .select('id, title, status, clients!inner(name)')
       .eq('recruiter_id', recruiter.id)
-      .eq('status', 'open')
       .ilike('clients.name', `%${query}%`)
       .limit(5)
     const combined = [...(byTitle || []), ...(byClient || [])]
