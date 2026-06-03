@@ -433,24 +433,51 @@ async function toolSearchDb({ entity_type, query }, recruiter) {
     return { results: unique.slice(0, 5) }
   }
   if (entity_type === 'role') {
-    // No status filter — named lookup must find the role regardless of status.
-    // Status is returned in the result so the model can act on it.
-    // "Open roles only" filtering belongs in pipeline-matching paths, not here.
-    const { data: byTitle } = await supabase
-      .from('roles')
-      .select('id, title, status, clients(name)')
-      .eq('recruiter_id', recruiter.id)
-      .ilike('title', `%${query}%`)
-      .limit(5)
-    const { data: byClient } = await supabase
-      .from('roles')
-      .select('id, title, status, clients!inner(name)')
-      .eq('recruiter_id', recruiter.id)
-      .ilike('clients.name', `%${query}%`)
-      .limit(5)
-    const combined = [...(byTitle || []), ...(byClient || [])]
-    const unique = combined.filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
-    return { results: unique }
+    // No status filter — named lookup finds roles regardless of status.
+    // Status is in the SELECT so the model can act on it.
+    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2)
+    if (!tokens.length) return { results: [] }
+
+    // Run all searches in parallel:
+    // full-phrase against title and client (handles exact matches efficiently),
+    // then per-token against title and client for cross-field compound queries
+    // (e.g. "Unit Sales Development" where client="Unit" and title="Sales Development ...").
+    const [fullByTitle, fullByClient, ...tokenResults] = await Promise.all([
+      supabase.from('roles').select('id, title, status, clients(name)')
+        .eq('recruiter_id', recruiter.id).ilike('title', `%${query}%`).limit(5),
+      supabase.from('roles').select('id, title, status, clients!inner(name)')
+        .eq('recruiter_id', recruiter.id).ilike('clients.name', `%${query}%`).limit(5),
+      ...tokens.map(t =>
+        supabase.from('roles').select('id, title, status, clients(name)')
+          .eq('recruiter_id', recruiter.id).ilike('title', `%${t}%`).limit(10)
+      ),
+      ...tokens.map(t =>
+        supabase.from('roles').select('id, title, status, clients!inner(name)')
+          .eq('recruiter_id', recruiter.id).ilike('clients.name', `%${t}%`).limit(10)
+      ),
+    ])
+
+    const nTokens = tokens.length
+    const titleTokenResults = tokenResults.slice(0, nTokens)
+    const clientTokenResults = tokenResults.slice(nTokens)
+
+    // Full-phrase matches — highest precision
+    const fullMatches = [...(fullByTitle.data || []), ...(fullByClient.data || [])]
+
+    // Cross-field matches: role appears in ≥1 title-token result AND ≥1 client-token result.
+    // This is what resolves "Unit Sales Development" → client "Unit" AND title "Sales Development...".
+    const clientTokenIds = new Set(clientTokenResults.flatMap(r => (r.data || []).map(x => x.id)))
+    const crossMatches = titleTokenResults
+      .flatMap(r => r.data || [])
+      .filter(r => clientTokenIds.has(r.id))
+
+    // Per-token fallback: any single-field match across all tokens
+    const tokenFallback = [...titleTokenResults, ...clientTokenResults].flatMap(r => r.data || [])
+
+    // Priority: full matches → cross-field → per-token fallback
+    const prioritized = [...fullMatches, ...crossMatches, ...tokenFallback]
+    const unique = prioritized.filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
+    return { results: unique.slice(0, 5) }
   }
   return { results: [] }
 }
