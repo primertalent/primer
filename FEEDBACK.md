@@ -6,6 +6,14 @@ Format: `Date | Source | Quote | Context`
 
 ---
 
+## June 4, 2026 — Ryan (Annie/Fulcrum session, post-pipeline fix)
+
+> "Wren showed situational awareness / economy of effort. Asked to screen Annie when the screen was already run this turn, it declined to redo it: 'already ran it, results above, 7/10 advance, ready to draft?' Didn't waste a tool call or repeat work. This is the cross-turn memory fix surfacing as judgment — knowing when NOT to act, not just acting with conviction. The 'smart as hell' requirement showing up as restraint. Felt like an employee who remembers what just happened, not a tool re-executing input."
+
+Context: Wren was asked to screen Annie against Fulcrum after the screen had already run in the same conversation turn. Rather than re-running the tool, it cited the result already in context and moved forward. This is the cross-turn memory fix (commit 2743df3, tool results persisting across turns) showing up as agent-shaped behavior — Wren uses what it knows instead of re-executing. The "smart as hell when you work together" quality from VISION showing up specifically as restraint and economy, not just capability.
+
+---
+
 ## May 13, 2026 — Ryan (daily use, strategic session)
 
 > "I don't want Wren to feel like a task creator, where we are doing things just to satisfy it and not what actually matters."
