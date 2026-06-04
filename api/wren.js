@@ -365,7 +365,7 @@ function getToolDefinitions() {
     },
     {
       name: 'get_role',
-      description: 'Retrieve a full role record: JD, process steps, comp range, and client objection history from recent debriefs across all candidates at this client. Always call this before screen_candidate.',
+      description: 'Retrieve a full role record: JD, process steps, comp range, and client objection history from recent debriefs across all candidates at this client.',
       input_schema: {
         type: 'object',
         properties: {
@@ -675,8 +675,11 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
   }
 
   const messages = buildScreenerMessages(candidateData, roleData, roleData.client_history)
+  // Haiku: screener is structured JSON extraction (score, strengths, concerns, red flags).
+  // ~3-5x faster and cheaper than Sonnet. If client-objection-pattern insight gets blander
+  // or output quality drops noticeably, revert this model to process.env.AI_MODEL.
   const aiRes = await anthropic.messages.create({
-    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1500,
     messages,
   })
