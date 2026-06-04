@@ -1147,5 +1147,19 @@ Recruiter settings page shows accuracy trends for recruiter_confidence vs ai_con
 
 *Call mode (Wren open/live during a candidate call).* Parked, not building. Proactive ingestion delivers the enrichment value without a live surface: Meet transcripts auto-flow after the call, which eliminates the gap a live-capture mode would solve. The version worth revisiting later — "Wren prepped and present for the call" (prep brief, open [NEEDS] flags, screening questions visible during the call) — only makes sense after auto-ingestion and proactive mode exist, since those determine whether an in-call gap remains. Do not build toward live transcription.
 
+*Feed sustainability — agent-loop conversation harvest.* Parked. The problem: a single infinite /wren conversation is not sustainable over months. The answer is not a chat-history sidebar and not deleting history.
+
+The model: the conversation feed is rolling working space; durable memory lives in the records (candidate, role, pipeline, interactions, actions table). The agent loop becomes the bridge — on its cycle it harvests completed conversations into the records (structured extraction: enrichment to candidates, status changes to pipelines, next actions to the actions table), then rolls the harvested conversation off the active feed into retrievable archive (not deleted — still searchable on explicit ask). The recruiter returns to a clean surface; Wren remembers everything because it's in the records, not the scroll.
+
+Critical design constraints for when this is built:
+- Capture = structured extraction into records, never a conversation summary. A pile of summaries is just the infinite scroll again.
+- Clear = roll off the active feed + archive, never delete. Occasionally need to review the actual exchange.
+- Harvest completed work, not active work. Do NOT blind-clear on a 4-hour timer — that could wipe an in-progress submittal mid-iteration. Clear conversations that are idle and done; leave live threads. This is a readiness judgment, same family as the surfacing-readiness gate.
+
+Build sequence (each step depends on the prior):
+1. Ingestion record-writing ships and is tested on real use (currently in progress).
+2. Agent loop confirmed reliable over several days (recently resurrected, unproven over time).
+3. Then build loop-harvest.
+
 **KNOWLEDGE TENSION TO RESOLVE LATER:**
 Niche depth vs demand following. Both approaches work for different recruiters. Wren should serve the recruiter's strategy, not pick a side. Future setting: weight niche depth or demand signals in role scoring.
