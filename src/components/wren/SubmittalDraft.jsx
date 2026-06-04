@@ -24,7 +24,11 @@ export default function SubmittalDraft({ data, isLatest }) {
         {!isLatest && (
           <span className="submittal-draft__older">earlier draft</span>
         )}
-        <span className="submittal-draft__toggle">{expanded ? '▲' : '▼'}</span>
+        <span className="submittal-draft__toggle">
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}>
+            <path d="M1 1l4 4 4-4" />
+          </svg>
+        </span>
       </div>
 
       {expanded && (

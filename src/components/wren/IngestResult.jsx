@@ -1,4 +1,4 @@
-import Chip, { CHIP_ICONS } from '../Chip'
+import Chip from '../Chip'
 
 const ACTION_LABEL = {
   created:  'Created',

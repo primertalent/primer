@@ -2,7 +2,7 @@ export default function ScreenResult({ data }) {
   if (!data || data.error) return null
 
   const score = data.match_score ?? 0
-  const scoreColor = score >= 7 ? 'var(--win)' : score >= 4 ? 'var(--mute)' : 'var(--accent)'
+  const scoreColor = score >= 7 ? 'var(--win)' : score >= 4 ? 'var(--ink)' : 'var(--accent)'
   const recColor = {
     advance: 'var(--signal-green)',
     hold:    'var(--signal-amber)',
