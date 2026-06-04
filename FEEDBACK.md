@@ -32,6 +32,14 @@ Context: On the path from default approval-required to earned autonomy. Default 
 
 ---
 
+## June 3, 2026 — Ryan (Annie/Fulcrum — second real-candidate session, moat confirmed)
+
+> "Logic comparing candidate to JD was mostly strong. On a real candidate (Annie/Fulcrum), preferred Wren's submittal work to Claude Code's on the same task. Mid-conversation call-note enrichment folded in correctly — resolved the make-or-break coding-depth question while honestly refusing to oversell it ('connected systems and integrations, don't oversell as core engineering'). Client-objection pattern (avoid consulting/legacy pedigree) surfaced and carried into the reframe."
+
+Context: Full screen-to-submittal run on Annie against a Fulcrum role, with mid-conversation call-note enrichment. Wren beat a direct Claude Code comparison on synthesis, client-objection pattern application, and honest depth-of-coding read. Moat behavior confirmed — substance is working. Issues surfaced were surface and capture: ingestion not persisting pasted data, format choice dropped, one rule-zero pedigree miss, and render formatting rough. None undermine the core output quality.
+
+---
+
 ## June 3, 2026 — Ryan (first real-candidate test of voice + two-surface submittal)
 
 > "The two-surface submittal model worked end to end on a real candidate. Internal breakdown with flags up, working-session transition, external HM-ready version with risk section dropped. Voice landed, facts-first, declarative, quantified, clean close, matches the gold-standard examples. Motivation guard fired correctly ([NEEDS] instead of invented alignment). Risk resolution and reframe behaved as designed. Three correctness bugs surfaced (logged in FRICTION) but the architecture and voice are confirmed."
