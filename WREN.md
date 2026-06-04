@@ -1143,5 +1143,9 @@ Recruiter settings page shows accuracy trends for recruiter_confidence vs ai_con
 
 *Onboarding philosophy.* Wren's value compounds with data. Onboarding flow must populate the memory layer with minimum effort from the recruiter. Three layers of capture maturity: zero-effort Workspace OAuth scans Gmail and Calendar history to create candidate existence rows automatically with a first report "I found X candidates in your network"; light-effort WrenCommand accepts CSV, spreadsheet, name list, or resume folder with auto-detected format and routing; real-work manual profile updates and tagging is the last resort, not the first ask. Progressive enrichment: existence rows fire first, context fills in via background enrichment, signal accumulates through use. The first surfacing magic moment is the onboarding success metric. LinkedIn is not integrated: LinkedIn API is closed to small tools, bulk export is limited, and Gmail plus Calendar is the higher-signal data source anyway.
 
+**PARKED CONCEPTS (do not build toward these):**
+
+*Call mode (Wren open/live during a candidate call).* Parked, not building. Proactive ingestion delivers the enrichment value without a live surface: Meet transcripts auto-flow after the call, which eliminates the gap a live-capture mode would solve. The version worth revisiting later — "Wren prepped and present for the call" (prep brief, open [NEEDS] flags, screening questions visible during the call) — only makes sense after auto-ingestion and proactive mode exist, since those determine whether an in-call gap remains. Do not build toward live transcription.
+
 **KNOWLEDGE TENSION TO RESOLVE LATER:**
 Niche depth vs demand following. Both approaches work for different recruiters. Wren should serve the recruiter's strategy, not pick a side. Future setting: weight niche depth or demand signals in role scoring.
