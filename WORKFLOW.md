@@ -10,9 +10,31 @@ How Ryan and Claude Code work together. Patterns that compound. Adjust deliberat
 
 **Tier 1 (read every session):** WREN.md, VISION.md, DECISIONS.md. The Current State TL;DR at the top of WREN.md (40-60 lines) is sufficient for most sessions.
 
-**Tier 2 (pull on demand):** POSITIONING.md, DESIGN.md, COLLISION_AUDIT.md, FRICTION.md, FRICTION_2026_04_audit.md, FEEDBACK.md, WORKFLOW.md, SKILLS_REFERENCE/. Read when the session touches their domain. Do not read all at startup.
+**Tier 2 (pull on demand):** POSITIONING.md, COLLISION_AUDIT.md, FRICTION.md, FRICTION_2026_04_audit.md, FEEDBACK.md, WORKFLOW.md, SKILLS_REFERENCE/. Read when the session touches their domain. Do not read all at startup.
+
+**DESIGN.md is Tier 1 for any session that creates or changes UI.** Pure backend slices (api/, prompts, DB, agent loop) keep it Tier 2. Any session that touches a component, a CSS class, or any visual output reads DESIGN.md at startup alongside WREN.md.
 
 Maintainer note: update the TL;DR after every session that ships work. Treat it like a build-status dashboard.
+
+---
+
+## Design conformance gate (UI slices)
+
+**Any build prompt or session that creates or modifies UI must read DESIGN.md and run its lint-pass checklist before committing.** Design conformance is a commit gate for UI slices, alongside correctness.
+
+Greppable lint checks to run before every UI commit:
+- `border-radius` not equal to `0` outside the three allowed exceptions (circular elements, `--radius-pill`, avatar/spinner)
+- `box-shadow` outside of the two permitted floating surfaces (tooltips, modals)
+- Emoji codepoints in JSX or CSS (replace with 1.5px-stroke SVG glyphs per DESIGN.md rule 5)
+- Icon library imports (`lucide-react`, `heroicons`, `feather`, etc.) — not permitted
+- Hardcoded hex values not in the DESIGN.md token table
+- `prose` elements using Inter or system font instead of Fraunces
+- Operator labels (timestamps, codes, urgency headers) using anything other than JetBrains Mono
+- Retired cream values (`#fdf6e3`, `#f5f0e8`, `#fefcf7`, or similar off-whites) — replaced by `--color-surface`
+- Third urgency color — only `win` (green) and `accent` (red) are token-backed; do not add a third
+- Non-token property names (`--color-*`, `--*-bg`, `--*-surface` outside the canonical token list)
+
+If a violation would break working functionality, flag it explicitly for deliberate decision — do not silently fix it.
 
 ---
 
