@@ -9,6 +9,7 @@ import { buildMultiScreenMessages } from '../lib/prompts/multiScreen'
 import { buildSubmissionMessages } from '../lib/prompts/submissionDraft'
 import { buildCvPdfMessages } from '../lib/prompts/cvExtraction'
 import { useAgent } from '../context/AgentContext'
+import Chip from './Chip'
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -40,14 +41,6 @@ function parseJson(text) {
     if (match) return JSON.parse(match[0])
   } catch {}
   return null
-}
-
-const CHIP_ICONS = {
-  resume:     '📄',
-  jd:         '📋',
-  transcript: '🎙️',
-  notes:      '📝',
-  url:        '🔗',
 }
 
 // ── IntakeResult ──────────────────────────────────────────
@@ -112,7 +105,7 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
           const { data } = await supabase
             .from('candidates').select('id, enrichment_data')
             .eq('recruiter_id', recruiter.id)
-            .eq('first_name', first_name).eq('last_name', last_name)
+            .ilike('first_name', first_name).ilike('last_name', last_name)
             .maybeSingle()
           existing = data
         }
@@ -376,7 +369,7 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear, onSaved }
         const { data } = await supabase
           .from('candidates').select('id')
           .eq('recruiter_id', recruiter.id)
-          .eq('first_name', first_name).eq('last_name', last_name)
+          .ilike('first_name', first_name).ilike('last_name', last_name)
           .maybeSingle()
         existing = data
       }
@@ -1023,21 +1016,14 @@ export default function WrenCommand() {
                   <span className="wren-chip-icon">↓</span>
                   <span className="wren-chip-label">{chip.label}</span>
                 </button>
-              : <span
+              : <Chip
                   key={chip.id}
-                  className={`wren-chip ${chip.loading ? 'wren-chip--loading' : chip.error ? 'wren-chip--error' : `wren-chip--${chip.type}`}`}
-                >
-                  {!chip.loading && <span className="wren-chip-icon">{chip.error ? '⚠' : (CHIP_ICONS[chip.type] ?? '📄')}</span>}
-                  <span className="wren-chip-label">{chip.label}</span>
-                  <button
-                    className="wren-chip-remove"
-                    onClick={() => removeChip(chip.id)}
-                    title="Remove"
-                    aria-label="Remove document"
-                  >
-                    ×
-                  </button>
-                </span>
+                  type={chip.type}
+                  label={chip.label}
+                  loading={chip.loading}
+                  error={chip.error}
+                  onRemove={() => removeChip(chip.id)}
+                />
           ))}
         </div>
       )}

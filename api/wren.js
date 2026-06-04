@@ -4,6 +4,9 @@ import { buildWrenAgentSystem } from '../src/lib/prompts/wrenAgent.js'
 import { buildScreenerMessages } from '../src/lib/prompts/resumeScreener.js'
 import { buildSubmittalForWren } from '../src/lib/prompts/submissionDraft.js'
 import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreachEmail.js'
+import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/intake.js'
+import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
+import { matchCandidateWithConfidence, extractConversationCandidateIds } from './_lib/matchWithConfidence.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -19,6 +22,23 @@ const supabase = createClient(
 
 function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+}
+
+function parseName(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  return {
+    first_name: parts[0] || 'Unknown',
+    last_name: parts.slice(1).join(' ') || '',
+  }
+}
+
+function parseJson(text) {
+  try { return JSON.parse(text) } catch {}
+  try {
+    const match = text.match(/\{[\s\S]*\}/)
+    if (match) return JSON.parse(match[0])
+  } catch {}
+  return null
 }
 
 // Strip large text fields from tool results before persisting to conversation_messages.
@@ -57,6 +77,12 @@ function truncateForHistory(toolName, result) {
         ...result,
         draft_text: result.draft_text ? result.draft_text.slice(0, 400) : result.draft_text,
       }
+    }
+    case 'ingest_input':
+    case 'enrich_from_notes': {
+      // Keep all structured fields; drop alternatives array (not needed in history)
+      const { alternatives, ...rest } = result
+      return rest
     }
     default:
       return result
@@ -130,11 +156,15 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: true })
 
     // Bound to last 10 turn groups (9 complete prior turns + current open turn)
-    const apiMessages = buildApiMessages(boundHistory(rawHistory || []))
+    const bounded = boundHistory(rawHistory || [])
+    const apiMessages = buildApiMessages(bounded)
     const system = buildWrenAgentSystem(recruiter)
     const tools = getToolDefinitions()
 
-    const { fullText, renders, toolSteps } = await runAgentLoop(apiMessages, system, tools, recruiter, res)
+    // Candidate IDs mentioned in prior turns — used for salience scoring in confidence matching
+    const convContext = { candidateIds: extractConversationCandidateIds(bounded) }
+
+    const { fullText, renders, toolSteps } = await runAgentLoop(apiMessages, system, tools, recruiter, res, convContext)
 
     // Save tool steps before the final message so created_at ordering is preserved
     if (toolSteps.length > 0) {
@@ -216,7 +246,7 @@ function buildApiMessages(history) {
   return msgs
 }
 
-async function runAgentLoop(initialMessages, system, tools, recruiter, res) {
+async function runAgentLoop(initialMessages, system, tools, recruiter, res, convContext = {}) {
   const messages = [...initialMessages]
   const renders = []
   const toolSteps = []  // persisted across-turn context; see turn_steps in conversation_messages
@@ -259,7 +289,7 @@ async function runAgentLoop(initialMessages, system, tools, recruiter, res) {
       for (const block of finalMsg.content) {
         if (block.type !== 'tool_use') continue
         sse(res, 'tool_call', { name: block.name })
-        const result = await executeTool(block.name, block.input, recruiter)
+        const result = await executeTool(block.name, block.input, recruiter, convContext)
         renders.push({ tool: block.name, data: result })
         sse(res, 'tool_result', { tool: block.name, data: result })
         toolResults.push({
@@ -376,24 +406,49 @@ function getToolDefinitions() {
         required: ['candidate_id'],
       },
     },
+    {
+      name: 'ingest_input',
+      description: "Classify and persist a pasted document (resume, JD, or call notes). Call this immediately when the recruiter's message contains a <document type=\"paste\"> block. Classifies the content, creates or enriches the matching record (candidate, company + role, or candidate interaction), and returns what was done. Never ask the recruiter to confirm before calling — act on high-confidence matches, ask only when genuinely ambiguous.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'The full content of the pasted document.' },
+        },
+        required: ['text'],
+      },
+    },
+    {
+      name: 'enrich_from_notes',
+      description: 'Persist call notes or a transcript to a candidate record. Use when the recruiter pastes notes in conversation (not via paste-block) or explicitly asks to save notes for a specific candidate. If candidate_id is known from context, pass it — skips matching. Otherwise resolves the candidate by name using confidence-gated matching.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          notes_text: { type: 'string', description: 'The call notes or transcript text.' },
+          candidate_id: { type: 'string', description: 'Pass when the candidate is already identified in this conversation.' },
+        },
+        required: ['notes_text'],
+      },
+    },
   ]
 }
 
 // ─── Tool execution ───────────────────────────────────────────────────────────
 
-async function executeTool(name, input, recruiter) {
+async function executeTool(name, input, recruiter, convContext = {}) {
   switch (name) {
-    case 'search_db':        return toolSearchDb(input, recruiter)
+    case 'search_db':        return toolSearchDb(input, recruiter, convContext)
     case 'get_candidate':    return toolGetCandidate(input, recruiter)
     case 'get_role':         return toolGetRole(input, recruiter)
     case 'screen_candidate': return toolScreenCandidate(input, recruiter)
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
+    case 'ingest_input':     return toolIngestInput(input, recruiter, convContext)
+    case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
     default:                 return { error: `Unknown tool: ${name}` }
   }
 }
 
-async function toolSearchDb({ entity_type, query }, recruiter) {
+async function toolSearchDb({ entity_type, query }, recruiter, convContext = {}) {
   if (entity_type === 'candidate') {
     const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2)
     if (!tokens.length) return { results: [] }
@@ -430,6 +485,31 @@ async function toolSearchDb({ entity_type, query }, recruiter) {
     const settled = await Promise.all(queries)
     const combined = settled.flatMap(r => r.data || [])
     const unique = combined.filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i)
+
+    // Attach salience match to help the model resolve "Annie" to the active Annie
+    const convCandidateIds = convContext.candidateIds || new Set()
+    if (unique.length > 1 && query.trim().split(/\s+/).length <= 3) {
+      const nameMatch = await matchCandidateWithConfidence(
+        { name: query },
+        recruiter.id,
+        supabase,
+        convCandidateIds
+      )
+      if (nameMatch.action === 'act' && nameMatch.match) {
+        // Surface the best match first with confidence label
+        const sorted = [
+          nameMatch.match,
+          ...unique.filter(c => c.id !== nameMatch.match.id),
+        ]
+        return {
+          results: sorted.slice(0, 5),
+          best_match: nameMatch.match.id,
+          best_match_confidence: nameMatch.confidence,
+          best_match_label: nameMatch.salience_label,
+        }
+      }
+    }
+
     return { results: unique.slice(0, 5) }
   }
   if (entity_type === 'role') {
@@ -717,4 +797,409 @@ async function toolDraftOutreach({ candidate_id, role_id }, recruiter) {
     if (match) try { result = JSON.parse(match[0]) } catch {}
   }
   return result ?? { subject: '', body: raw }
+}
+
+// ─── Ingest tools ─────────────────────────────────────────────────────────────
+
+async function toolIngestInput({ text }, recruiter, convContext = {}) {
+  if (!text?.trim()) return { error: 'No text provided' }
+
+  // Step 1: Classify (cheap — 100 tokens, 2000-char slice)
+  const classifyMsgs = buildClassifyMessages(text)
+  const classifyRes = await anthropic.messages.create({
+    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    max_tokens: classifyMsgs.maxTokens,
+    system: classifyMsgs.system,
+    messages: classifyMsgs.messages,
+  })
+  let classification = { type: 'notes', label: 'Document' }
+  const classifyRaw = classifyRes.content[0]?.text ?? ''
+  const classifyParsed = parseJson(classifyRaw)
+  if (classifyParsed?.type) classification = classifyParsed
+
+  const type = classification.type
+
+  // Step 2: Route by type
+  if (type === 'resume') {
+    return ingestResume(text, classification, recruiter, convContext)
+  }
+  if (type === 'jd') {
+    return ingestJd(text, classification, recruiter)
+  }
+  // transcript and notes both go through the notes path
+  return ingestNotes(text, classification, recruiter, convContext)
+}
+
+async function ingestResume(text, classification, recruiter, convContext) {
+  // Full intake to extract candidate fields (name, email, title, company, cv_text, signals)
+  const { data: existingRoles } = await supabase
+    .from('roles').select('id, title, clients(name)')
+    .eq('recruiter_id', recruiter.id).eq('status', 'open')
+
+  const intakeMsgs = buildIntakeMessages(text, existingRoles || [])
+  const intakeRes = await anthropic.messages.create({
+    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    max_tokens: intakeMsgs.maxTokens,
+    system: intakeMsgs.system,
+    messages: intakeMsgs.messages,
+  })
+  const extracted = parseJson(intakeRes.content[0]?.text ?? '')
+  if (!extracted) return { classification: classification.type, label: classification.label, error: 'Extraction failed' }
+
+  const c = extracted.candidate || {}
+  if (!c.name && !c.email) {
+    return { classification: classification.type, label: classification.label, error: 'No candidate name found in resume' }
+  }
+
+  // Confidence-gated match
+  const matchResult = await matchCandidateWithConfidence(
+    { name: c.name, email: c.email },
+    recruiter.id,
+    supabase,
+    convContext.candidateIds || new Set()
+  )
+
+  if (matchResult.action === 'ask') {
+    return {
+      classification: classification.type,
+      label: classification.label,
+      action: 'ask',
+      alternatives: matchResult.alternatives,
+      extracted_name: c.name,
+    }
+  }
+
+  // Persist candidate (create or enrich)
+  const { first_name, last_name } = parseName(c.name)
+  const mergedEnrichment = {
+    ...(c.signals        && { signals: c.signals }),
+    ...(c.career_summary && { career_summary: c.career_summary }),
+    ...(extracted.pitch?.one_liner && { intake_pitch: extracted.pitch.one_liner }),
+  }
+
+  const candidatePayload = {
+    recruiter_id: recruiter.id,
+    first_name,
+    last_name,
+    ...(c.email           && { email: c.email }),
+    ...(c.current_title   && { current_title: c.current_title }),
+    ...(c.current_company && { current_company: c.current_company }),
+    ...(c.cv_text         && { cv_text: c.cv_text }),
+  }
+
+  let candidateId
+  let action
+
+  if (matchResult.action === 'act' && matchResult.match) {
+    const { data: current } = await supabase
+      .from('candidates').select('enrichment_data').eq('id', matchResult.match.id).single()
+    await supabase.from('candidates').update({
+      ...candidatePayload,
+      enrichment_data: { ...(current?.enrichment_data || {}), ...mergedEnrichment },
+    }).eq('id', matchResult.match.id)
+    candidateId = matchResult.match.id
+    action = 'enriched'
+  } else {
+    const { data, error } = await supabase
+      .from('candidates')
+      .insert({ ...candidatePayload, enrichment_data: mergedEnrichment })
+      .select('id').single()
+    if (error) return { classification: classification.type, label: classification.label, error: error.message }
+    candidateId = data.id
+    action = 'created'
+  }
+
+  // If intake extracted a role, also persist company + role
+  let roleId = null
+  if (extracted.role?.title && extracted.role?.company) {
+    const roleResult = await persistRole(extracted, text, recruiter)
+    if (!roleResult.error) {
+      roleId = roleResult.role_id
+      // Pipeline upsert
+      const fitScore = extracted.screening?.score != null
+        ? Math.min(100, Math.round(extracted.screening.score * 10))
+        : null
+      await supabase.from('pipeline').upsert(
+        {
+          recruiter_id: recruiter.id,
+          candidate_id: candidateId,
+          role_id: roleId,
+          current_stage: 'Sourced',
+          status: 'active',
+          ...(fitScore != null && { fit_score: fitScore }),
+          ...(extracted.screening?.reasoning && { fit_score_rationale: extracted.screening.reasoning }),
+        },
+        { onConflict: 'candidate_id,role_id' }
+      )
+    }
+  }
+
+  const name = `${first_name} ${last_name}`.trim()
+  return {
+    classification: classification.type,
+    label: classification.label,
+    action,
+    entity_type: 'candidate',
+    candidate_id: candidateId,
+    name,
+    current_title: c.current_title || null,
+    current_company: c.current_company || null,
+    role_id: roleId,
+    what_happened: action === 'enriched'
+      ? `Enriched ${name}'s record with resume`
+      : `Created candidate record for ${name}`,
+  }
+}
+
+async function ingestJd(text, classification, recruiter) {
+  // Full intake to extract role fields
+  const { data: existingRoles } = await supabase
+    .from('roles').select('id, title, clients(name)')
+    .eq('recruiter_id', recruiter.id).eq('status', 'open')
+
+  const intakeMsgs = buildIntakeMessages(text, existingRoles || [])
+  const intakeRes = await anthropic.messages.create({
+    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    max_tokens: intakeMsgs.maxTokens,
+    system: intakeMsgs.system,
+    messages: intakeMsgs.messages,
+  })
+  const extracted = parseJson(intakeRes.content[0]?.text ?? '')
+  if (!extracted) return { classification: classification.type, label: classification.label, error: 'Extraction failed' }
+
+  if (!extracted.role?.title || !extracted.role?.company) {
+    return { classification: classification.type, label: classification.label, error: 'No role title or company found in JD' }
+  }
+
+  const result = await persistRole(extracted, text, recruiter)
+  return { classification: classification.type, label: classification.label, ...result }
+}
+
+async function ingestNotes(text, classification, recruiter, convContext) {
+  // Targeted extraction (cheap — 800 tokens)
+  const notesMsgs = buildNotesExtractionMessages(text)
+  const notesRes = await anthropic.messages.create({
+    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    max_tokens: notesMsgs.maxTokens,
+    system: notesMsgs.system,
+    messages: notesMsgs.messages,
+  })
+  const extracted = parseJson(notesRes.content[0]?.text ?? '')
+  const candidateName = extracted?.candidate_name
+  const candidateEmail = extracted?.candidate_email
+
+  if (!candidateName && !candidateEmail) {
+    return {
+      classification: classification.type,
+      label: classification.label,
+      action: 'ask',
+      question: "Who are these notes about? I couldn't find a name.",
+    }
+  }
+
+  const matchResult = await matchCandidateWithConfidence(
+    { name: candidateName, email: candidateEmail },
+    recruiter.id,
+    supabase,
+    convContext.candidateIds || new Set()
+  )
+
+  if (matchResult.action === 'ask') {
+    return {
+      classification: classification.type,
+      label: classification.label,
+      action: 'ask',
+      alternatives: matchResult.alternatives,
+      extracted_name: candidateName,
+    }
+  }
+
+  // No match for notes → ask (don't auto-create from notes alone)
+  if (matchResult.action === 'create') {
+    return {
+      classification: classification.type,
+      label: classification.label,
+      action: 'ask',
+      question: `I don't have ${candidateName || 'this candidate'} in your book yet. Who are these notes about, or should I create a new record?`,
+    }
+  }
+
+  return persistNotesToCandidate(text, extracted, matchResult.match, classification, recruiter)
+}
+
+async function persistNotesToCandidate(rawText, extracted, candidate, classification, recruiter) {
+  const callLog = extracted?.call_log || {}
+  const signals = extracted?.signals || {}
+
+  const interactionBody = callLog.raw_transcript || callLog.summary || rawText.slice(0, 5000)
+  const { data: interaction, error: intErr } = await supabase
+    .from('interactions')
+    .insert({
+      recruiter_id: recruiter.id,
+      candidate_id: candidate.id,
+      type: 'call',
+      subject: callLog.summary ? callLog.summary.slice(0, 100) : 'Call notes',
+      body: interactionBody,
+      occurred_at: new Date().toISOString(),
+    })
+    .select('id').single()
+
+  if (intErr) return { error: intErr.message }
+
+  // Update enrichment_data with any new signals
+  const newSignals = {}
+  if (signals.motivation)         newSignals.motivation = signals.motivation
+  if (signals.comp_expectations)  newSignals.comp_expectations = signals.comp_expectations
+  if (signals.timeline)           newSignals.timeline = signals.timeline
+  if (signals.status_change)      newSignals.status_change = signals.status_change
+  if (signals.red_flags?.length)  newSignals.red_flags = signals.red_flags
+
+  if (Object.keys(newSignals).length > 0) {
+    const { data: current } = await supabase
+      .from('candidates').select('enrichment_data').eq('id', candidate.id).single()
+    await supabase.from('candidates').update({
+      enrichment_data: { ...(current?.enrichment_data || {}), ...newSignals },
+    }).eq('id', candidate.id)
+  }
+
+  const name = `${candidate.first_name} ${candidate.last_name}`
+  const signalCount = Object.keys(newSignals).length
+  return {
+    classification: classification.type,
+    label: classification.label,
+    action: 'enriched',
+    entity_type: 'candidate',
+    candidate_id: candidate.id,
+    name,
+    interaction_id: interaction.id,
+    signals_captured: signalCount,
+    what_happened: signalCount > 0
+      ? `Added call notes to ${name}'s record (${signalCount} signal${signalCount !== 1 ? 's' : ''} captured)`
+      : `Added call notes to ${name}'s record`,
+  }
+}
+
+// Shared role persistence: match-or-create company then role.
+// Uses ilike for both; falls back to intake model's role_id if it matched an existing role.
+async function persistRole(extracted, rawText, recruiter) {
+  const r = extracted.role || {}
+
+  // Match or create client (company) — ilike, case-insensitive
+  let clientId
+  const { data: existingClient } = await supabase
+    .from('clients').select('id')
+    .eq('recruiter_id', recruiter.id).ilike('name', r.company)
+    .maybeSingle()
+
+  if (existingClient) {
+    clientId = existingClient.id
+  } else {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({ recruiter_id: recruiter.id, name: r.company, ...(r.location && { hq_location: r.location }) })
+      .select('id').single()
+    if (error) return { error: error.message }
+    clientId = data.id
+  }
+
+  // Match or create role
+  let roleId
+  let roleAction
+
+  if (r.role_id) {
+    // Intake model matched semantically to an existing role
+    roleId = r.role_id
+    roleAction = 'matched'
+  } else {
+    const { data: existingRole } = await supabase
+      .from('roles').select('id')
+      .eq('recruiter_id', recruiter.id).eq('client_id', clientId).ilike('title', r.title)
+      .maybeSingle()
+
+    if (existingRole) {
+      roleId = existingRole.id
+      roleAction = 'reused'
+    } else {
+      const { data, error } = await supabase
+        .from('roles')
+        .insert({
+          recruiter_id: recruiter.id,
+          client_id: clientId,
+          title: r.title,
+          status: 'open',
+          process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+          notes: rawText.slice(0, 20000), // store raw JD text
+        })
+        .select('id').single()
+      if (error) return { error: error.message }
+      roleId = data.id
+      roleAction = 'created'
+    }
+  }
+
+  return {
+    action: roleAction,
+    entity_type: 'role',
+    role_id: roleId,
+    client_id: clientId,
+    role_title: r.title,
+    company: r.company,
+    what_happened: roleAction === 'created'
+      ? `Created ${r.title} at ${r.company}`
+      : roleAction === 'reused'
+        ? `Found existing role: ${r.title} at ${r.company}`
+        : `Matched to ${r.title} at ${r.company}`,
+  }
+}
+
+async function toolEnrichFromNotes({ notes_text, candidate_id }, recruiter, convContext = {}) {
+  if (!notes_text?.trim()) return { error: 'No notes provided' }
+
+  // Targeted extraction first
+  const notesMsgs = buildNotesExtractionMessages(notes_text)
+  const notesRes = await anthropic.messages.create({
+    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+    max_tokens: notesMsgs.maxTokens,
+    system: notesMsgs.system,
+    messages: notesMsgs.messages,
+  })
+  const extracted = parseJson(notesRes.content[0]?.text ?? '')
+
+  let candidate
+
+  if (candidate_id) {
+    const { data } = await supabase
+      .from('candidates')
+      .select('id, first_name, last_name, enrichment_data')
+      .eq('id', candidate_id).eq('recruiter_id', recruiter.id)
+      .single()
+    if (!data) return { error: 'Candidate not found' }
+    candidate = data
+  } else {
+    const candidateName = extracted?.candidate_name
+    const candidateEmail = extracted?.candidate_email
+
+    if (!candidateName && !candidateEmail) {
+      return { action: 'ask', question: "Who are these notes about? I couldn't find a name." }
+    }
+
+    const matchResult = await matchCandidateWithConfidence(
+      { name: candidateName, email: candidateEmail },
+      recruiter.id,
+      supabase,
+      convContext.candidateIds || new Set()
+    )
+
+    if (matchResult.action !== 'act') {
+      return {
+        action: 'ask',
+        alternatives: matchResult.alternatives,
+        extracted_name: candidateName,
+      }
+    }
+    candidate = matchResult.match
+  }
+
+  const classification = { type: 'notes', label: 'Call notes' }
+  return persistNotesToCandidate(notes_text, extracted, candidate, classification, recruiter)
 }

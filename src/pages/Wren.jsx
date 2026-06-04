@@ -2,14 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import AppLayout from '../components/AppLayout'
 import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
+import IngestResult from '../components/wren/IngestResult'
+import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+
+// Strip <document type="paste">...</document> blocks for display — raw content
+// is sent to the server but never shown in the thread.
+function stripDocumentBlocks(text) {
+  return (text || '').replace(/<document[^>]*>[\s\S]*?<\/document>/g, '').trim()
+}
 
 export default function Wren() {
   const { recruiter } = useRecruiter()
   const [conversationId, setConversationId] = useState(null)
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
+  const [pendingPaste, setPendingPaste] = useState(null) // { text, label }
   const [streaming, setStreaming] = useState(false)
   const [streamingMsg, setStreamingMsg] = useState(null)
   const threadRef = useRef(null)
@@ -56,16 +65,39 @@ export default function Wren() {
     }
   }
 
+  function handlePaste(e) {
+    const text = e.clipboardData?.getData('text')?.trim() || ''
+    // Short text or URL: native paste
+    if (!text || text.length <= 300 || /^https?:\/\/\S+$/.test(text)) return
+    e.preventDefault()
+    setPendingPaste({ text, label: 'Pasted document' })
+  }
+
+  const canSend = (inputText.trim() || pendingPaste) && !streaming
+
   async function sendMessage() {
-    if (!inputText.trim() || streaming) return
-    const text = inputText.trim()
+    if (!canSend) return
+
+    let messageText = inputText.trim()
+    if (pendingPaste) {
+      const docBlock = `<document type="paste" name="${pendingPaste.label}">\n${pendingPaste.text}\n</document>`
+      messageText = messageText ? `${docBlock}\n\n${messageText}` : docBlock
+    }
+
+    // Display text strips the raw document content — the thread stays readable
+    const displayText = [
+      pendingPaste ? `[${pendingPaste.label}]` : '',
+      inputText.trim(),
+    ].filter(Boolean).join('  ')
+
+    setPendingPaste(null)
     setInputText('')
     setStreaming(true)
 
     const optimisticUser = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: { type: 'text', text },
+      content: { type: 'text', text: displayText },
       created_at: new Date().toISOString(),
       _optimistic: true,
     }
@@ -87,7 +119,7 @@ export default function Wren() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ conversation_id: convId, message: text }),
+        body: JSON.stringify({ conversation_id: convId, message: messageText }),
       })
 
       if (!resp.ok) {
@@ -171,7 +203,9 @@ export default function Wren() {
 
   function renderMessage(msg, draftSeenRef, totalDrafts) {
     const isUser = msg.role === 'user'
-    const text = msg.content?.text || ''
+    // Strip document blocks from user messages — raw content goes to server, thread stays readable
+    const rawText = msg.content?.text || ''
+    const text = isUser ? stripDocumentBlocks(rawText) : rawText
     const renders = msg.content?.renders || msg.renders || []
 
     return (
@@ -186,6 +220,9 @@ export default function Wren() {
             draftSeenRef.current++
             const isLatest = draftSeenRef.current === totalDrafts
             return <SubmittalDraft key={i} data={r.data} isLatest={isLatest} />
+          }
+          if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
+            return <IngestResult key={i} data={r.data} />
           }
           return null
         })}
@@ -221,6 +258,9 @@ export default function Wren() {
                   draftSeenRef.current++
                   return <SubmittalDraft key={i} data={r.data} isLatest={true} />
                 }
+                if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
+                  return <IngestResult key={i} data={r.data} />
+                }
                 return null
               })}
               {streamingMsg.error && (
@@ -236,20 +276,30 @@ export default function Wren() {
         </div>
 
         <div className="wren-input-bar">
+          {pendingPaste && (
+            <div className="wren-chips">
+              <Chip
+                type="notes"
+                label={pendingPaste.label}
+                onRemove={() => setPendingPaste(null)}
+              />
+            </div>
+          )}
           <textarea
             ref={inputRef}
             className="wren-input"
-            placeholder="Screen a resume, draft a submittal, write outreach, find a network fit…"
+            placeholder="Screen a resume, draft a submittal, write outreach, find a network fit — or paste anything."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             disabled={streaming}
             rows={1}
           />
           <button
             className="btn-primary wren-send"
             onClick={sendMessage}
-            disabled={!inputText.trim() || streaming}
+            disabled={!canSend}
           >
             Send
           </button>
