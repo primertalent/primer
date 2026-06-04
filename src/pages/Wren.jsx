@@ -182,6 +182,7 @@ export default function Wren() {
       )
     } finally {
       setStreaming(false)
+      setStreamingMsg(null)  // clear thinking dots on any close — abrupt or clean
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }

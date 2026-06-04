@@ -164,7 +164,10 @@ export default async function handler(req, res) {
     // Candidate IDs mentioned in prior turns — used for salience scoring in confidence matching
     const convContext = { candidateIds: extractConversationCandidateIds(bounded) }
 
-    const { fullText, renders, toolSteps } = await runAgentLoop(apiMessages, system, tools, recruiter, res, convContext)
+    const { fullText, renders, toolSteps, _errorSent } = await runAgentLoop(apiMessages, system, tools, recruiter, res, convContext)
+
+    // Tool threw mid-loop — error already sent and stream already closed
+    if (_errorSent) return
 
     // Save tool steps before the final message so created_at ordering is preserved
     if (toolSteps.length > 0) {
@@ -289,7 +292,15 @@ async function runAgentLoop(initialMessages, system, tools, recruiter, res, conv
       for (const block of finalMsg.content) {
         if (block.type !== 'tool_use') continue
         sse(res, 'tool_call', { name: block.name })
-        const result = await executeTool(block.name, block.input, recruiter, convContext)
+        let result
+        try {
+          result = await executeTool(block.name, block.input, recruiter, convContext)
+        } catch (toolErr) {
+          console.error(`[wren] tool ${block.name} threw:`, toolErr)
+          sse(res, 'error', { message: toolErr.message || `Tool ${block.name} failed` })
+          res.end()
+          return { fullText, renders, toolSteps, _errorSent: true }
+        }
         renders.push({ tool: block.name, data: result })
         sse(res, 'tool_result', { tool: block.name, data: result })
         toolResults.push({
