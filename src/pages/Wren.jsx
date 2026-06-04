@@ -32,9 +32,9 @@ export default function Wren() {
   }, [recruiter?.id])
 
   useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight
-    }
+    if (!threadRef.current) return
+    const el = threadRef.current
+    requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
   }, [messages, streamingMsg])
 
   async function loadMostRecentConversation() {
