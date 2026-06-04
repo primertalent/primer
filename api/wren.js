@@ -418,6 +418,18 @@ function getToolDefinitions() {
       },
     },
     {
+      name: 'add_to_pipeline',
+      description: "Add a candidate to a role's pipeline at Sourced stage. This is the only tool that writes a pipeline entry. Call when: (1) the recruiter explicitly says to add someone to a role, or (2) the recruiter accepts a placement offer after a screen or draft (suggest_pipeline was true and they said yes). Always announce what was done. Never call this without explicit recruiter instruction or acceptance.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          candidate_id: { type: 'string', description: 'DB candidate ID.' },
+          role_id: { type: 'string', description: 'DB role ID.' },
+        },
+        required: ['candidate_id', 'role_id'],
+      },
+    },
+    {
       name: 'ingest_input',
       description: "Classify and persist a pasted document (resume, JD, or call notes). Call this immediately when the recruiter's message contains a <document type=\"paste\"> block. Classifies the content, creates or enriches the matching record (candidate, company + role, or candidate interaction), and returns what was done. Never ask the recruiter to confirm before calling — act on high-confidence matches, ask only when genuinely ambiguous.",
       input_schema: {
@@ -453,6 +465,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'screen_candidate': return toolScreenCandidate(input, recruiter)
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
+    case 'add_to_pipeline':   return toolAddToPipeline(input, recruiter)
     case 'ingest_input':     return toolIngestInput(input, recruiter, convContext)
     case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
     default:                 return { error: `Unknown tool: ${name}` }
@@ -699,6 +712,9 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
     from_paste: !!candidateData._from_paste,
     role_title: roleData.title,
     client_name: roleData.clients?.name,
+    // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
+    suggest_pipeline: !candidateData._from_paste && !!candidate_id
+      && ['advance', 'hold/advance'].includes(result.recommendation),
   }
 }
 
@@ -760,6 +776,8 @@ async function toolDraftSubmittal({ role_id, candidate_id, resume_text, mode = '
     role_title: roleData.title,
     client_name: roleData.clients?.name,
     is_revision: !!(revision_instruction && prior_draft),
+    // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
+    suggest_pipeline: !candidateData._from_paste && !!candidate_id,
   }
 }
 
@@ -845,12 +863,10 @@ async function toolIngestInput({ text }, recruiter, convContext = {}) {
 }
 
 async function ingestResume(text, classification, recruiter, convContext) {
-  // Full intake to extract candidate fields (name, email, title, company, cv_text, signals)
-  const { data: existingRoles } = await supabase
-    .from('roles').select('id, title, clients(name)')
-    .eq('recruiter_id', recruiter.id).eq('status', 'open')
-
-  const intakeMsgs = buildIntakeMessages(text, existingRoles || [])
+  // Resume creates/enriches candidate only — no role context, no pipeline entry.
+  // Passing existingRoles here caused "only option" false matches (Unit SDR bug).
+  // Role matching belongs to the JD path; placement belongs to add_to_pipeline.
+  const intakeMsgs = buildIntakeMessages(text, [])
   const intakeRes = await anthropic.messages.create({
     model: process.env.AI_MODEL || 'claude-sonnet-4-6',
     max_tokens: intakeMsgs.maxTokens,
@@ -923,31 +939,6 @@ async function ingestResume(text, classification, recruiter, convContext) {
     action = 'created'
   }
 
-  // If intake extracted a role, also persist company + role
-  let roleId = null
-  if (extracted.role?.title && extracted.role?.company) {
-    const roleResult = await persistRole(extracted, text, recruiter)
-    if (!roleResult.error) {
-      roleId = roleResult.role_id
-      // Pipeline upsert
-      const fitScore = extracted.screening?.score != null
-        ? Math.min(100, Math.round(extracted.screening.score * 10))
-        : null
-      await supabase.from('pipeline').upsert(
-        {
-          recruiter_id: recruiter.id,
-          candidate_id: candidateId,
-          role_id: roleId,
-          current_stage: 'Sourced',
-          status: 'active',
-          ...(fitScore != null && { fit_score: fitScore }),
-          ...(extracted.screening?.reasoning && { fit_score_rationale: extracted.screening.reasoning }),
-        },
-        { onConflict: 'candidate_id,role_id' }
-      )
-    }
-  }
-
   const name = `${first_name} ${last_name}`.trim()
   return {
     classification: classification.type,
@@ -958,7 +949,6 @@ async function ingestResume(text, classification, recruiter, convContext) {
     name,
     current_title: c.current_title || null,
     current_company: c.current_company || null,
-    role_id: roleId,
     what_happened: action === 'enriched'
       ? `Enriched ${name}'s record with resume`
       : `Created candidate record for ${name}`,
@@ -1164,6 +1154,43 @@ async function persistRole(extracted, rawText, recruiter) {
         ? `Found existing role: ${r.title} at ${r.company}`
         : `Matched to ${r.title} at ${r.company}`,
   }
+}
+
+async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
+  const [{ data: candidate }, { data: role }] = await Promise.all([
+    supabase.from('candidates')
+      .select('id, first_name, last_name')
+      .eq('id', candidate_id).eq('recruiter_id', recruiter.id).single(),
+    supabase.from('roles')
+      .select('id, title, clients(name)')
+      .eq('id', role_id).eq('recruiter_id', recruiter.id).single(),
+  ])
+  if (!candidate) return { error: 'Candidate not found' }
+  if (!role) return { error: 'Role not found' }
+
+  const { data: existing } = await supabase
+    .from('pipeline').select('id, current_stage')
+    .eq('candidate_id', candidate_id).eq('role_id', role_id)
+    .eq('recruiter_id', recruiter.id).maybeSingle()
+
+  const candidateName = `${candidate.first_name} ${candidate.last_name}`
+  const roleTitle = role.title
+  const company = role.clients?.name
+
+  if (existing) {
+    return { action: 'already_exists', candidate_name: candidateName, role_title: roleTitle, company, stage: existing.current_stage }
+  }
+
+  const { error } = await supabase.from('pipeline').insert({
+    recruiter_id: recruiter.id,
+    candidate_id,
+    role_id,
+    current_stage: 'Sourced',
+    status: 'active',
+  })
+  if (error) return { error: error.message }
+
+  return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'Sourced' }
 }
 
 async function toolEnrichFromNotes({ notes_text, candidate_id }, recruiter, convContext = {}) {

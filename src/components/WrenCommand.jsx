@@ -187,22 +187,6 @@ function IntakeResult({ result, recruiter, jdChips = [], onClear, onSaved }) {
           }
         }
 
-        if (candidateId) {
-          const fitScore = s?.score ? Math.min(100, Math.round(s.score * 10)) : null
-          const { error: pipeErr } = await supabase.from('pipeline').upsert(
-            {
-              recruiter_id: recruiter.id,
-              candidate_id: candidateId,
-              role_id: savedRoleId,
-              current_stage: 'Sourced',
-              status: 'active',
-              ...(fitScore != null && { fit_score: fitScore }),
-              ...(s?.reasoning    && { fit_score_rationale: s.reasoning }),
-            },
-            { onConflict: 'candidate_id,role_id' }
-          )
-          if (pipeErr) throw pipeErr
-        }
       }
 
       if (call_log?.summary && candidateId) {
@@ -448,23 +432,6 @@ function MultiScreenResult({ result, recruiter, jdChips = [], onClear, onSaved }
           if (error) throw error
           roleId = data.id
         }
-
-        // Pipeline
-        const fitScore = ranking.match_score != null
-          ? Math.min(100, Math.round(ranking.match_score * 10))
-          : null
-
-        await supabase.from('pipeline').upsert(
-          {
-            recruiter_id: recruiter.id,
-            candidate_id: candidateId,
-            role_id: roleId,
-            current_stage: 'Sourced',
-            status: 'active',
-            ...(fitScore != null && { fit_score: fitScore }),
-          },
-          { onConflict: 'candidate_id,role_id' }
-        )
 
         // Screener result
         await supabase.from('screener_results').insert({
