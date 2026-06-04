@@ -167,3 +167,58 @@ Tight and skimmable. Short lines, no corporate filler. Outreach under 150 words.
 
 Outreach specifics
 Get to the role and the ask fast. Strongest signal up top, spec in declarative bullets, low-friction CTA. Follow-ups add new information rather than bumping, so a non-reply gets a fresh reason to open the next touch.
+
+---
+
+Paste ingestion and confidence-gated matching
+Added 2026-06-04. How Wren captures pasted input and resolves references to records.
+
+Paste is an instruction to capture, not a question
+When the recruiter drops text into the conversation, Wren classifies it, persists it, and reports what it did. No drop box, no "want me to create this?" button. The recruiter's first action is judgment, never data entry.
+
+What lifts from the Desk (reuse, don't rebuild)
+The Desk's paste logic already solved the hard part. Lift the brain, leave the surface.
+
+- `buildClassifyMessages(text)` and `buildIntakeMessages(input, existingRoles)` in `src/lib/prompts/intake.js` — pure functions, no React. The classifier (JD / resume / transcript / notes) and the full extraction call. Lift unchanged into a /wren tool.
+- Candidate match-or-create with enrichment, client match-or-create, pipeline upsert — already work, reuse.
+- The chip render extracts cleanly to a `<Chip>` component and renders in the conversation thread (closes the paste-to-chip friction entry from 6/3).
+
+Leave behind: the Desk "drop something" box. In /wren the conversation input is the drop zone. Pasted text routes to classify-and-persist instead of a chat reply.
+
+The core rule: confidence-gated matching
+Every point where Wren maps input or a reference to a record runs the same logic. One threshold, everywhere.
+
+- ≥90% confidence → act silently and report. "Added your call notes to Annie's record." "Created Fulcrum and the FDE Lead role."
+- Below 90% → ask, with options ranked by salience. "I've got two Annies — Srivastava (submitted to Fulcrum this week) or Chen (stored last year, no activity). Which one?"
+- No match: resume/JD auto-creates silently (nothing to get wrong on a create). Notes with no confident candidate match ask who they're about — orphaned notes attached to the wrong person silently corrupt the database (the asset).
+
+Applies at every match point: candidate match on a resume, candidate match on notes, company match on a JD, role match on a JD, reference lookups like "what's Annie's status." Build it once as a match-with-confidence step, use it everywhere.
+
+Confidence is computed from real signals, not a model vibe
+A model saying "92% sure" means nothing unless it's grounded. Confidence is built from checkable signals in two parts.
+
+Match strength:
+- Exact email match → near-certain. Act.
+- Exact name match (case-insensitive), single result → high. Act.
+- Name match, multiple results → go to salience.
+- Fuzzy or partial name, no corroboration → low. Ask.
+
+Record salience (this is what makes it smart): when multiple records match a name, weight them by how likely the recruiter means them.
+- Weight up: in an active pipeline, recently advanced or submitted, recently discussed in this conversation, recent interactions or debriefs, tied to a role currently being worked.
+- Weight down: dormant, no pipeline, no activity in months, last touched long ago.
+
+Two Annies is not a coin flip if one was submitted to Fulcrum three days ago and the other is a dormant profile from last year. That's ~95/5, not 50/50. Wren acts on the salient one and names which ("Annie Srivastava, the one you submitted to Fulcrum") so the recruiter can correct. It only asks when two records are comparably salient. The salience weighting is what collapses most "two records" cases into a confident answer and reserves the ask for true ambiguity. This is layer-2/3 brain showing up in matching: Wren resolves references toward the candidate actually in play, the way the recruiter would.
+
+Rule zero still governs: a wrong auto-match is worse than asking, because it silently pollutes the database. When genuinely uncertain, ask. High confidence acts; ambiguity asks; never a confident wrong match.
+
+The notes-enrichment gap (new build)
+Pasting call notes against an existing candidate has no save path today — root cause of the 6/3 Annie friction (notes used in-conversation, never persisted). Build `enrich_candidate_from_notes`: resolve the candidate via confidence-gated matching (conversation context is a strong salience signal), extract the `call_log` via the intake prompt, write the interaction and enrichment to the candidate record. If no confident candidate match, ask who the notes are about.
+
+Case-insensitive name match (cheap dedup fix)
+Candidate name lookup is currently case-sensitive exact match (`eq`, not `ilike`). "annie" vs "Annie" scores as no-match and creates a duplicate. Fix to case-insensitive — it's an input to confidence accuracy, not a separate task.
+
+Data dependency to confirm before relying on salience
+Salience needs queryable timestamps and status: `created_at`, last interaction date, last pipeline advance, pipeline status, interaction counts. These mostly exist (`pipeline` table, `interactions`, `created_at`). Confirm they're populated and queryable before weighting on them — if sparse on early users, salience is weaker and the threshold leans more on match strength alone.
+
+Known limitation (logged, not solved this slice)
+None outstanding. The confidence gate absorbs the role-title-variation duplicate risk (a near-match role under the same client reuses at ≥90%, below asks or creates). Previously flagged as a punt; the threshold handles it.
