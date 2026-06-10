@@ -207,6 +207,10 @@ In 18 months when AI sourcing is commoditized, the same recruiters will be drown
 
 "Everything is yours. Your candidates, your notes, your data. We don't sell data, don't share across users, don't train on your records."
 
+**"I've been burned by tools that lock in my data. What happens if I leave?"**
+
+"One-click full export. Every candidate, every role, every interaction, every note — all of it downloads as a CSV in under 60 seconds. Promised publicly on the pricing page. The one thing that doesn't export is the trained ladder: the autonomy levels you've established with Wren, your voice layer, and your outcome patterns. Those compound with use. Your data is yours. Your trained Wren is yours too — but it lives here, same as a trained employee."
+
 **"I'm a solo recruiter, I don't need enterprise tooling."**
 
 "Right. Wren is built for you specifically. No team features, no admin panels. One operator, one desk, one tool that respects your time."
@@ -286,6 +290,30 @@ You stay the closer. Wren makes sure every deal gets your A game.
 If you've ever lost a candidate at the final round and known, in your gut, that you could have prevented it — Wren is for you.
 
 [link]
+
+---
+
+## GTM Artifact — hirewren.com landing page
+
+Format: a literal job posting.
+
+**"Recruiting Coordinator. Works nights and weekends. Never forgets a follow-up. $499/month."**
+
+The WREN_JD.md task table is the body copy. Line items: intake capture, screening, submittal writing, chasing, status communication, scheduling, prep docs, debrief capture, re-engagement. Hours per week. Coverage today. Target tier.
+
+The close: A human coordinator costs $45-55k/yr loaded. Wren costs $6k/yr. That table is the pricing argument.
+
+This format does three things: it frames Wren as a hire, not a subscription; it makes the ROI self-evident from the job description; and it makes the landing page scannable by the exact ICP who has already tried and failed to hire at this cost.
+
+---
+
+## Activation metric (week-one definition of value)
+
+**First submittal drafted from the user's own real candidate within 48 hours of signup.**
+
+This is the moment attributable value exists. Not "Wren generated something" — "Wren used my candidate and my role and produced something I would have sent." Instrument it. Users who miss the 48-hour window get a personal call.
+
+This metric is the anti-demo trap: it forces the product to deliver on real data, not sample data. It's also the onboarding exit test — if Wren can't get a new user to this moment in 48 hours on their own pipeline, the onboarding is broken.
 
 ---
 

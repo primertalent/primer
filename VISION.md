@@ -88,11 +88,7 @@ Wren handles the operational work an entry-level recruiter would handle, with se
 
 ## Operating principles
 
-**Three-tier autonomy.** Wren operates on three tiers. Acts on high-confidence reversible moves. Drafts for approval on judgment moves. Surfaces moments without drafting when the recruiter should decide whether the work is worth doing. The recruiter sees everything Wren did, approves what Wren proposed, and commissions what Wren noticed.
-
-**Email autonomy is tiered, not binary.** Email is a Wren capability, not a card type. Routine sends complete in one tap on phone. Considered sends route through the desk for review. The recruiter never navigates to compose. Wren drafts where it has signal; voice initiates the rest.
-
-Autonomy is tiered. Default is approval required. Power users earn autonomous send on routine sends through demonstrated trust. Some moments (submittals, comp negotiation, late-stage client communication) are never autonomous regardless of preference. Wren refuses to do dumb things even when asked.
+**The autonomy ladder.** Autonomy is earned per task type, not granted globally. Tier 0: observe, log, update records silently. Tier 1: do the work, wait for one-tap approval. Tier 2: act, then report in the brief. Tier 3: act silently, log only. Every task starts conservative. Promotion is offered by Wren after a demonstrated approval streak (e.g. 10 of 10 unedited approvals), accepted by the recruiter, always reversible. Submittals, comp conversations, and late-stage client communication never exceed Tier 1 regardless of streak. The trained ladder is itself the retention moat: nobody walks away from a trained employee to start over with a smarter stranger.
 
 **Wren defers to recruiter judgment. Always.** Wren's role is to surface signal, recommend, and draft. Wren is not a gate. When Wren and the recruiter disagree on direction, Wren states its read clearly, executes the recruiter's choice without protest, and offers what would strengthen the move. The recruiter can override any recommendation. The recruiter cannot override Wren's right to surface what was missed, but Wren surfaces it as helpful context, never as resistance. A coworker who refuses to do work they disagree with gets fired. Wren does the work.
 
@@ -125,6 +121,14 @@ This is the operational form of "the recruiter never types data Wren already has
 **Candidates are tiered, not flat.** Wren's surfacing engine prioritizes proactive attention based on career signal strength. S-tier and A-tier candidates warrant aggressive surfacing and cadenced check-ins. B-tier surfaces on strong matches only. C-tier surfaces only on direct match to active roles. Tier is derived from career signals (employer quality, trajectory, quantified output, skill demand, pedigree, recent track record) and confirmed by the recruiter. Without tiering, the surfacing engine produces noise. With tiering, it produces signal.
 
 **Wren remembers who not to work with.** Eliminations are first-class state, not deletions. Wren captures the reason, severity, and affected relationships. Permanent red flags trigger active suppression on future encounters. Soft passes surface context on relevant matches. The recruiter never re-engages a burned candidate by accident. Institutional memory of bad fits is as valuable as institutional memory of good ones.
+
+**The three-bucket rule (shape constraint).** Every feature must be one of three things: a new artifact Wren can render in conversation, a new signal the agent loop can read, or a new action Wren can take with approval. If a feature wants its own page, nav item, or modal, it is wrong by definition. This rule is to product shape what DESIGN.md is to visuals: a constraint, not a preference.
+
+**Zero input labor, not zero interaction.** Wren asks the recruiter to change almost nothing: their calls, inbox, and calendar are already the input. The one new behavior Wren asks for, proudly, is responding to Wren: approve, edit, hold, answer. That is not workflow change. That is what having an employee is. The promise: never re-type, never paste out of obligation, never operate. Paste survives only as the capture valve for thoughts that live in the recruiter's head.
+
+**Retrieval is never the response.** Wren never just shows a record. It shows the record plus the one thing that needs attention. If nothing needs attention, it says so. "This deal is clean" is information an ATS will never give you.
+
+**The flywheel.** Wren does the labor, the labor produces the data, the data produces the insights, the insights make the labor smarter. Capture is exhaust, not a feature.
 
 ---
 

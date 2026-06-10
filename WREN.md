@@ -3,7 +3,10 @@
 
 ---
 
-## Current State (updated 2026-06-03)
+## Current State (updated 2026-06-10)
+
+**Session 33 (2026-06-10) — Strategy capture + Phase 0 launch:**
+Build plan reset. 4-phase arc: Phase 0 (burn the boats — auth gate + legacy surface deletion + pipeline rename), Phase 1 (One Surface — Wren speaks first, deal ledger artifact, ambient pipeline v1), Phase 2 (Pocket Employee — PWA + push + voice), Phase 3 (Memory That Compounds — outcome write-back + pattern retrieval). Beta (Phase 4) runs parallel starting week of 6/15. Kill list explicit: Tier 2 chip wiring, "Add to a role" diagnosis, all Desk handler work, Gemini Notes polish, extension, Stage 9 cadence engine, Stage 8 closing playbook all dead until after outcome write-back. WREN_JD.md created as roadmap spine — job-coverage thinking replaces feature-list thinking. VISION.md: autonomy ladder (Tier 0–3, earned promotion) replaces three-tier autonomy; three-bucket rule, zero input labor, retrieval is never the response, flywheel added as shape constraints. DECISIONS.md: 6 new entries. Honesty metric (% Wren-initiated) added to brief footer spec.
 
 **Shipped recently:**
 - search_db role cross-field matching + model-side expansion + fail-loud (commit 2f0c676, 2026-06-03): role queries now handle compound phrases like "Unit Sales Development" by intersecting per-token title matches with per-token client matches. Model instructed to expand role abbreviations (SDR → "Sales Development", AE, BDR, CSM, etc.) before calling search_db — no hardcoded map, model handles the long tail. New fail-loud rule: any empty search_db result (candidate or role) asks for clarification rather than dead-ending silently.
@@ -636,95 +639,54 @@ If any answer is wrong, redesign or defer.
 - WrenResponse.jsx — removed. Desk is the agent's voice.
 - Dashboard.jsx — removed. Replaced by Desk.jsx.
 
-**Build plan (organized around the three foundations):**
+**Build plan (locked 2026-06-10):**
 
-The pivot from SaaS shape to agent shape happens through three foundations, built in order. Each foundation makes the next one possible.
+**Phase 0 — Burn the boats (this week)**
+- Auth gate on `api/ai.js` (JWT, match `api/wren.js` pattern)
+- Submit Google read-scope verification (Ryan, not code)
+- Delete legacy surfaces (Desk.jsx, Candidates.jsx, CreateCandidate.jsx, EditCandidate.jsx, CandidateCard.jsx, CallMode.jsx, Roles.jsx, RoleDetail.jsx, EditRole.jsx, CreateRole.jsx, ActionCard.jsx, SidePanel.jsx, WrenCommand.jsx)
+- `pipeline` → `pipelines` rename migration rides in the cleanup
 
-**Phase 1 — Engine (shipped):**
-- ✅ Agent loop infrastructure: GitHub Actions cron, `api/agent-loop` endpoint, `agentLoop.js` prompt, `actions` table
-- ✅ Loop reads only active pipeline rows (per "When Wren engages" trigger)
-- ✅ Loop output: prioritized actions + sharpening data asks, both writing to `actions` table
-- ✅ Call Prep module
-- ✅ Stage-Gate Agent Flows (late_stage, offer, accepted triggers)
-- ✅ Recruiter vs AI Confidence (data accumulates from day one)
+**Phase 1 — The One Surface (two weeks, target ~6/26)**
+- Wren speaks first: agent loop output composes the brief on `/wren` load
+- Desk ticker: weighted value, at risk, next close
+- Deal ledger artifact (stamped card, fee at stake, verdict pill, one named risk)
+- Entity views become conversation renders, rebuilt as artifacts only when missed
+- Moat bug fixes: shared fact base (screen output feeds submittal context), motivation scan of notes/interactions in draft builder
+- Ambient pipeline v1: Gmail auto-forward to existing CloudMailin address (no Google review needed), ingestion event dispatcher (classify → resolve via matchWithConfidence → fire tool → land in brief)
+- Injection defense designed into the dispatcher from line one: inbound content is data never instructions, hard-scoped tools per ingestion source, Tier 0/1 only for email-triggered actions, no outbound send triggered by inbound content without approval
+- Exit test: Ryan runs his full desk for a week without wanting a deleted page back
 
-**Phase 2 — Browser strip-down (structurally 60% done, paused at Phase 2.5):**
-- ✅ Actions Tray as Desk home: loop output as primary surface, Tray, ActionCard, AppLayout, SidePanel, WrenCommand agent-shaped and shipped
-- ✅ WrenResponse removed, log+debrief collapse, side panels
-- ✅ Drafts table (migration 20260505000000_drafts.sql), zero consumers yet
-- ✅ CF-5, CF-6, CF-7 resolved (see COLLISION_AUDIT.md)
-- ⬜ CandidateCard strip-down (pre-strip-down architecture still in place)
-- ⬜ RoleDetail strip-down (pre-strip-down architecture still in place)
-- ⬜ CF-1, CF-2, CF-4 open; CF-3 partial. Deferred until after Phase 2.5.
+**Phase 2 — The Pocket Employee (one week, target ~7/3)**
+- PWA shell: manifest, service worker, install prompt
+- Push wired to agent loop: 7am brief arrives as notification
+- Voice input on composer (Web Speech API)
+- Exit test: soccer test. Push → open → approve, under 10 seconds
 
-**Phase 2.5 — Email ingestion (Build 1 shipped, Build 2 partially shipped):**
-- ✅ **Build 1 (shipped 2026-05-05):** `api/ingest-email.js` receives webhooks from CloudMailin. Auth via shared secret (header or query param). Multi-tenant routing via `recruiters.email_intake_address`. Haiku classifier marks emails as `candidate_communication`, `client_communication`, or `noise`. Fire-and-forget agent loop trigger via internal fetch to `api/agent-loop?recruiter_id=...`. Candidate matched by email or fuzzy name, created as stub if no match. Interaction written with classification in `meta` jsonb. Verified end-to-end with two test emails.
-- ✅ **Build 2 (fully shipped — Pieces 1 + 2: 2026-05-06, Piece 3: 2026-05-07, Piece 4: 2026-05-12, Piece 4-2: 2026-05-13):**
-  - ✅ **Piece 1 — Classifier-first reorder:** Classifier runs before any DB write. Noise discarded to `ingestion_log` table without creating candidates or interactions. Three pre-classifier guards: self-send, domain blocklist (LinkedIn noreply, mailer-daemon, bounce, unsubscribe@), and List-Unsubscribe header detection. `ingestion_log` table created (migration 20260506000001). `interactions.candidate_id` made nullable to support `client_communication` writes. All four guard paths verified in production. Safe to enable Gmail filter forwarding.
-  - ✅ **Piece 2 — new_inbound action cards:** Candidate emails surface as action cards in the Desk Tray within 30–60 seconds of arrival, regardless of pipeline status. Cards carry urgency from classifier output, intent-derived why and suggested_next_step, and two chips: "Draft reply" (navigates to candidate page) and "Add to a role" (navigates with autoScreen state). Realtime INSERT handler fixed to derive entity IDs from `payload.new` instead of hardcoding null (commit 5d0fa07). Verified end-to-end with real email tests.
-  - ✅ **Piece 3 — Submittal-after-Meet flow (shipped 2026-05-07):** Gemini Notes detection (direct delivery + recruiter-forwarded), guard-1 priority placement so forwarded notes aren't swallowed by the self-send guard. Auto-create candidate via Haiku extraction (current_title, current_company, location, motivation_summary, source_context) when name extracted but no DB match. `intake_notes_ready` action card with inline notes expansion (Fraunces body, JetBrains Mono uppercase headers, hairline dividers). `submittal_draft_ready` card with explicit recruiter-triggered draft → inline review/edit/approve-copy/discard — never auto-generates. Webhook retry idempotency via Message-ID dedup with partial unique index (migration 20260507000001). Picker visibility fix committed as 4c15b25.
-  - ✅ **Piece 4 — Auto-match candidate to active role from Gemini Notes (shipped 2026-05-12, commit 5758274):** Two-pass matcher in `api/_lib/matchRoleFromNotes.js`. Pass 1: DB pre-filter on normalized company name (strips legal suffixes, leading "The", comma qualifiers); exact equality first, ≥6-char substring fallback; confidence 95 (single open role at client) or 98 (role title also appears in notes). Pass 2: Haiku fallback for ambiguous or no-company cases, bounded at 200 tokens. Outcome B branches: ≥90 → auto-create pipeline, `intake_notes_ready` card born with `pipeline_id` and `auto_matched: true`; 60–89 → proposed match card, "Confirm [Role]" + "Different role" buttons; no match → existing "Add to a role" unchanged. "Wrong role" undo on auto-matched cards deletes pipeline in-place (no flash). Calibration fields in `actions.context`: `auto_matched`, `auto_match_confidence`, `auto_match_type`, `proposed_match`, `matched_at`, `confirmed_at`. First production instance of "Wren matches before it asks" principle firing on real intake data.
-  - ✅ **Piece 4-2 — Auto-extract expected comp from Gemini Notes (shipped 2026-05-13, commit c29f037):** Two-pass extractor in `api/_lib/extractCompFromNotes.js`. Pass 1 regex scans `motivation_summary` (curated by intake Haiku call) then `notes_body` for explicit numeric comp signals within an 80-char keyword window; confidence 90. Pass 2 Haiku fallback bounded at 120 tokens; auto-write threshold 80. Fires only when `pipelineId` exists (P4-1 auto-match must have succeeded — skips proposed-match and no-match paths). Never overwrites existing `expected_comp`. Outcome C also runs when an active pipeline already exists but comp is null. Six calibration fields in `actions.context`: `auto_comp_extracted`, `auto_comp_confidence`, `auto_comp_value_low`, `auto_comp_value_high`, `auto_comp_source_excerpt`, `auto_comp_pass`. Manual `set_expected_comp` chip untouched — stays as fallback.
-- ✅ **Phase 4 sliced — Gmail send only (shipped 2026-05-13, commit 3d577d2):** OAuth flow in `api/google-auth.js` (code exchange, token storage on recruiter row). Send via Gmail REST API in `api/gmail-send.js` (RFC 2822 build, token refresh at request time, outbound interaction log on every send, `submitted_at` set on first send only). `src/pages/GoogleAuthCallback.jsx` handles redirect, verifies Supabase session, calls exchange endpoint, navigates to /desk. Migration 20260513000000_gmail_tokens.sql adds `gmail_access_token`, `gmail_refresh_token`, `gmail_token_expiry` to `recruiters`. `submittal_draft_ready` card gains subject preview ("Candidate – Role"), To input, "Approve & send" (when connected, disabled until To filled) or "Connect Gmail" (when not). `gmailConnected` prop threaded from Desk via `!!recruiter.gmail_access_token`. Principle established: Gmail send is a capability, not a card type. Token storage and send endpoint reusable across future card types.
-- ⬜ **Build 3:** Deferred. Phase 4 sliced delivered the approval-gated send path.
+**Phase 3 — The Memory That Compounds (two weeks, mid-July)**
+- Outcome write-back: closing or losing a deal captures what happened and why, in conversation, 30 seconds
+- Pattern retrieval: briefs and screens cite the recruiter's own history
 
-**Known limitations / tech debt:**
-- Candidate name extraction reads the email `from` header only for general inbound emails. For forwarded Gemini Notes specifically, the recruiter hint mechanism now filters the forwarder's name — recruiter's own name no longer becomes the candidate. Body signature parsing for general emails remains unimplemented.
-- The `drafts` table first consumer shipped in Build 2 Piece 3 (Gemini Notes capture + explicit draft trigger — 2026-05-07).
-- **`/api/ai` has no auth gate.** Any POST with a valid messages body bills the Anthropic key. Pre-existing condition, not introduced by Piece 3. Harden before any beta user signs up: add a Supabase JWT check or shared secret to the route. Piece 3 does not worsen the exposure — `fireResponse` in AgentContext already uses this endpoint.
-- **Discard chip on `intake_notes_ready` writes `acted_on_at`, which suppresses re-generation.** Semantically the field name is wrong (the recruiter didn't act, they declined). The behavior is right (recruiter explicitly declining shouldn't surface again on next loop). Future fix is loop-level: distinguish "declined to act" dismissal from "snooze" dismissal. Park until field-name confusion actually causes a debugging issue.
-- **"Add to a role" buttons still broken** across the Desk action card chip, DealStatusBar button, and sidebar candidate view despite 4c15b25 picker visibility fix. Root cause undiagnosed. Workaround: scroll to the Pipeline section inside the candidate page and use the inline "+ Add to Role" button there.
-- **Section header parser in `intake_notes_ready` uses a heuristic** (single line ≤60 chars, no terminal punctuation, no bullet prefix). Fragile if Gemini ever generates a header longer than 60 chars or ending in punctuation. Acceptable for V1; hardened when Gemini Notes format shifts.
-- **Narrow orphan window between draft write and action row update.** If the process crashes between writing the draft record and updating the action row to `submittal_draft_ready`, the draft exists but the recruiter never sees the card flip. Acceptable for V1 single-user. Fix before multi-user.
-- **`run_in_background` shell commands using `until curl ...; do sleep N; done` can orphan bash parent processes** after Claude Code considers the task complete. Orphaned loops generated a 401 flood in Vercel logs for hours. Always kill backgrounded processes by explicit PID at the end of any task that started one. Never assume cleanup happened automatically.
-- **`pipeline` table is singular, not pluralized.** Inconsistent with Supabase convention. Will cause confusion in future SQL queries. Rename migration needed before beta; any raw SQL using `pipeline` will break.
-- **Existing `intake_notes_ready` cards do not auto-upgrade to `submittal_draft_ready`** when a pipeline is created for that candidate after the card was written. Recruiter must manually re-trigger the draft flow. Reduced scope after P4-1: auto-match creates the pipeline at ingestion time so most Gemini Notes cards are born with `pipeline_id` set. The upgrade path only fires for manual "Add to a role" cases. Still open, lower priority than pre-P4-1.
-- **`matchRoleFromNotes` company normalization may need tuning.** Suffix list covers common US/EU forms; edge cases (holdings companies, international suffixes, unusual abbreviations) will miss Pass 1 and fall to Haiku. Signal to watch: Pass 1 firing followed by "Wrong role" tap within an hour. Three instances in a week → revisit normalization rules or threshold. Calibration data in `actions.context` provides the signal without instrumentation.
-- **`extractCompFromNotes` regex keyword window may need tuning.** 80-char window is a first-pass calibration. Signal to watch: `auto_comp_pass: 'none'` rate in `actions.context` over the first week of real use. High miss rate → widen the window or add keywords. `auto_comp_pass: 'haiku'` doing most of the work → regex patterns too narrow, tighten them so the cheap path fires more.
-- **Agent loop cron fix shipped (commit d9157eb, 2026-05-28).** Root cause was two-layer: Vercel Hobby 10s function timeout + curl `--max-time 15` killing the HTTP connection at 15s regardless of Vercel's ceiling. Fixed: Vercel Pro upgrade (maxDuration: 60 honored) and `--max-time` raised to 65s. Watch for re-occurrence as data volume grows beyond ~55s of processing time.
-- **DB cleared 2026-05-13.** 5 stale test candidates, 1 stale role, 13 stale clients deleted. Fresh slate for real onboarding from May 14 forward. Recruiter row and auth preserved.
-- **Intake call type classification not yet implemented.** Gemini Notes path treats every call as a candidate intake. Client intake calls (producing a role record, not a candidate record) are a distinct call type not yet classified. Router step needed in `handleGeminiNotesPath` to distinguish before extraction fires. Current behavior: a client intake call will produce a candidate record for the client contact, not a role record. Low frequency for now; becomes a problem when Workspace OAuth brings in all calendar events.
+**Phase 4 — Beta (parallel, not after)**
+- 10 outreach conversations start week of 6/15, during Phase 1
+- 5 users at $199 by late July; onboarding is pipeline paste
+- Per-user token tracking ships before user five
+- Week-one activation metric: first submittal drafted from the user's own real candidate within 48 hours of signup. Instrument it. Users who miss it get a call.
 
-**Phase 2.75 — LinkedIn browser extension:**
-- Status: captured, not committed. Sequencing decision after Build 2 and Build 3 ship and email ingestion has been used on real candidates for 2+ weeks.
-- What it does: Chrome extension that adds Wren to LinkedIn profile and message surfaces. Scrapes visible content (user-consented, acting as the user). POSTs to the existing ingestion endpoint. In-place access to existing skills: screener, scorecard, pitch builder, outreach generators. Save to a role from a profile view. Generate outreach from a profile. Rate against an active JD.
-- Why it matters: 60-70% of first responses from candidates come back through LinkedIn, not email. Email ingestion is necessary but not sufficient. LinkedIn has no API for messages. Extension is the only path that doesn't depend on LinkedIn's API and doesn't get shut off.
-- Why it's strategic: This is where the work happens. Removes context switching. Skills already built become more useful from this surface. Once installed and trusted, switching cost is real. Demoable in 30 seconds.
-- Scope: 1-2 weeks. Manifest V3 compliance, LinkedIn DOM scraping, auth from extension to endpoint, in-extension UI.
-- Decision gate: After 2 weeks of real email ingestion use, ask whether email alone feels sufficient or LinkedIn data is constantly missing. If the second, build the extension before Phase 3. If the first, ship Phase 3 first.
+**Kill list (explicit, 2026-06-10)**
+- Tier 2 chip wiring, "Add to a role" diagnosis, all Desk handler work: dead with the surfaces
+- Gemini Notes email path polish: read-scope OAuth replaces it
+- Granola/Fathom/texts/LinkedIn extension: not before five paying users
+- Stage 9 cadence engine: two-day build AFTER outcome write-back exists, premature before
+- Stage 8 full closing playbook: needs outcome data to be sharp; own-history lines in the brief are its v1 and ship in Phase 3
 
-**Known ingestion gaps:**
-- LinkedIn messages: deferred until extension ships. Manual paste via WrenCommand works for now.
-- Phone calls: Granola/Fathom integration deferred to Phase 4.
-- Texts: deferred. Lowest signal-to-effort ratio.
-- In-person meeting notes: manual paste via WrenCommand works.
+**Open operational items (not code)**
+- Privacy policy + ToS with AI-output liability clause + data deletion path: before user five, ideally before July
+- Supabase RLS audit: before user five
+- One-click full data export: promised publicly on the pricing page. The rows export; the trained ladder, voice layer, and outcome patterns do not. The moat survives the export.
+- Monthly one-hour competitive scan: watch Paraform building for its own network, sourcing startups drifting toward the desk.
 
-**Phase 3 — PWA (earliest day 30, only after ingestion is real and Tray is daily surface):**
-- Phone app with push notifications, voice input, voice output, swipe-to-act
-- Soccer-game test: open Wren on phone, see top 3 actions, act on one in under 10 seconds
-
-**Phase 4 — Google Workspace OAuth:**
-- Full Google OAuth: Gmail + Calendar + Meet transcripts in one auth flow
-- Proper version of Phase 2.5 email ingestion, replaces forwarding service
-- Granola or Fathom call transcript integration
-- Deal scorecard per candidate, close sequence generator, calibration view
-
-**What's next (immediate):**
-- **✅ Phase 4 sliced — Gmail send only (shipped 2026-05-13):** Foundation in place. Next validation: send a real submittal to a client from the Desk card.
-- **✅ Handler registry + card lifecycle reliability (shipped 2026-05-20):** 18 chip actions resolve inline. Five lifecycle fixes: add_fee auto-resolve, debrief extractor on ingest path, build_version ghost card prevention, P4-2 on proposed matches, forwarded name parse fix.
-- **✅ Agent loop cron fix (shipped 2026-05-28, commit d9157eb):** --max-time 65s + Vercel Pro. Loop should run cleanly under current data load.
-- **✅ /wren reactive conversation surface (shipped 2026-05-28, commit f18dce3):** Home route live. Multi-turn submittal refinement now possible. Working well in testing.
-- **Submittal as multi-turn collaboration:** Now unblocked by /wren. First serious test of the moat moment — recruiter iterates on a real submittal via conversation until it's right.
-- **Tier 2 chip wiring (partial fix gap, session 28):** prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter still has to find the action inside the panel. Future build: dedicated modals or wiring to existing prep/outreach surfaces.
-- **Card shape conversion pass (queued):** Audit every action card type for SaaS-shape buttons and convert to agent-shape drafts. Driven by friction log. Not a single build; a refactoring lens. Prioritize after friction data accumulates.
-  - *Audit prompt when this build comes up:* "Audit all action card types and classify each one as agent-shaped or SaaS-shaped. Agent-shaped = Wren noticed something, explains the senior recruiter move, drafts/proposes the action, and lets the recruiter approve/edit/reject. SaaS-shaped = asks the recruiter to navigate, log, configure, pick, or generate manually. Do not rewrite anything. Return a table: action_type, current card behavior, agent-shaped or SaaS-shaped, recommended one-motion action, priority."
-- **P4-3 (lower priority, open):** `intake_notes_ready` auto-upgrade on manual pipeline insert — fires only for manual "Add to a role" cases. See COLLISION_AUDIT.md.
-- **P4-4 (lower priority, open):** "Add to a role" button reliability — root cause still undiagnosed. Workaround: scroll to Pipeline section in candidate page.
-- **P4-5 (before beta):** `pipeline` table rename to `pipelines`. Audit all raw SQL before executing.
-- **Phase 2 completion (deferred until after Phase 2.5):** CandidateCard and RoleDetail strip-down. CF-1, CF-2, CF-4 open; CF-3 partial.
-- **Phase 3 (PWA):** Push notifications, voice, swipe-to-act. Earliest day 30, only after ingestion is real and Tray is daily surface.
-
-**Do not build:**
+**Do not build**
 - Team features, shared pipelines, assignments
 - New analytics or reporting surfaces
 - Any second recruiter's feature requests
