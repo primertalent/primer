@@ -309,7 +309,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
 
   // ── Active pipeline lookup (with role + client context for Outcome C) ────
   const { data: activePipelines } = await supabase
-    .from('pipeline')
+    .from('pipelines')
     .select('id, expected_comp, roles(id, title, notes, target_comp_min, target_comp_max, clients(id, name))')
     .eq('candidate_id', candidateId)
     .eq('recruiter_id', recruiterId)
@@ -349,7 +349,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       if (confidence >= 90) {
         // Dedup: unique constraint on (candidate_id, role_id) — check before insert.
         const { data: existingPipeline } = await supabase
-          .from('pipeline')
+          .from('pipelines')
           .select('id')
           .eq('candidate_id', candidateId)
           .eq('role_id', matchedRole.id)
@@ -358,7 +358,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         if (!existingPipeline) {
           const firstStage = matchedRole.process_steps?.[0] ?? 'Sourced'
           const { data: newPipeline, error: pipelineErr } = await supabase
-            .from('pipeline')
+            .from('pipelines')
             .insert({
               recruiter_id:  recruiterId,
               candidate_id:  candidateId,
@@ -401,7 +401,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       if (compResult) {
         try {
           await supabase
-            .from('pipeline')
+            .from('pipelines')
             .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
             .eq('id', pipelineId)
         } catch (err) {
@@ -519,7 +519,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     if (compResult) {
       try {
         await supabase
-          .from('pipeline')
+          .from('pipelines')
           .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
           .eq('id', pipeline.id)
       } catch (err) {
@@ -944,7 +944,7 @@ export default async function handler(req, res) {
     // ── Active pipeline lookup ───────────────────────────────────────────────
     // Build 1 heuristic: link to the most recently-updated active pipeline.
     const { data: activePipelines } = await supabase
-      .from('pipeline')
+      .from('pipelines')
       .select('id, updated_at')
       .eq('candidate_id', candidateId)
       .eq('recruiter_id', recruiterId)

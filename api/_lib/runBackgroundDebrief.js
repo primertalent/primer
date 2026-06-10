@@ -58,7 +58,7 @@ export async function runBackgroundDebrief({
 
     pipelineId
       ? supabase
-          .from('pipeline')
+          .from('pipelines')
           .select('id, current_stage, role_id, roles(id, title, clients(name))')
           .eq('id', pipelineId)
           .single()
@@ -126,7 +126,7 @@ export async function runBackgroundDebrief({
   if (pipelineId && debrief.next_action) {
     try {
       await supabase
-        .from('pipeline')
+        .from('pipelines')
         .update({ next_action: debrief.next_action })
         .eq('id', pipelineId)
     } catch (err) {

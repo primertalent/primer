@@ -151,7 +151,7 @@ export default async function handler(req, res) {
   // Set pipeline.submitted_at only on first send — it anchors the client-side
   // deal clock. Re-sends don't reset it; the interaction log captures those.
   if (pipeline_id) {
-    await supabase.from('pipeline')
+    await supabase.from('pipelines')
       .update({ submitted_at: now })
       .eq('id', pipeline_id)
       .is('submitted_at', null)

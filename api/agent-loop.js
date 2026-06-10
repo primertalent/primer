@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       recruiterIds = [scopedId]
     } else {
       const { data: pipelineRows, error: prErr } = await supabase
-        .from('pipeline')
+        .from('pipelines')
         .select('recruiter_id')
         .not('current_stage', 'in', '(placed,lost)')
       if (prErr) throw prErr

@@ -109,7 +109,7 @@ export async function matchCandidateWithConfidence(
 
   const [pipelineRes, interactionsRes] = await Promise.all([
     supabase
-      .from('pipeline')
+      .from('pipelines')
       .select('candidate_id, current_stage, status, updated_at, submitted_at')
       .in('candidate_id', candidateIds)
       .eq('recruiter_id', recruiterId)

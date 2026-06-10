@@ -16,7 +16,7 @@ const URGENCY_RANK = { now: 3, today: 2, this_week: 1 }
 export async function runLoopForRecruiter(recruiterId, sourceRunId) {
   // ── Pass 1: active pipeline + candidate + role + client ──
   const { data: pipelines, error: pErr } = await supabase
-    .from('pipeline')
+    .from('pipelines')
     .select(`
       id, current_stage, fit_score, next_action, next_action_due_at,
       expected_comp, submitted_at, last_followup_at,

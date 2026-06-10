@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
   // Never overwrite existing comp
   const { data: pipeline } = await supabase
-    .from('pipeline')
+    .from('pipelines')
     .select('expected_comp')
     .eq('id', pipeline_id)
     .eq('recruiter_id', recruiter.id)
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   if (compResult) {
     try {
       await supabase
-        .from('pipeline')
+        .from('pipelines')
         .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
         .eq('id', pipeline_id)
     } catch (err) {

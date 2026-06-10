@@ -604,7 +604,7 @@ async function toolGetCandidate({ candidate_id }, recruiter) {
     .limit(5)
 
   const { data: pipelines } = await supabase
-    .from('pipeline')
+    .from('pipelines')
     .select('id, current_stage, fit_score, expected_comp, roles(id, title, clients(name))')
     .eq('candidate_id', candidate_id)
     .eq('recruiter_id', recruiter.id)
@@ -635,7 +635,7 @@ async function toolGetRole({ role_id }, recruiter) {
     const roleIds = (clientRoles || []).map(r => r.id)
     if (roleIds.length > 0) {
       const { data: pipelines } = await supabase
-        .from('pipeline')
+        .from('pipelines')
         .select('id, candidates(first_name, last_name)')
         .in('role_id', roleIds)
         .eq('recruiter_id', recruiter.id)
@@ -1169,7 +1169,7 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
   if (!role) return { error: 'Role not found' }
 
   const { data: existing } = await supabase
-    .from('pipeline').select('id, current_stage')
+    .from('pipelines').select('id, current_stage')
     .eq('candidate_id', candidate_id).eq('role_id', role_id)
     .eq('recruiter_id', recruiter.id).maybeSingle()
 
@@ -1181,7 +1181,7 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
     return { action: 'already_exists', candidate_name: candidateName, role_title: roleTitle, company, stage: existing.current_stage }
   }
 
-  const { error } = await supabase.from('pipeline').insert({
+  const { error } = await supabase.from('pipelines').insert({
     recruiter_id: recruiter.id,
     candidate_id,
     role_id,
