@@ -5,16 +5,6 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Wren from './pages/Wren'
-import Desk from './pages/Desk'
-import CandidateCard from './pages/CandidateCard'
-import Roles from './pages/Roles'
-import CreateRole from './pages/CreateRole'
-import Candidates from './pages/Candidates'
-import CreateCandidate from './pages/CreateCandidate'
-import RoleDetail from './pages/RoleDetail'
-import EditRole from './pages/EditRole'
-import EditCandidate from './pages/EditCandidate'
-import CallMode from './pages/CallMode'
 import GoogleAuthCallback from './pages/GoogleAuthCallback'
 
 export default function App() {
@@ -28,21 +18,15 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
-          <Route path="/desk" element={<ProtectedRoute><Desk /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<Navigate to="/desk" replace />} />
-          <Route path="/network" element={<ProtectedRoute><Candidates /></ProtectedRoute>} />
-          <Route path="/network/new" element={<ProtectedRoute><CreateCandidate /></ProtectedRoute>} />
-          <Route path="/network/:id" element={<ProtectedRoute><CandidateCard /></ProtectedRoute>} />
-          <Route path="/network/:id/edit" element={<ProtectedRoute><EditCandidate /></ProtectedRoute>} />
-          <Route path="/network/:id/call" element={<ProtectedRoute><CallMode /></ProtectedRoute>} />
-          <Route path="/candidates" element={<Navigate to="/network" replace />} />
-          <Route path="/candidates/new" element={<Navigate to="/network/new" replace />} />
-          <Route path="/candidates/:id" element={<Navigate to="/network/:id" replace />} />
-          <Route path="/candidates/:id/edit" element={<Navigate to="/network/:id/edit" replace />} />
-          <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
-          <Route path="/roles/:id" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />
-          <Route path="/roles/:id/edit" element={<ProtectedRoute><EditRole /></ProtectedRoute>} />
-          <Route path="/roles/new" element={<ProtectedRoute><CreateRole /></ProtectedRoute>} />
+          {/* Legacy routes — redirect everything to /wren */}
+          <Route path="/desk" element={<Navigate to="/wren" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/wren" replace />} />
+          <Route path="/network" element={<Navigate to="/wren" replace />} />
+          <Route path="/network/*" element={<Navigate to="/wren" replace />} />
+          <Route path="/candidates" element={<Navigate to="/wren" replace />} />
+          <Route path="/candidates/*" element={<Navigate to="/wren" replace />} />
+          <Route path="/roles" element={<Navigate to="/wren" replace />} />
+          <Route path="/roles/*" element={<Navigate to="/wren" replace />} />
         </Routes>
         </AgentProvider>
       </AuthProvider>

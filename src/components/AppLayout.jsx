@@ -19,24 +19,6 @@ export default function AppLayout({ children, fullBleed = false }) {
           >
             Wren
           </NavLink>
-          <NavLink
-            to="/desk"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Desk
-          </NavLink>
-          <NavLink
-            to="/roles"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Deals
-          </NavLink>
-          <NavLink
-            to="/network"
-            className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-          >
-            Network
-          </NavLink>
         </nav>
         <button className="btn-ghost" onClick={signOut}>Sign out</button>
       </header>

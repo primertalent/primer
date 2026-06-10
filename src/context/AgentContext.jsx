@@ -121,54 +121,9 @@ export function AgentProvider({ children }) {
       handler(context)
       return
     }
-    const cid = context?.candidate_id
-    const rid = context?.role_id
-    const pid = context?.pipeline_id
-    switch (actionId) {
-      case 'screen_against_role':
-        if (cid) navigate(`/network/${cid}`, { state: { autoScreen: rid } })
-        break
-      case 'draft_submission':
-        if (cid) navigate(`/network/${cid}`)
-        break
-      case 'add_fee':
-        if (rid) navigate(`/roles/${rid}`)
-        break
-      case 'log_debrief':
-        if (cid) navigate(`/network/${cid}`, { state: { openDebrief: true } })
-        break
-      case 'log_interaction':
-        if (cid) navigate(`/network/${cid}`, { state: { openLog: true } })
-        break
-      case 'set_expected_comp':
-        if (cid) navigate(`/network/${cid}`, { state: { openCompFor: pid } })
-        break
-      case 'prep_for_interview':
-      case 'prep_call':
-        if (cid) navigate(`/network/${cid}`)
-        break
-      case 'draft_outreach':
-        if (cid) navigate(`/network/${cid}`)
-        break
-      case 'build_search_strings':
-        if (rid) navigate(`/roles/${rid}`)
-        break
-      case 'find_network_fits':
-        navigate(rid ? `/network?role=${rid}` : '/network')
-        break
-      case 'queue_follow_up':
-      case 'draft_urgency_note':
-        if (cid) navigate(`/network/${cid}`)
-        break
-      case 'draft_inbound_reply':
-        if (cid) navigate(`/network/${cid}`)
-        break
-      case 'match_candidate':
-        navigate('/network')
-        break
-      default:
-        break
-    }
+    // Navigation fallback — fires only when no page-level handler is registered.
+    // All chip actions are now handled inside the /wren conversation surface.
+    navigate('/wren')
   }, [navigate])
 
   const ephemeralCards = Object.values(ephemeralMap)
