@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import SignUp from './pages/SignUp'
 import Wren from './pages/Wren'
+import Landing from './pages/Landing'
 import GoogleAuthCallback from './pages/GoogleAuthCallback'
 
 export default function App() {
@@ -13,7 +14,7 @@ export default function App() {
       <AuthProvider>
         <AgentProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/wren" replace />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/wren" element={<ProtectedRoute><Wren /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
