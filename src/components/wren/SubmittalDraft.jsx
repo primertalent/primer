@@ -2,6 +2,15 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import GoogleConnectCard from './GoogleConnectCard'
 
+// Returns lines containing unresolved flag markers. Three variants: [NEEDS:, [NOT CAPTURED, [FLAG:
+function findUnresolvedFlags(text) {
+  return (text || '')
+    .split('\n')
+    .filter(line => /\[(?:NEEDS:|NOT CAPTURED|FLAG:)/i.test(line))
+    .map(line => line.trim())
+    .slice(0, 3)
+}
+
 export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent, onTokenRevoked }) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(isLatest)
@@ -12,6 +21,8 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
   const [sentAt, setSentAt] = useState(null)
   const [sendError, setSendError] = useState(null)
   const [tokenRevoked, setTokenRevoked] = useState(false)
+  const [flagWarning, setFlagWarning] = useState(false)
+  const [flagLines, setFlagLines] = useState([])
 
   // Sync expanded when isLatest changes (newer draft arriving collapses older ones)
   if (isLatest && !expanded) setExpanded(true)
@@ -22,10 +33,24 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
     setTimeout(() => setCopied(false), 2000)
   }
 
-  async function send() {
+  async function send(override = false) {
     if (!toEmail.trim() || sending) return
+
+    // Flag check on first click — show warning and require explicit second click.
+    // override is only set by the SEND ANYWAY button; it is never derivable from
+    // model output or ingested content (the send endpoint is not a tool).
+    if (!override) {
+      const found = findUnresolvedFlags(data.draft_text || '')
+      if (found.length > 0) {
+        setFlagLines(found)
+        setFlagWarning(true)
+        return
+      }
+    }
+
     setSending(true)
     setSendError(null)
+    setFlagWarning(false)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -50,11 +75,18 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
           pipeline_id:  data.pipeline_id  ?? null,
           candidate_id: data.candidate_id ?? null,
           user_approved: true,
+          override,
         }),
       })
 
       const result = await res.json()
 
+      if (result.error === 'unresolved_flags') {
+        setFlagLines(result.flags || [])
+        setFlagWarning(true)
+        setSending(false)
+        return
+      }
       if (result.error === 'google_token_revoked') {
         setTokenRevoked(true)
         setShowSendForm(false)
@@ -136,6 +168,32 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
               >
                 Cancel
               </button>
+            </div>
+          )}
+
+          {flagWarning && (
+            <div className="submittal-draft__flag-warning">
+              <span className="submittal-draft__flag-label">
+                {flagLines.length} unresolved {flagLines.length === 1 ? 'flag' : 'flags'} in this draft
+              </span>
+              {flagLines.map((line, i) => (
+                <div key={i} className="submittal-draft__flag-line">{line}</div>
+              ))}
+              <div className="submittal-draft__flag-actions">
+                <button
+                  className="submittal-draft__send-confirm"
+                  onClick={() => send(true)}
+                  disabled={sending}
+                >
+                  {sending ? 'Sending…' : 'SEND ANYWAY'}
+                </button>
+                <button
+                  className="submittal-draft__send-cancel"
+                  onClick={() => { setFlagWarning(false); setFlagLines([]) }}
+                >
+                  Go back
+                </button>
+              </div>
             </div>
           )}
 

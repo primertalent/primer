@@ -5040,6 +5040,38 @@ select.field-input {
   color: var(--accent);
 }
 
+.submittal-draft__flag-warning {
+  margin: 0 16px 12px;
+  border: 1px solid var(--hair-2);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.submittal-draft__flag-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.submittal-draft__flag-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.75;
+  padding-left: 8px;
+  border-left: 2px solid var(--hair-2);
+}
+
+.submittal-draft__flag-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .submittal-draft__connect-inline {
   flex: 1;
 }

@@ -134,9 +134,24 @@ export default async function handler(req, res) {
     }).eq('id', recruiter.id)
   }
 
-  const { to, subject, body, draft_id, pipeline_id, candidate_id } = req.body
+  const { to, subject, body, draft_id, pipeline_id, candidate_id, override } = req.body
   if (!to || !subject || !body) {
     return res.status(400).json({ error: 'missing_fields' })
+  }
+
+  // Server-side flag guard — real gate, client check is UX only.
+  // override: true is only set by the explicit SEND ANYWAY path in SubmittalDraft.jsx;
+  // nothing in the agent/tool path can reach this endpoint or construct override.
+  if (!override) {
+    const FLAG_RE = /\[(?:NEEDS:|NOT CAPTURED|FLAG:)/i
+    if (FLAG_RE.test(body) || FLAG_RE.test(subject)) {
+      const flags = [...(subject + '\n' + body).split('\n')]
+        .filter(line => FLAG_RE.test(line))
+        .map(line => line.trim())
+        .slice(0, 5)
+      console.warn('[gmail-send] blocked: unresolved flags in draft', flags)
+      return res.status(200).json({ error: 'unresolved_flags', flags })
+    }
   }
 
   // Send via Gmail REST API
