@@ -27,6 +27,17 @@ function stripDocumentBlocks(text) {
   return (text || '').replace(/<document[^>]*>[\s\S]*?<\/document>/g, '').trim()
 }
 
+// Remove stray markdown syntax from Wren's conversational text. Conservative:
+// only strips paired markers and leading header tokens — never reflows content,
+// so a lone ** in pasted comp notes degrades to literal ** rather than mangling.
+function stripMarkdown(text) {
+  return (text || '')
+    .replace(/\*\*(.*?)\*\*/gs, '$1')  // **bold** → bold (paired only)
+    .replace(/__(.*?)__/gs, '$1')       // __bold__ → bold (paired only)
+    .replace(/^#{1,6} /gm, '')          // ## Header → Header
+    .replace(/`([^`\n]+)`/g, '$1')      // `code` → code (single-line only)
+}
+
 export default function Wren() {
   const { recruiter } = useRecruiter()
   const [conversationId, setConversationId] = useState(null)
@@ -236,7 +247,7 @@ export default function Wren() {
     const isUser = msg.role === 'user'
     // Strip document blocks from user messages — raw content goes to server, thread stays readable
     const rawText = msg.content?.text || ''
-    const text = isUser ? stripDocumentBlocks(rawText) : rawText
+    const text = isUser ? stripDocumentBlocks(rawText) : stripMarkdown(rawText)
     const renders = msg.content?.renders || msg.renders || []
 
     return (
@@ -306,7 +317,7 @@ export default function Wren() {
             <div className="wren-msg wren-msg--wren wren-msg--streaming">
               <div className="wren-msg__label">WREN</div>
               {streamingMsg.text && (
-                <div className="wren-msg__text">{streamingMsg.text}</div>
+                <div className="wren-msg__text">{stripMarkdown(streamingMsg.text)}</div>
               )}
               {streamingMsg.renders.map((r, i) => {
                 if (r.tool === 'screen_candidate') {
