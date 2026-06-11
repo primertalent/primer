@@ -6427,3 +6427,73 @@ select.field-input {
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* ── GoogleConnectCard ───────────────────────────────────── */
+
+.google-connect-card {
+  border: 1px solid var(--hair-2);
+  background: var(--panel);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.google-connect-card__text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+  flex: 1;
+  margin: 0;
+}
+
+.google-connect-card__btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--ink);
+  color: var(--ink-inverse);
+  border: none;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.google-connect-card__btn:hover {
+  background: var(--mute);
+}
+
+/* ── Gmail hint affordance (input bar) ───────────────────── */
+
+.wren-gmail-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 40px;
+  background: var(--panel);
+  border-top: 1px solid var(--hair);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+}
+
+.wren-gmail-hint__connect {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

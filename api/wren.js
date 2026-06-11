@@ -117,10 +117,12 @@ export default async function handler(req, res) {
 
   const { data: recruiter, error: rErr } = await supabase
     .from('recruiters')
-    .select('id, full_name, email')
+    .select('id, full_name, email, gmail_access_token')
     .eq('user_id', user.id)
     .single()
   if (rErr || !recruiter) return res.status(401).json({ error: 'No recruiter profile' })
+
+  const gmailConnected = !!recruiter.gmail_access_token
 
   const { conversation_id, message } = req.body
   if (!message?.trim()) return res.status(400).json({ error: 'message required' })
@@ -159,7 +161,7 @@ export default async function handler(req, res) {
     // Bound to last 10 turn groups (9 complete prior turns + current open turn)
     const bounded = boundHistory(rawHistory || [])
     const apiMessages = buildApiMessages(bounded)
-    const system = buildWrenAgentSystem(recruiter)
+    const system = buildWrenAgentSystem(recruiter, { gmailConnected })
     const tools = getToolDefinitions()
 
     // Candidate IDs mentioned in prior turns — used for salience scoring in confidence matching
@@ -453,6 +455,11 @@ function getToolDefinitions() {
         required: ['notes_text'],
       },
     },
+    {
+      name: 'connect_google',
+      description: 'Surface the Gmail connect UI. Call this when Gmail is not connected and the recruiter asks about sending email, connecting Gmail, or connecting Google. Do not call if Gmail is already connected.',
+      input_schema: { type: 'object', properties: {} },
+    },
   ]
 }
 
@@ -469,6 +476,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'add_to_pipeline':   return toolAddToPipeline(input, recruiter)
     case 'ingest_input':     return toolIngestInput(input, recruiter, convContext)
     case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
+    case 'connect_google':   return { action: 'connect', connected: false }
     default:                 return { error: `Unknown tool: ${name}` }
   }
 }

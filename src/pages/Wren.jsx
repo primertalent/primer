@@ -3,9 +3,22 @@ import AppLayout from '../components/AppLayout'
 import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
 import IngestResult from '../components/wren/IngestResult'
+import GoogleConnectCard from '../components/wren/GoogleConnectCard'
 import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
+
+function initiateGoogleOAuth() {
+  const params = new URLSearchParams({
+    client_id:     import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID,
+    redirect_uri:  `${window.location.origin}/auth/google/callback`,
+    response_type: 'code',
+    scope:         'https://www.googleapis.com/auth/gmail.send',
+    access_type:   'offline',
+    prompt:        'consent',
+  })
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+}
 
 // Strip <document type="paste">...</document> blocks for display — raw content
 // is sent to the server but never shown in the thread.
@@ -36,6 +49,20 @@ export default function Wren() {
     const el = threadRef.current
     requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
   }, [messages, streamingMsg])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google_connected') === '1') {
+      window.history.replaceState({}, '', '/wren')
+      setMessages(prev => [...prev, {
+        id: 'google-connected-' + Date.now(),
+        role: 'assistant',
+        content: { type: 'text', text: 'Gmail connected. Approved submittals can now be sent directly from your inbox.' },
+        created_at: new Date().toISOString(),
+        _local: true,
+      }])
+    }
+  }, [])
 
   async function loadMostRecentConversation() {
     const { data: conv } = await supabase
@@ -225,6 +252,9 @@ export default function Wren() {
           if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
             return <IngestResult key={i} data={r.data} />
           }
+          if (r.tool === 'connect_google') {
+            return <GoogleConnectCard key={i} />
+          }
           return null
         })}
       </div>
@@ -262,6 +292,9 @@ export default function Wren() {
                 if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
                   return <IngestResult key={i} data={r.data} />
                 }
+                if (r.tool === 'connect_google') {
+                  return <GoogleConnectCard key={i} />
+                }
                 return null
               })}
               {streamingMsg.error && (
@@ -276,6 +309,14 @@ export default function Wren() {
           )}
         </div>
 
+        {recruiter && !recruiter.gmail_access_token && (
+          <div className="wren-gmail-hint">
+            <span>Gmail not connected</span>
+            <button className="wren-gmail-hint__connect" onClick={initiateGoogleOAuth}>
+              Connect
+            </button>
+          </div>
+        )}
         <div className="wren-input-bar">
           {pendingPaste && (
             <div className="wren-chips">

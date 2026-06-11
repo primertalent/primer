@@ -27,7 +27,7 @@ export default function GoogleAuthCallback() {
       // Google returned an error (e.g. user denied access)
       if (error || !code) {
         console.warn('[GoogleAuthCallback] OAuth denied or missing code:', error)
-        navigate('/desk')
+        navigate('/wren')
         return
       }
 
@@ -53,7 +53,7 @@ export default function GoogleAuthCallback() {
         console.error('[GoogleAuthCallback] fetch error:', err)
       }
 
-      navigate('/desk')
+      navigate('/wren?google_connected=1')
     }
 
     handleCallback()
