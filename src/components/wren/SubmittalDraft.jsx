@@ -157,7 +157,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
               />
               <button
                 className="submittal-draft__send-confirm"
-                onClick={send}
+                onClick={() => send()}
                 disabled={!toEmail.trim() || sending}
               >
                 {sending ? 'Sending…' : 'SEND'}
