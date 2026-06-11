@@ -370,6 +370,13 @@ async function runAgentLoop(initialMessages, system, tools, recruiter, res, conv
         assistant: finalMsg.content,  // tool_use blocks (+ any pre-call text)
         user: truncatedResults,       // tool_result blocks with trimmed payloads
       })
+
+      // Inject newline between iterations so pre-tool preamble and post-tool
+      // text don't run together when the next iteration emits text immediately.
+      if (iterText.trim()) {
+        fullText += '\n'
+        sse(res, 'text', { text: '\n' })
+      }
     } else {
       // Unexpected stop reason — capture text and exit
       if (iterText) toolSteps.push({ type: 'final', text: iterText })

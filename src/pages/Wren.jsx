@@ -38,6 +38,22 @@ function sanitizeDashes(text) {
     .replace(/[‒–—―]/g, ' - ')
 }
 
+// Client-side mirror of the server-side sanitizeRenderData in api/wren.js.
+// Applied to tool_result payloads before storing in accRenders so streaming
+// and in-memory renders are clean without waiting for a page reload.
+function sanitizeRenderData(data) {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data)) return data.map(item => typeof item === 'string' ? sanitizeDashes(item) : sanitizeRenderData(item))
+  const out = {}
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === 'string') out[k] = sanitizeDashes(v)
+    else if (Array.isArray(v)) out[k] = v.map(item => typeof item === 'string' ? sanitizeDashes(item) : sanitizeRenderData(item))
+    else if (v && typeof v === 'object') out[k] = sanitizeRenderData(v)
+    else out[k] = v
+  }
+  return out
+}
+
 // Remove stray markdown syntax from Wren's conversational text. Conservative:
 // only strips paired markers and leading header tokens — never reflows content,
 // so a lone ** in pasted comp notes degrades to literal ** rather than mangling.
@@ -214,7 +230,7 @@ export default function Wren() {
             accText += payload.text
             setStreamingMsg({ text: sanitizeDashes(accText), renders: accRenders })
           } else if (evtType === 'tool_result') {
-            accRenders = [...accRenders, { tool: payload.tool, data: payload.data }]
+            accRenders = [...accRenders, { tool: payload.tool, data: sanitizeRenderData(payload.data) }]
             setStreamingMsg({ text: sanitizeDashes(accText), renders: accRenders })
           } else if (evtType === 'done') {
             const finalMsg = {
@@ -258,6 +274,7 @@ export default function Wren() {
   }
 
   function renderMessage(msg, draftSeenRef, totalDrafts) {
+    if (msg.content?.type === 'turn_steps') return null
     const isUser = msg.role === 'user'
     // Strip document blocks from user messages — raw content goes to server, thread stays readable
     const rawText = msg.content?.text || ''
