@@ -247,7 +247,21 @@ export default function Wren() {
           if (r.tool === 'draft_submittal') {
             draftSeenRef.current++
             const isLatest = draftSeenRef.current === totalDrafts
-            return <SubmittalDraft key={i} data={r.data} isLatest={isLatest} />
+            return <SubmittalDraft
+              key={i}
+              data={r.data}
+              isLatest={isLatest}
+              gmailConnected={!!recruiter?.gmail_access_token}
+              onSent={(to, ts) => {
+                setMessages(prev => [...prev, {
+                  id: 'send-confirm-' + Date.now(),
+                  role: 'assistant',
+                  content: { type: 'text', text: `Sent to ${to} at ${ts}. Logged to your interactions.` },
+                  created_at: new Date().toISOString(),
+                  _local: true,
+                }])
+              }}
+            />
           }
           if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
             return <IngestResult key={i} data={r.data} />
@@ -287,7 +301,7 @@ export default function Wren() {
                 }
                 if (r.tool === 'draft_submittal') {
                   draftSeenRef.current++
-                  return <SubmittalDraft key={i} data={r.data} isLatest={true} />
+                  return <SubmittalDraft key={i} data={r.data} isLatest={true} gmailConnected={false} />
                 }
                 if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
                   return <IngestResult key={i} data={r.data} />

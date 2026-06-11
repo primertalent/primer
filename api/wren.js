@@ -774,17 +774,36 @@ async function toolDraftSubmittal({ role_id, candidate_id, resume_text, mode = '
   })
 
   const draft_text = aiRes.content[0]?.text ?? ''
+
+  // Look up the active pipeline entry so the send endpoint can stamp submitted_at
+  let pipeline_id = null
+  if (candidate_id && role_id && !candidateData._from_paste) {
+    const { data: pl } = await supabase
+      .from('pipelines')
+      .select('id')
+      .eq('candidate_id', candidate_id)
+      .eq('role_id', role_id)
+      .eq('recruiter_id', recruiter.id)
+      .not('current_stage', 'in', '(placed,lost)')
+      .maybeSingle()
+    pipeline_id = pl?.id ?? null
+  }
+
   return {
     draft_text,
     mode,
     format,
     from_paste: !!candidateData._from_paste,
+    candidate_id: candidate_id ?? null,
+    role_id,
+    pipeline_id,
     candidate_name: candidateData._from_paste
       ? null
       : `${candidateData.first_name} ${candidateData.last_name}`,
     role_title: roleData.title,
     client_name: roleData.clients?.name,
     is_revision: !!(revision_instruction && prior_draft),
+    gmail_connected: !!recruiter.gmail_access_token,
     // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
     suggest_pipeline: !candidateData._from_paste && !!candidate_id,
   }

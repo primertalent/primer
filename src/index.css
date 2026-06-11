@@ -4916,6 +4916,123 @@ select.field-input {
   padding: 0 10px;
 }
 
+.submittal-draft__sent {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--win);
+  margin-left: auto;
+}
+
+/* Action buttons — primary (ink fill) and secondary (hairline) */
+.submittal-draft__action-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: none;
+  color: var(--ink);
+  border: 1px solid var(--hair-2);
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.submittal-draft__action-btn:hover {
+  background: var(--chip);
+}
+
+.submittal-draft__action-btn--primary {
+  background: var(--ink);
+  color: var(--ink-inverse);
+  border-color: var(--ink);
+}
+
+.submittal-draft__action-btn--primary:hover {
+  background: var(--mute);
+  border-color: var(--mute);
+}
+
+/* Send form — recipient input */
+.submittal-draft__send-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--hair);
+  background: var(--bg);
+}
+
+.submittal-draft__send-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+  flex-shrink: 0;
+}
+
+.submittal-draft__send-input {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.submittal-draft__send-input:focus {
+  border-color: var(--ink);
+}
+
+.submittal-draft__send-confirm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--ink);
+  color: var(--ink-inverse);
+  border: none;
+  padding: 0 14px;
+  height: 32px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.submittal-draft__send-confirm:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.submittal-draft__send-cancel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: none;
+  color: var(--mute);
+  border: none;
+  padding: 0 8px;
+  height: 32px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.submittal-draft__send-error {
+  padding: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.submittal-draft__connect-inline {
+  flex: 1;
+}
+
 /* ── IngestResult inline component ──────────────────────── */
 /* Rule 1: border-radius 0. Rule 4: action label = mono, summary = inherited ink. */
 /* Rule 2: no box-shadow. Rule 5: no emoji (icons live in Chip.jsx as SVG). */
