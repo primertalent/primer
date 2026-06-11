@@ -27,8 +27,9 @@ function stripDocumentBlocks(text) {
   return (text || '').replace(/<document[^>]*>[\s\S]*?<\/document>/g, '').trim()
 }
 
-// Dash sanitizer — mirrors the server-side version in api/wren.js.
-// Applied at render so historical rows (persisted before this fix) also clean up.
+// Dash sanitizer — explicit \u escapes to guarantee correct matching regardless
+// of how the bundler handles the source file encoding.
+// U+2012 figure dash, U+2013 en dash, U+2014 em dash, U+2015 horizontal bar.
 function sanitizeDashes(text) {
   if (!text) return text
   return text
@@ -211,10 +212,10 @@ export default function Wren() {
             setConversationId(convId)
           } else if (evtType === 'text') {
             accText += payload.text
-            setStreamingMsg({ text: accText, renders: accRenders })
+            setStreamingMsg({ text: sanitizeDashes(accText), renders: accRenders })
           } else if (evtType === 'tool_result') {
             accRenders = [...accRenders, { tool: payload.tool, data: payload.data }]
-            setStreamingMsg({ text: accText, renders: accRenders })
+            setStreamingMsg({ text: sanitizeDashes(accText), renders: accRenders })
           } else if (evtType === 'done') {
             const finalMsg = {
               id: payload.message_id || crypto.randomUUID(),
