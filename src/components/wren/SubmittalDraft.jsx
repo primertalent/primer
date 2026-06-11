@@ -35,7 +35,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
       const subject = [
         data.candidate_name || 'Candidate',
         data.role_title || 'Role',
-      ].join(' – ')
+      ].join(' - ')
 
       const res = await fetch('/api/gmail-send', {
         method: 'POST',

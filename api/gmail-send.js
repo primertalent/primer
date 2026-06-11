@@ -19,12 +19,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Encode non-ASCII subject text per RFC 2047 (UTF-8 base64 form).
+// ASCII-only subjects pass through unchanged; anything with accented chars
+// or Unicode punctuation is wrapped as =?UTF-8?B?...?= so SMTP relays
+// and Gmail decode it correctly.
+function rfc2047Subject(subject) {
+  if (!/[^\x00-\x7F]/.test(subject)) return subject
+  return `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`
+}
+
 // Build an RFC 2822 message and base64url-encode it for the Gmail API.
 function buildRaw({ from, to, subject, body }) {
   const msg = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${rfc2047Subject(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     '',
