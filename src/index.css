@@ -5033,6 +5033,20 @@ select.field-input {
   flex: 1;
 }
 
+.submittal-draft__revoked {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--hair);
+}
+
+.submittal-draft__revoked-msg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
 /* ── IngestResult inline component ──────────────────────── */
 /* Rule 1: border-radius 0. Rule 4: action label = mono, summary = inherited ink. */
 /* Rule 2: no box-shadow. Rule 5: no emoji (icons live in Chip.jsx as SVG). */

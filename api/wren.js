@@ -457,7 +457,7 @@ function getToolDefinitions() {
     },
     {
       name: 'connect_google',
-      description: 'Surface the Gmail connect UI. Call this when Gmail is not connected and the recruiter asks about sending email, connecting Gmail, or connecting Google. Do not call if Gmail is already connected.',
+      description: 'Surface the Gmail connect UI. Call this when the recruiter asks about sending email, connecting Gmail, or connecting Google — including when their access was revoked and they need to reconnect.',
       input_schema: { type: 'object', properties: {} },
     },
   ]

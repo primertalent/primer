@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import GoogleConnectCard from './GoogleConnectCard'
 
-export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent }) {
+export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent, onTokenRevoked }) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(isLatest)
   const [actionsHeld, setActionsHeld] = useState(false)
@@ -11,6 +11,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent 
   const [sending, setSending] = useState(false)
   const [sentAt, setSentAt] = useState(null)
   const [sendError, setSendError] = useState(null)
+  const [tokenRevoked, setTokenRevoked] = useState(false)
 
   // Sync expanded when isLatest changes (newer draft arriving collapses older ones)
   if (isLatest && !expanded) setExpanded(true)
@@ -54,8 +55,15 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent 
 
       const result = await res.json()
 
+      if (result.error === 'google_token_revoked') {
+        setTokenRevoked(true)
+        setShowSendForm(false)
+        setSending(false)
+        if (onTokenRevoked) onTokenRevoked()
+        return
+      }
       if (result.error === 'auth_required') {
-        setSendError('Gmail token expired — reconnect Google and try again.')
+        setSendError('Gmail not connected — use the Connect button below.')
         setSending(false)
         return
       }
@@ -75,7 +83,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent 
     }
   }
 
-  const canSend = gmailConnected ?? data.gmail_connected
+  const canSend = !tokenRevoked && (gmailConnected ?? data.gmail_connected)
 
   return (
     <div className={`submittal-draft${isLatest ? '' : ' submittal-draft--collapsed'}`}>
@@ -135,8 +143,20 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent 
             <div className="submittal-draft__send-error">{sendError}</div>
           )}
 
+          {/* Revocation notice — replaces action row when token is cleared */}
+          {isLatest && tokenRevoked && (
+            <div className="submittal-draft__revoked">
+              <span className="submittal-draft__revoked-msg">
+                Google access was revoked. Reconnect to send.
+              </span>
+              <div className="submittal-draft__connect-inline">
+                <GoogleConnectCard />
+              </div>
+            </div>
+          )}
+
           {/* Action row */}
-          {isLatest && !actionsHeld && !sentAt && (
+          {isLatest && !actionsHeld && !sentAt && !tokenRevoked && (
             <div className="submittal-draft__actions">
               <button className="btn-ghost submittal-draft__copy" onClick={copy}>
                 {copied ? 'Copied' : 'Copy'}

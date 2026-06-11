@@ -34,6 +34,7 @@ export default function Wren() {
   const [pendingPaste, setPendingPaste] = useState(null) // { text, label }
   const [streaming, setStreaming] = useState(false)
   const [streamingMsg, setStreamingMsg] = useState(null)
+  const [gmailTokenRevoked, setGmailTokenRevoked] = useState(false)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const loadedRef = useRef(false)
@@ -54,6 +55,7 @@ export default function Wren() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('google_connected') === '1') {
       window.history.replaceState({}, '', '/wren')
+      setGmailTokenRevoked(false)
       setMessages(prev => [...prev, {
         id: 'google-connected-' + Date.now(),
         role: 'assistant',
@@ -251,12 +253,22 @@ export default function Wren() {
               key={i}
               data={r.data}
               isLatest={isLatest}
-              gmailConnected={!!recruiter?.gmail_access_token}
+              gmailConnected={!!recruiter?.gmail_access_token && !gmailTokenRevoked}
               onSent={(to, ts) => {
                 setMessages(prev => [...prev, {
                   id: 'send-confirm-' + Date.now(),
                   role: 'assistant',
                   content: { type: 'text', text: `Sent to ${to} at ${ts}. Logged to your interactions.` },
+                  created_at: new Date().toISOString(),
+                  _local: true,
+                }])
+              }}
+              onTokenRevoked={() => {
+                setGmailTokenRevoked(true)
+                setMessages(prev => [...prev, {
+                  id: 'token-revoked-' + Date.now(),
+                  role: 'assistant',
+                  content: { type: 'text', text: 'Google access was revoked. Reconnect below to resume sending.' },
                   created_at: new Date().toISOString(),
                   _local: true,
                 }])
@@ -323,7 +335,7 @@ export default function Wren() {
           )}
         </div>
 
-        {recruiter && !recruiter.gmail_access_token && (
+        {recruiter && (!recruiter.gmail_access_token || gmailTokenRevoked) && (
           <div className="wren-gmail-hint">
             <span>Gmail not connected</span>
             <button className="wren-gmail-hint__connect" onClick={initiateGoogleOAuth}>

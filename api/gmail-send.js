@@ -6,9 +6,10 @@
  * marks draft sent → logs outbound interaction → sets pipeline.submitted_at
  * on first send only.
  *
- * Returns { success: true } or { error: 'auth_required' | 'send_failed' | ... }
- * auth_required: Gmail not connected or refresh failed — frontend initiates OAuth.
- * send_failed:   Gmail API rejected the message — card stays, toast shows.
+ * Returns { success: true } or { error: 'auth_required' | 'google_token_revoked' | 'send_failed' | ... }
+ * auth_required:        Gmail not connected at all — recruiter needs to run OAuth flow.
+ * google_token_revoked: Access was revoked at Google — token cleared, reconnect needed.
+ * send_failed:          Gmail API rejected the message — card stays, toast shows.
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -50,6 +51,26 @@ async function refreshAccessToken(refreshToken) {
   return res.json()
 }
 
+// Wipe all three token columns — called when access is definitively revoked.
+async function clearGmailTokens(supabase, recruiterId) {
+  await supabase.from('recruiters').update({
+    gmail_access_token:  null,
+    gmail_refresh_token: null,
+    gmail_token_expiry:  null,
+  }).eq('id', recruiterId)
+}
+
+function doGmailSend(accessToken, raw) {
+  return fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw }),
+  })
+}
+
 export const config = { maxDuration: 30 }
 
 export default async function handler(req, res) {
@@ -79,17 +100,24 @@ export default async function handler(req, res) {
   let accessToken = recruiter.gmail_access_token
   const tokenExpiry = recruiter.gmail_token_expiry ? new Date(recruiter.gmail_token_expiry) : null
   const needsRefresh = !tokenExpiry || tokenExpiry < new Date(Date.now() + 60_000)
+  let didRefresh = false
 
   if (needsRefresh) {
     if (!recruiter.gmail_refresh_token) return res.status(200).json({ error: 'auth_required' })
 
     const refreshed = await refreshAccessToken(recruiter.gmail_refresh_token)
+    if (refreshed.error === 'invalid_grant') {
+      // Definitively revoked — clear token row so the hint updates on next load.
+      await clearGmailTokens(supabase, recruiter.id)
+      return res.status(200).json({ error: 'google_token_revoked' })
+    }
     if (refreshed.error) {
       console.warn('[gmail-send] token refresh failed:', refreshed.error)
       return res.status(200).json({ error: 'auth_required' })
     }
 
     accessToken = refreshed.access_token
+    didRefresh = true
     const newExpiry = new Date(Date.now() + (refreshed.expires_in ?? 3600) * 1000).toISOString()
     await supabase.from('recruiters').update({
       gmail_access_token: accessToken,
@@ -104,18 +132,39 @@ export default async function handler(req, res) {
 
   // Send via Gmail REST API
   const raw = buildRaw({ from: recruiter.email, to, subject, body })
-  const gmailRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ raw }),
-  })
+  let gmailRes = await doGmailSend(accessToken, raw)
+
+  // 401 on send with a fresh (or still-valid) token: stale access token edge case.
+  // Attempt one refresh before declaring revocation.
+  if (gmailRes.status === 401 && !didRefresh) {
+    if (!recruiter.gmail_refresh_token) {
+      await clearGmailTokens(supabase, recruiter.id)
+      return res.status(200).json({ error: 'google_token_revoked' })
+    }
+    const refreshed = await refreshAccessToken(recruiter.gmail_refresh_token)
+    if (refreshed.error === 'invalid_grant') {
+      await clearGmailTokens(supabase, recruiter.id)
+      return res.status(200).json({ error: 'google_token_revoked' })
+    }
+    if (refreshed.error) {
+      console.warn('[gmail-send] retry refresh failed:', refreshed.error)
+      return res.status(200).json({ error: 'auth_required' })
+    }
+    accessToken = refreshed.access_token
+    await supabase.from('recruiters').update({
+      gmail_access_token: accessToken,
+      gmail_token_expiry: new Date(Date.now() + (refreshed.expires_in ?? 3600) * 1000).toISOString(),
+    }).eq('id', recruiter.id)
+    gmailRes = await doGmailSend(accessToken, raw)
+  }
 
   if (!gmailRes.ok) {
+    if (gmailRes.status === 401) {
+      // Still 401 after refresh — definitively revoked.
+      await clearGmailTokens(supabase, recruiter.id)
+      return res.status(200).json({ error: 'google_token_revoked' })
+    }
     const gmailErr = await gmailRes.json().catch(() => ({}))
-    if (gmailRes.status === 401) return res.status(200).json({ error: 'auth_required' })
     console.error('[gmail-send] Gmail API error:', gmailErr)
     return res.status(200).json({
       error:  'send_failed',
