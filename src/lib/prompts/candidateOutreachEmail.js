@@ -1,4 +1,5 @@
 import { buildVoiceBlock, buildRuleZero } from './voiceRules.js'
+import { VOICE_CONTRACT } from './voiceContract.js'
 
 // voiceSamples: optional [{ channel, subject, body }] from voice_samples table.
 // Desk callers pass only (candidate, role) — voiceSamples defaults to [] and voice rules still apply.
@@ -42,6 +43,8 @@ Client: ${role.clients?.name ?? 'Unknown'}${
   const prompt = `You are an outreach email specialist writing cold recruiting emails in a specific recruiter's voice.
 
 ${ruleZero}
+
+${VOICE_CONTRACT}
 
 ${voiceBlock}
 

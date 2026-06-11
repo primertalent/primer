@@ -24,6 +24,40 @@ function sse(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 }
 
+// Deterministic dash sanitizer — applied to all model-generated text before persist.
+// Rules (spec order):
+//   bounded (no spaces around): 2024–2025 → 2024-2025
+//   spaced: 9/10 — recommend → 9/10, recommend
+//   any remaining → ' - '
+// Unicode: U+2012 figure dash, U+2013 en dash, U+2014 em dash, U+2015 horizontal bar.
+const DASHES = /[‒–—―]/g
+
+function sanitizeDashes(text) {
+  if (typeof text !== 'string') return text
+  return text
+    .replace(/(\S)[‒–—―](\S)/g, '$1-$2')
+    .replace(/ [‒–—―] /g, ', ')
+    .replace(DASHES, ' - ')
+}
+
+// Walk all string values in a render data object so the sanitizer covers
+// screen result fields (career_trajectory, recommendation_reason, etc.)
+// as well as draft_text — regardless of which prompt produced them.
+function sanitizeRenderData(data) {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data)) {
+    return data.map(item => typeof item === 'string' ? sanitizeDashes(item) : sanitizeRenderData(item))
+  }
+  const out = {}
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === 'string') out[k] = sanitizeDashes(v)
+    else if (Array.isArray(v)) out[k] = v.map(item => typeof item === 'string' ? sanitizeDashes(item) : sanitizeRenderData(item))
+    else if (v && typeof v === 'object') out[k] = sanitizeRenderData(v)
+    else out[k] = v
+  }
+  return out
+}
+
 function parseName(fullName) {
   const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
   return {
@@ -172,6 +206,13 @@ export default async function handler(req, res) {
     // Tool threw mid-loop — error already sent and stream already closed
     if (_errorSent) return
 
+    // Sanitize model output before persist — removes em/en dashes from all text
+    // fields in both conversational text and render data (covers draft_text, screen
+    // result fields like recommendation_reason, career_trajectory, etc.).
+    // User messages are never touched — only the model-generated side of the turn.
+    const persistText = sanitizeDashes(fullText)
+    const persistRenders = renders.map(r => ({ tool: r.tool, data: sanitizeRenderData(r.data) }))
+
     // Save tool steps before the final message so created_at ordering is preserved
     if (toolSteps.length > 0) {
       await supabase.from('conversation_messages').insert({
@@ -188,7 +229,7 @@ export default async function handler(req, res) {
         conversation_id: convId,
         recruiter_id: recruiter.id,
         role: 'assistant',
-        content: { type: 'message', text: fullText, renders },
+        content: { type: 'message', text: persistText, renders: persistRenders },
       })
       .select('id')
       .single()

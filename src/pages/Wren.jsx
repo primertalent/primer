@@ -27,15 +27,28 @@ function stripDocumentBlocks(text) {
   return (text || '').replace(/<document[^>]*>[\s\S]*?<\/document>/g, '').trim()
 }
 
+// Dash sanitizer — mirrors the server-side version in api/wren.js.
+// Applied at render so historical rows (persisted before this fix) also clean up.
+function sanitizeDashes(text) {
+  if (!text) return text
+  return text
+    .replace(/(\S)[‒–—―](\S)/g, '$1-$2')
+    .replace(/ [‒–—―] /g, ', ')
+    .replace(/[‒–—―]/g, ' - ')
+}
+
 // Remove stray markdown syntax from Wren's conversational text. Conservative:
 // only strips paired markers and leading header tokens — never reflows content,
 // so a lone ** in pasted comp notes degrades to literal ** rather than mangling.
+// Also sanitizes dashes so historical rows (pre-fix) clean up at render time.
 function stripMarkdown(text) {
-  return (text || '')
-    .replace(/\*\*(.*?)\*\*/gs, '$1')  // **bold** → bold (paired only)
-    .replace(/__(.*?)__/gs, '$1')       // __bold__ → bold (paired only)
-    .replace(/^#{1,6} /gm, '')          // ## Header → Header
-    .replace(/`([^`\n]+)`/g, '$1')      // `code` → code (single-line only)
+  return sanitizeDashes(
+    (text || '')
+      .replace(/\*\*(.*?)\*\*/gs, '$1')  // **bold** → bold (paired only)
+      .replace(/__(.*?)__/gs, '$1')       // __bold__ → bold (paired only)
+      .replace(/^#{1,6} /gm, '')          // ## Header → Header
+      .replace(/`([^`\n]+)`/g, '$1')      // `code` → code (single-line only)
+  )
 }
 
 export default function Wren() {

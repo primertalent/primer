@@ -1,4 +1,5 @@
 import { buildVoiceBlock, buildRuleZero } from './voiceRules.js'
+import { VOICE_CONTRACT } from './voiceContract.js'
 
 // ─── /wren two-surface submittal ─────────────────────────────────────────────
 // Used exclusively by api/wren.js. Desk pages use buildSubmissionMessages below.
@@ -31,6 +32,8 @@ function buildInternalBreakdownMessages(candidate, role, fitScore, voiceSamples)
   const prompt = `You are a technical recruiter producing an internal candidate breakdown before deciding whether to submit.
 
 ${ruleZero}
+
+${VOICE_CONTRACT}
 
 ${voiceBlock}
 
@@ -83,6 +86,8 @@ function buildExternalSubmittalMessages(candidate, role, fitScore, format, resol
   const prompt = `You are an expert technical recruiter writing a candidate submission for a hiring manager.
 
 ${ruleZero}
+
+${VOICE_CONTRACT}
 
 ${voiceBlock}
 
@@ -143,7 +148,7 @@ function buildCandidateSection(candidate) {
 
   const timelineSection = candidate.career_timeline?.length
     ? `\nCareer timeline:\n${candidate.career_timeline
-        .map(e => `– ${e.title} at ${e.company} (${e.start} – ${e.end ?? 'Present'})${
+        .map(e => `– ${e.title} at ${e.company} (${e.start}-${e.end ?? 'Present'})${
           e.achievements?.length ? '\n  Achievements: ' + e.achievements.join(' | ') : ''
         }`)
         .join('\n')}`
@@ -190,7 +195,7 @@ export function buildSubmissionMessages(candidate, role, fitScore, format = 'ema
 
   const timelineSection = candidate.career_timeline?.length
     ? `\nCAREER TIMELINE (parsed):\n${candidate.career_timeline
-        .map(e => `- ${e.title} at ${e.company} (${e.start} – ${e.end ?? 'Present'})${
+        .map(e => `- ${e.title} at ${e.company} (${e.start}-${e.end ?? 'Present'})${
           e.achievements?.length ? '\n  Achievements: ' + e.achievements.join(' | ') : ''
         }`)
         .join('\n')}`
@@ -271,7 +276,7 @@ function formatComp(min, max, type) {
   if (!min && !max) return null
   const fmt = n => `$${Number(n).toLocaleString()}`
   const range = (min && max)
-    ? `${fmt(min)} – ${fmt(max)}`
+    ? `${fmt(min)}-${fmt(max)}`
     : min ? `${fmt(min)}+` : `Up to ${fmt(max)}`
   const suffixes = {
     salary:             '/yr',
