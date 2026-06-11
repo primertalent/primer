@@ -1,15 +1,15 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import birdMark from '../../wren-bird-mark.png'
+import WrenMark from './WrenMark'
 
-export default function AppLayout({ children, fullBleed = false }) {
+export default function AppLayout({ children, fullBleed = false, thinking = false }) {
   const { signOut } = useAuth()
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <img src={birdMark} className="brand-mark" alt="" aria-hidden="true" />
+          <WrenMark state={thinking ? 'thinking' : 'idle'} size="28px" />
           <span className="brand-name">Wren</span>
         </div>
         <nav className="app-nav">

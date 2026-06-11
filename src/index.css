@@ -4693,27 +4693,38 @@ select.field-input {
   color: var(--signal-red);
 }
 
-/* Thinking dots */
-.wren-thinking {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding: 4px 0;
+/* ── Wren bird mark — two-layer animated logo ──────── */
+/* body (.wb) sets the box; wing (.ww) rotates at the shoulder pivot */
+.wren        { position: relative; display: inline-block; line-height: 0; vertical-align: middle; }
+.wren img    { display: block; width: 100%; height: auto; }
+.wren .wb    { position: relative; }
+.wren .ww    { position: absolute; inset: 0; transform-origin: 51.5% 28%; transition: transform .4s cubic-bezier(.4,0,.2,1); }
+.wren.ink  img { filter: brightness(0); }
+.wren.cream img { filter: brightness(0) invert(1); }
+
+@keyframes wrenFlap {
+  0%   { transform: rotate(0deg); }
+  9%   { transform: rotate(15deg); }
+  18%  { transform: rotate(3deg); }
+  27%  { transform: rotate(13deg); }
+  38%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes wrenBob {
+  0%, 100% { transform: translateY(0); }
+  9%, 27%  { transform: translateY(-2.2%); }
+  18%      { transform: translateY(-0.6%); }
 }
 
-.wren-thinking span {
-  width: 5px;
-  height: 5px;
-  background: var(--mute);
-  border-radius: 50%;
-  animation: wren-pulse 1.2s ease-in-out infinite;
-}
-.wren-thinking span:nth-child(2) { animation-delay: 0.2s; }
-.wren-thinking span:nth-child(3) { animation-delay: 0.4s; }
+.wren.thinking      { animation: wrenBob  1.5s ease-in-out infinite; }
+.wren.thinking .ww  { animation: wrenFlap 1.5s ease-in-out infinite; }
+.wren.thinking.busy,
+.wren.thinking.busy .ww { animation-duration: .92s; }
 
-@keyframes wren-pulse {
-  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
-  40%            { opacity: 1;    transform: scale(1);   }
+@media (prefers-reduced-motion: reduce) {
+  .wren.thinking, .wren.thinking .ww { animation: none; }
+  .wren.thinking { animation: wrenPulse 1.6s ease-in-out infinite; }
+  @keyframes wrenPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 }
 
 /* Fixed input bar */

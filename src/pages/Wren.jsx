@@ -4,6 +4,7 @@ import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
 import IngestResult from '../components/wren/IngestResult'
 import GoogleConnectCard from '../components/wren/GoogleConnectCard'
+import WrenMark from '../components/WrenMark'
 import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
@@ -292,7 +293,7 @@ export default function Wren() {
   draftSeenRef.current = 0
 
   return (
-    <AppLayout fullBleed>
+    <AppLayout fullBleed thinking={streaming}>
       <div className="wren-shell">
         <div className="wren-thread" ref={threadRef}>
           {messages.length === 0 && !streamingMsg && (
@@ -327,9 +328,7 @@ export default function Wren() {
                 <div className="wren-msg__error">{streamingMsg.error}</div>
               )}
               {!streamingMsg.text && !streamingMsg.error && (
-                <div className="wren-thinking">
-                  <span /><span /><span />
-                </div>
+                <WrenMark state="thinking" size="26px" />
               )}
             </div>
           )}
