@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import WrenMark from './WrenMark'
+import { WrenMark } from './WrenMark'
 
 export default function AppLayout({ children, fullBleed = false, thinking = false }) {
   const { signOut } = useAuth()
@@ -9,7 +9,7 @@ export default function AppLayout({ children, fullBleed = false, thinking = fals
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <WrenMark state={thinking ? 'thinking' : 'idle'} size="28px" />
+          <WrenMark state={thinking ? 'thinking' : 'idle'} size={28} />
           <span className="brand-name">Wren</span>
         </div>
         <nav className="app-nav">

@@ -4,7 +4,7 @@ import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
 import IngestResult from '../components/wren/IngestResult'
 import GoogleConnectCard from '../components/wren/GoogleConnectCard'
-import WrenMark from '../components/WrenMark'
+import { WrenMark } from '../components/WrenMark'
 import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
@@ -328,7 +328,7 @@ export default function Wren() {
                 <div className="wren-msg__error">{streamingMsg.error}</div>
               )}
               {!streamingMsg.text && !streamingMsg.error && (
-                <WrenMark state="thinking" size="26px" />
+                <WrenMark state="thinking" size={26} />
               )}
             </div>
           )}

@@ -1,4 +1,4 @@
-export default function WrenMark({ state = 'idle', tone = 'ink', size = '26px' }) {
+export function WrenMark({ size = 28, tone = 'ink', state = 'idle' }) {
   const cls = [
     'wren',
     tone,
