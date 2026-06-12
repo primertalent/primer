@@ -1,0 +1,64 @@
+/* bird-flap.css — the Wren "thinking" mark.
+   The bird flaps only while Wren is actively working (Rule 8 in DESIGN.md).
+   Two layers sliced from the one mark: a still body + a wing that hinges at
+   the shoulder. At rest they recombine pixel-exact to wren-bird-mark.png.
+
+   Markup:
+     <span class="wren-mark ink thinking">           // or `cream` on dark; add `busy` for fast cadence
+       <img class="wb" src="/assets/wren-body.png" alt="">
+       <img class="ww" src="/assets/wren-wing.png" alt="Wren">
+     </span>
+   Size it by setting width on .wren-mark (height follows the 501:383 aspect).
+   Toggle the `thinking` class from real in-flight agent state — never ambiently. */
+
+.wren-mark {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+  aspect-ratio: 501 / 383;          /* keeps the two layers locked together */
+}
+.wren-mark img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* single-color stamp — inverts with the theme */
+.wren-mark.ink   img { filter: brightness(0); }
+.wren-mark.cream img { filter: brightness(0) invert(1); }
+
+/* the wing hinges at the shoulder; eases back to folded rest when work ends */
+.wren-mark .ww {
+  transform-origin: 51.5% 28%;
+  transition: transform .4s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* two quick beats, then a settle — never a constant frantic loop */
+@keyframes wrenFlap {
+  0%   { transform: rotate(0deg); }
+  9%   { transform: rotate(15deg); }
+  18%  { transform: rotate(3deg); }
+  27%  { transform: rotate(13deg); }
+  38%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes wrenBob {
+  0%, 100% { transform: translateY(0); }
+  9%, 27%  { transform: translateY(-2.2%); }
+  18%      { transform: translateY(-0.6%); }
+}
+
+.wren-mark.thinking            { animation: wrenBob  1.5s ease-in-out infinite; }
+.wren-mark.thinking .ww        { animation: wrenFlap 1.5s ease-in-out infinite; }
+/* active background work — faster, busier */
+.wren-mark.thinking.busy,
+.wren-mark.thinking.busy .ww   { animation-duration: .92s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wren-mark.thinking,
+  .wren-mark.thinking .ww      { animation: none; }
+  .wren-mark.thinking          { animation: wrenPulse 1.6s ease-in-out infinite; }
+}
+@keyframes wrenPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }

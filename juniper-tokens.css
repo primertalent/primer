@@ -1,0 +1,47 @@
+/* juniper-tokens.css — Wren Juniper palette (2026-06 revision)
+   Drop-in replacement for the :root token blocks in the codebase.
+   Verdict semantics are unchanged; only the values move.
+   See DESIGN.md for the full rationale. */
+
+:root {
+  /* ── Light (default) ───────────────────────────────────── */
+  --bg:          #eef1ee;               /* pale spruce-tinted paper — main canvas */
+  --panel:       #f8faf8;               /* cards, panels, modals */
+  --rail:        #e4e9e5;               /* composer rail, secondary surfaces */
+  --ink:         #16201d;               /* primary text, full-strength borders — spruce-ink */
+  --ink-inverse: #f6f9f6;               /* text/icons on dark or accent-filled surfaces */
+  --mute:        #55625c;               /* secondary text, mono labels */
+  --hair:        rgba(22,32,29,0.10);   /* default 1px borders */
+  --hair-2:      rgba(22,32,29,0.19);   /* emphasized borders, table rules */
+  --accent:        #a8392b;             /* PROTECT, urgent — true brick-red */
+  --accent-hover:  #243430;             /* only allowed interaction state for --accent */
+  --win:           #1f5a4d;             /* PUSH, locked, good news — deep juniper spruce */
+  --kill:          #7d2a22;             /* KILL — deep brick, used sparingly */
+  --chip:          rgba(22,32,29,0.05); /* subtle inline chip backgrounds */
+
+  /* Signal palette — taxonomic only, retained unchanged (foreground-only on --chip) */
+  --signal-blue:   #1e40af;
+  --signal-green:  #15803d;
+  --signal-purple: #6b21a8;
+  --signal-teal:   #0e7490;
+  --signal-amber:  #92400e;
+  --signal-red:    #dc2626;
+}
+
+/* ── Dark (terminal — opt-in) ─────────────────────────────── */
+[data-theme="terminal"] {
+  --bg:            #0d1311;              /* deep spruce-black */
+  --panel:         #141d19;
+  --rail:          #18221d;
+  --ink:           #cdd8d1;              /* cool bone-green */
+  --ink-inverse:   #0d1311;
+  --mute:          #768078;
+  --hair:          rgba(205,216,209,0.10);
+  --hair-2:        rgba(205,216,209,0.20);
+  --accent:        #cf5a48;              /* brick, lifted for dark — replaces the old #d97757 */
+  --accent-hover:  #e07a68;
+  --win:           #4e9e7a;              /* spruce, lifted for dark */
+  --kill:          #c46060;
+  --chip:          rgba(205,216,209,0.06);
+  /* signal palette inherits from :root */
+}

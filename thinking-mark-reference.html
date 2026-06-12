@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wren — Thinking Mark</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#faf8f4; --panel:#fdfcf8; --rail:#f3f1ec;
+      --ink:#1a1714; --cream:#faf8f4; --mute:#6b655a;
+      --hair:rgba(26,23,20,0.10); --hair2:rgba(26,23,20,0.18);
+      --accent:#b8451f; --win:#3d6b3d;
+      --serif:'Fraunces',Georgia,serif;
+      --mono:'JetBrains Mono',ui-monospace,monospace;
+      --sans:'Söhne','Inter',system-ui,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+    .page{max-width:1120px;margin:0 auto;padding:52px 56px 80px}
+
+    .head{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:40px;
+      display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px}
+    .head h1{font-family:var(--serif);font-weight:400;font-size:42px;margin:0;letter-spacing:-0.02em;font-variation-settings:"opsz" 144}
+    .head .meta{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:0.14em;text-transform:uppercase;text-align:right;line-height:1.7}
+    .head p{margin:12px 0 0;font-family:var(--serif);font-style:italic;font-size:16px;color:var(--mute);max-width:640px;line-height:1.5;text-wrap:pretty}
+
+    .label{font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--mute);
+      margin:48px 0 18px;padding-bottom:10px;border-bottom:1px solid var(--hair2)}
+
+    /* ─── the mark ─────────────────────────────────────────── */
+    .wren{position:relative;display:inline-block;line-height:0;vertical-align:middle}
+    .wren img{display:block;width:100%;height:auto}
+    .wren .wb{position:relative}
+    .wren .ww{position:absolute;inset:0;transform-origin:51.5% 28%;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+    .wren.ink img{filter:brightness(0)}
+    .wren.cream img{filter:brightness(0) invert(1)}
+
+    /* two quick flutters, then a settle — the rhythm of a bird that's working something out */
+    @keyframes wrenFlap{
+      0%{transform:rotate(0deg)}
+      9%{transform:rotate(15deg)}
+      18%{transform:rotate(3deg)}
+      27%{transform:rotate(13deg)}
+      38%{transform:rotate(0deg)}
+      100%{transform:rotate(0deg)}
+    }
+    @keyframes wrenBob{
+      0%,100%{transform:translateY(0)}
+      9%,27%{transform:translateY(-2.2%)}
+      18%{transform:translateY(-0.6%)}
+    }
+    .wren.thinking{animation:wrenBob 1.5s ease-in-out infinite}
+    .wren.thinking .ww{animation:wrenFlap 1.5s ease-in-out infinite}
+    /* faster, busier cadence for active work */
+    .wren.thinking.busy{animation-duration:.92s}
+    .wren.thinking.busy .ww{animation-duration:.92s}
+
+    @media (prefers-reduced-motion: reduce){
+      .wren.thinking, .wren.thinking .ww{animation:none}
+      .wren.thinking{animation:wrenPulse 1.6s ease-in-out infinite}
+      @keyframes wrenPulse{0%,100%{opacity:1}50%{opacity:.55}}
+    }
+
+    /* ─── hero ─────────────────────────────────────────────── */
+    .hero{display:grid;grid-template-columns:1.05fr 1fr;gap:0;border:1px solid var(--hair);background:var(--panel)}
+    .hero-stage{padding:56px 48px;display:grid;place-items:center;border-right:1px solid var(--hair);min-height:340px;position:relative}
+    .hero-stage .floor{position:absolute;left:48px;right:48px;bottom:64px;border-bottom:1px dashed var(--hair2)}
+    .hero-side{padding:40px 40px 38px;display:flex;flex-direction:column;justify-content:center;gap:22px}
+    .hero-side h2{font-family:var(--serif);font-weight:500;font-size:27px;margin:0;letter-spacing:-0.012em;line-height:1.18}
+    .hero-side p{margin:0;font-size:14.5px;line-height:1.6;color:var(--mute);text-wrap:pretty}
+    .seg{display:inline-flex;border:1px solid var(--hair2);background:var(--bg);width:max-content}
+    .seg button{appearance:none;border:0;background:transparent;font-family:var(--mono);font-size:11px;letter-spacing:0.1em;
+      text-transform:uppercase;color:var(--mute);padding:9px 15px;cursor:pointer;border-right:1px solid var(--hair2)}
+    .seg button:last-child{border-right:0}
+    .seg button.on{background:var(--ink);color:var(--cream)}
+    .statel{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:9px}
+    .statel .dot{width:7px;height:7px;border-radius:50%;background:var(--mute)}
+    .statel.is-thinking .dot{background:var(--accent)}
+
+    /* ─── context demos ────────────────────────────────────── */
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    .card{border:1px solid var(--hair);background:var(--panel)}
+    .card .cap{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--mute);padding:14px 18px 0}
+    .card .note{font-family:var(--serif);font-style:italic;font-size:13.5px;color:var(--mute);line-height:1.5;padding:12px 18px 18px;text-wrap:pretty}
+
+    /* masthead mock */
+    .mh{display:flex;align-items:center;gap:16px;padding:16px 20px;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin:14px 0 0;background:var(--bg)}
+    .mh .lock{display:flex;align-items:center;gap:8px}
+    .mh .nm{font-family:var(--serif);font-size:22px;font-weight:500;letter-spacing:-0.016em}
+    .mh .pres{display:flex;align-items:center;gap:9px;padding-left:16px;border-left:1px solid var(--hair)}
+    .mh .pres .ptxt{font-size:13px;color:var(--ink)}
+    .dots::after{content:'';animation:dots 1.4s steps(1,end) infinite}
+    @keyframes dots{0%{content:''}25%{content:'·'}50%{content:'· ·'}75%{content:'· · ·'}100%{content:''}}
+
+    /* conversation thinking turn */
+    .turn{padding:20px 20px 22px}
+    .turn .who{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+    .turn .who .w{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--accent)}
+    .turn .who .s{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--mute)}
+    .thinkrow{display:inline-flex;align-items:center;gap:11px;border:1px solid var(--hair);background:var(--bg);padding:10px 14px}
+    .thinkrow .t{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--mute)}
+
+    /* dark */
+    .darkstage{background:#0c0e0c;padding:30px 24px;display:flex;align-items:center;gap:18px}
+    .darkstage .nm{font-family:var(--serif);font-size:22px;font-weight:500;letter-spacing:-0.016em;color:var(--cream)}
+    .darkstage .t{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7a7568;margin-left:auto}
+
+    /* scale row */
+    .scale{display:flex;align-items:flex-end;gap:44px;padding:34px 40px;border:1px solid var(--hair);background:var(--panel);flex-wrap:wrap}
+    .scale .unit{display:flex;flex-direction:column;align-items:center;gap:14px}
+    .scale .px{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--mute)}
+
+    /* spec */
+    .spec{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);margin-top:6px}
+    .spec .cell{background:var(--panel);padding:18px 18px 20px}
+    .spec .k{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--mute)}
+    .spec .v{font-family:var(--serif);font-size:21px;font-weight:500;margin-top:6px;letter-spacing:-0.008em}
+    .spec .d{font-size:12.5px;color:var(--mute);line-height:1.5;margin-top:6px;text-wrap:pretty}
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="head">
+      <div>
+        <h1>The thinking mark</h1>
+        <p>When Wren is working — reading the book, drafting a move, holding a thought — the bird flaps. One mark, two layers: the body stays still, the wing hinges at the shoulder. It signals "I'm on it" without a spinner, a mascot, or a single new color.</p>
+      </div>
+      <div class="meta">Wren · brand motion<br/>Round 01 · 2026</div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-stage">
+        <div class="floor"></div>
+        <span class="wren ink thinking" id="hero" style="width:300px"></span>
+      </div>
+      <div class="hero-side">
+        <div class="statel is-thinking" id="hstate"><span class="dot"></span><span id="hstatetxt">Thinking</span></div>
+        <h2>It flaps while it works, settles when it's done.</h2>
+        <p>The flap is two quick beats and a rest — the rhythm of a bird working something out, not a frantic loading bar. Stop the work and the wing eases back to its folded rest pose. Try it:</p>
+        <div class="seg" id="heroseg">
+          <button data-s="idle">Idle</button>
+          <button data-s="thinking" class="on">Thinking</button>
+          <button data-s="busy">Working</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IN CONTEXT -->
+    <div class="label">In context</div>
+    <div class="grid2">
+
+      <div class="card">
+        <div class="cap">Masthead presence · the agent is at work</div>
+        <div class="mh">
+          <div class="lock">
+            <span class="wren ink thinking" style="width:30px"></span>
+            <span class="nm">Wren</span>
+          </div>
+          <div class="pres">
+            <span class="wren ink thinking busy" style="width:18px"></span>
+            <span class="ptxt">Working your book<span class="dots"></span></span>
+          </div>
+        </div>
+        <div class="note">The wordmark bird stays calm; a small second bird in the status line flaps faster while the loop runs. Two cadences, one vocabulary.</div>
+      </div>
+
+      <div class="card">
+        <div class="cap">Conversation · Wren is forming a reply</div>
+        <div class="turn">
+          <div class="who"><span class="w">WREN</span><span class="s">· NOW</span></div>
+          <div class="thinkrow">
+            <span class="wren ink thinking" style="width:26px"></span>
+            <span class="t">Reading Sarah's debrief and the Inworld thread…</span>
+          </div>
+        </div>
+        <div class="note">Replaces the three-dot typing bubble. The bird flapping is the "Wren is thinking" tell — on brand, and unmistakably Wren.</div>
+      </div>
+    </div>
+
+    <!-- DARK + SCALE -->
+    <div class="grid2" style="margin-top:24px">
+      <div class="card">
+        <div class="cap">On dark · same motion, inverted</div>
+        <div class="darkstage">
+          <span class="wren cream thinking" style="width:46px"></span>
+          <span class="nm">Wren</span>
+          <span class="t">thinking</span>
+        </div>
+        <div class="note">The cream wing flaps over the dark field. Construction is colour-agnostic — the gap behind the wing is transparent, so it reveals whatever it sits on.</div>
+      </div>
+
+      <div class="card">
+        <div class="cap">Holds at every size</div>
+        <div class="scale" style="border:0">
+          <div class="unit"><span class="wren ink thinking busy" style="width:18px"></span><span class="px">18 px</span></div>
+          <div class="unit"><span class="wren ink thinking busy" style="width:28px"></span><span class="px">28 px</span></div>
+          <div class="unit"><span class="wren ink thinking" style="width:48px"></span><span class="px">48 px</span></div>
+          <div class="unit"><span class="wren ink thinking" style="width:84px"></span><span class="px">84 px</span></div>
+        </div>
+        <div class="note">Even at favicon scale the flap is legible because the wing breaks the body's silhouette as it lifts. No detail needed — just the gesture.</div>
+      </div>
+    </div>
+
+    <!-- SPEC -->
+    <div class="label">How it's built</div>
+    <div class="spec">
+      <div class="cell">
+        <div class="k">Construction</div>
+        <div class="v">Two layers</div>
+        <div class="d">Body + wing, sliced from the one mark. They recombine pixel-exact at rest — the static logo is untouched.</div>
+      </div>
+      <div class="cell">
+        <div class="k">Pivot</div>
+        <div class="v">The shoulder</div>
+        <div class="d">Wing hinges at 51.5% / 28% — where it actually attaches. It lifts up and back, breaking the topline like a real flap.</div>
+      </div>
+      <div class="cell">
+        <div class="k">Cadence</div>
+        <div class="v">2 beats + rest</div>
+        <div class="d">0 → 15° → 13° → fold, then a pause. 1.5s calm / 0.9s working. Never a constant frantic loop.</div>
+      </div>
+      <div class="cell">
+        <div class="k">Reduced motion</div>
+        <div class="v">Soft pulse</div>
+        <div class="d">Respects prefers-reduced-motion: the wing stays folded and the mark breathes in opacity instead.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:30px;font-family:var(--serif);font-style:italic;font-size:15.5px;color:var(--mute);line-height:1.55;max-width:760px;text-wrap:pretty">
+      One decision to make: is the flap reserved strictly for "Wren is actively doing work," or does it also greet you on load and when Wren has something new to say? I'd keep it to active work — a bird that flaps constantly stops meaning anything.
+    </p>
+
+  </div>
+
+  <!-- build every .wren as a two-layer mark -->
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#b8451f"/><g transform="translate(50 52) scale(0.085) translate(-250 -191)" fill="#faf8f4"><path d="M258 107 205 150 150 205 112 250 200 261 292 252 318 178 292 128Z"/><circle cx="250" cy="191" r="120" fill="none" stroke="#faf8f4" stroke-width="14"/></g></svg>
+  </template>
+  <script>
+    (function(){
+      var BODY='wren-body.png', WING='wren-wing.png';
+      document.querySelectorAll('.wren').forEach(function(el){
+        el.innerHTML =
+          '<img class="wb" src="'+BODY+'" alt="">' +
+          '<img class="ww" src="'+WING+'" alt="Wren">';
+      });
+      // hero state control
+      var hero=document.getElementById('hero');
+      var seg=document.getElementById('heroseg');
+      var hstate=document.getElementById('hstate');
+      var htxt=document.getElementById('hstatetxt');
+      if(seg){
+        seg.addEventListener('click',function(e){
+          var b=e.target.closest('button'); if(!b)return;
+          seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+          b.classList.add('on');
+          var s=b.dataset.s;
+          hero.classList.remove('thinking','busy');
+          if(s==='thinking'){hero.classList.add('thinking');}
+          if(s==='busy'){hero.classList.add('thinking','busy');}
+          var on = s!=='idle';
+          hstate.classList.toggle('is-thinking',on);
+          htxt.textContent = s==='idle'?'Idle · folded':(s==='busy'?'Working':'Thinking');
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
