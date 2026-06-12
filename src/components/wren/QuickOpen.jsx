@@ -33,13 +33,13 @@ export default function QuickOpen({ onSelect, onClose }) {
       const [{ data: candidates }, { data: roles }] = await Promise.all([
         supabase
           .from('candidates')
-          .select('id, full_name, current_title, current_company')
-          .or(`full_name.ilike.%${q}%,current_title.ilike.%${q}%,current_company.ilike.%${q}%`)
+          .select('id, first_name, last_name, current_title, current_company')
+          .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,current_title.ilike.%${q}%,current_company.ilike.%${q}%`)
           .limit(5),
         supabase
           .from('roles')
-          .select('id, title, client_name, status')
-          .or(`title.ilike.%${q}%,client_name.ilike.%${q}%`)
+          .select('id, title, status, clients(name)')
+          .ilike('title', `%${q}%`)
           .limit(5),
       ])
       if (cancelled) return
@@ -47,16 +47,16 @@ export default function QuickOpen({ onSelect, onClose }) {
         ...(candidates || []).map(c => ({
           id: `c-${c.id}`,
           type: 'candidate',
-          label: c.full_name || '(no name)',
+          label: [c.first_name, c.last_name].filter(Boolean).join(' ') || '(no name)',
           sub: [c.current_title, c.current_company].filter(Boolean).join(' · '),
-          prompt: `Tell me about ${c.full_name}`,
+          prompt: `Tell me about ${[c.first_name, c.last_name].filter(Boolean).join(' ')}`,
         })),
         ...(roles || []).map(r => ({
           id: `r-${r.id}`,
           type: 'role',
           label: r.title || '(no title)',
-          sub: [r.client_name, r.status].filter(Boolean).join(' · '),
-          prompt: `Tell me about the ${r.title}${r.client_name ? ` role at ${r.client_name}` : ''}`,
+          sub: [r.clients?.name, r.status].filter(Boolean).join(' · '),
+          prompt: `Tell me about the ${r.title}${r.clients?.name ? ` role at ${r.clients.name}` : ''}`,
         })),
       ]
       setResults(items)
