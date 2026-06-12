@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppLayout from '../components/AppLayout'
 import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
@@ -77,9 +77,12 @@ export default function Wren() {
   const [streaming, setStreaming] = useState(false)
   const [streamingMsg, setStreamingMsg] = useState(null)
   const [gmailTokenRevoked, setGmailTokenRevoked] = useState(false)
+  const [convList, setConvList] = useState([])
+  const [railOpen, setRailOpen] = useState(true)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const loadedRef = useRef(false)
+  const latestConvIdRef = useRef(null)
 
   useEffect(() => {
     if (!recruiter?.id || loadedRef.current) return
@@ -119,6 +122,7 @@ export default function Wren() {
     if (!conv) return
 
     setConversationId(conv.id)
+    latestConvIdRef.current = conv.id
 
     const { data: msgs } = await supabase
       .from('conversation_messages')
@@ -127,6 +131,32 @@ export default function Wren() {
       .order('created_at', { ascending: true })
 
     if (msgs) setMessages(msgs)
+    loadConversationList()
+  }
+
+  async function loadConversationList() {
+    const { data } = await supabase
+      .from('conversations')
+      .select('id, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(60)
+    if (data) setConvList(data)
+  }
+
+  async function switchToDay(convIds) {
+    const results = await Promise.all(
+      convIds.map(id =>
+        supabase
+          .from('conversation_messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', id)
+          .order('created_at', { ascending: true })
+      )
+    )
+    const allMsgs = results.flatMap(r => r.data || [])
+    allMsgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    setMessages(allMsgs)
+    setConversationId(convIds[0])
   }
 
   function handleKeyDown(e) {
@@ -146,23 +176,40 @@ export default function Wren() {
 
   const canSend = (inputText.trim() || pendingPaste) && !streaming
 
-  async function sendMessage() {
-    if (!canSend) return
+  async function sendMessage(directMsg = null) {
+    if (directMsg != null ? streaming : !canSend) return
 
-    let messageText = inputText.trim()
-    if (pendingPaste) {
-      const docBlock = `<document type="paste" name="${pendingPaste.label}">\n${pendingPaste.text}\n</document>`
-      messageText = messageText ? `${docBlock}\n\n${messageText}` : docBlock
+    let messageText
+    let displayText
+    if (directMsg != null) {
+      messageText = directMsg.trim()
+      displayText = messageText
+      if (!messageText) return
+    } else {
+      messageText = inputText.trim()
+      if (pendingPaste) {
+        const docBlock = `<document type="paste" name="${pendingPaste.label}">\n${pendingPaste.text}\n</document>`
+        messageText = messageText ? `${docBlock}\n\n${messageText}` : docBlock
+      }
+      displayText = [
+        pendingPaste ? `[${pendingPaste.label}]` : '',
+        inputText.trim(),
+      ].filter(Boolean).join('  ')
+      setPendingPaste(null)
+      setInputText('')
     }
 
-    // Display text strips the raw document content — the thread stays readable
-    const displayText = [
-      pendingPaste ? `[${pendingPaste.label}]` : '',
-      inputText.trim(),
-    ].filter(Boolean).join('  ')
+    if (latestConvIdRef.current && conversationId !== latestConvIdRef.current) {
+      const targetId = latestConvIdRef.current
+      setConversationId(targetId)
+      const { data: histMsgs } = await supabase
+        .from('conversation_messages')
+        .select('id, role, content, created_at')
+        .eq('conversation_id', targetId)
+        .order('created_at', { ascending: true })
+      if (histMsgs) setMessages(histMsgs)
+    }
 
-    setPendingPaste(null)
-    setInputText('')
     setStreaming(true)
 
     const optimisticUser = {
@@ -177,7 +224,7 @@ export default function Wren() {
 
     let accText = ''
     let accRenders = []
-    let convId = conversationId
+    let convId = latestConvIdRef.current || conversationId
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -226,6 +273,7 @@ export default function Wren() {
           if (evtType === 'conversation') {
             convId = payload.conversation_id
             setConversationId(convId)
+            latestConvIdRef.current = convId
           } else if (evtType === 'text') {
             accText += payload.text
             setStreamingMsg({ text: sanitizeDashes(accText), renders: accRenders })
@@ -241,6 +289,7 @@ export default function Wren() {
             }
             setMessages(prev => [...prev, finalMsg])
             setStreamingMsg(null)
+            loadConversationList()
           } else if (evtType === 'error') {
             throw new Error(payload.message || 'Stream error')
           }
@@ -330,6 +379,25 @@ export default function Wren() {
     )
   }
 
+  const dayGroups = useMemo(() => {
+    const byDay = new Map()
+    for (const conv of convList) {
+      const key = new Date(conv.updated_at).toDateString()
+      if (!byDay.has(key)) byDay.set(key, [])
+      byDay.get(key).push(conv.id)
+    }
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    return [...byDay.entries()].map(([key, ids]) => {
+      let label
+      if (key === today.toDateString()) label = 'Today'
+      else if (key === yesterday.toDateString()) label = 'Yesterday'
+      else label = new Date(key).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      return { key, label, convIds: [...ids].reverse() }
+    })
+  }, [convList])
+
   const totalDrafts = countTotalDrafts()
   const draftSeenRef = useRef(0)
   draftSeenRef.current = 0
@@ -337,81 +405,111 @@ export default function Wren() {
   return (
     <AppLayout fullBleed thinking={streaming}>
       <div className="wren-shell">
-        <div className="wren-thread" ref={threadRef}>
-          {messages.length === 0 && !streamingMsg && (
-            <div className="wren-empty">
-              <span>Ready. What do you need?</span>
-            </div>
-          )}
-          {messages.map(msg => renderMessage(msg, draftSeenRef, totalDrafts))}
-          {streamingMsg && (
-            <div className="wren-msg wren-msg--wren wren-msg--streaming">
-              <div className="wren-msg__label">WREN</div>
-              {streamingMsg.text && (
-                <div className="wren-msg__text">{stripMarkdown(streamingMsg.text)}</div>
-              )}
-              {streamingMsg.renders.map((r, i) => {
-                if (r.tool === 'screen_candidate') {
-                  return <ScreenResult key={i} data={r.data} />
-                }
-                if (r.tool === 'draft_submittal') {
-                  draftSeenRef.current++
-                  return <SubmittalDraft key={i} data={r.data} isLatest={true} gmailConnected={false} />
-                }
-                if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
-                  return <IngestResult key={i} data={r.data} />
-                }
-                if (r.tool === 'connect_google') {
-                  return <GoogleConnectCard key={i} />
-                }
-                return null
-              })}
-              {streamingMsg.error && (
-                <div className="wren-msg__error">{streamingMsg.error}</div>
-              )}
-              {!streamingMsg.text && !streamingMsg.error && (
-                <WrenMark state="thinking" size={26} />
-              )}
-            </div>
-          )}
-        </div>
-
-        {recruiter && (!recruiter.gmail_access_token || gmailTokenRevoked) && (
-          <div className="wren-gmail-hint">
-            <span>Gmail not connected</span>
-            <button className="wren-gmail-hint__connect" onClick={initiateGoogleOAuth}>
-              Connect
+        <aside className={`wren-rail${railOpen ? '' : ' wren-rail--closed'}`}>
+          <div className="wren-rail__header">
+            <span>HISTORY</span>
+            <button
+              className="wren-rail__toggle"
+              onClick={() => setRailOpen(r => !r)}
+              aria-label={railOpen ? 'Close history' : 'Open history'}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d={railOpen ? 'M7 2L4 5l3 3' : 'M3 2l3 3-3 3'} />
+              </svg>
             </button>
           </div>
-        )}
-        <div className="wren-input-bar">
-          {pendingPaste && (
-            <div className="wren-chips">
-              <Chip
-                type="notes"
-                label={pendingPaste.label}
-                onRemove={() => setPendingPaste(null)}
-              />
+          <nav className="wren-rail__days">
+            {dayGroups.map(({ key, label, convIds }) => {
+              const isActive = convIds.includes(conversationId)
+              return (
+                <button
+                  key={key}
+                  className={`wren-rail__day${isActive ? ' wren-rail__day--active' : ''}`}
+                  onClick={() => switchToDay(convIds)}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </nav>
+        </aside>
+        <div className="wren-col">
+          <div className="wren-thread" ref={threadRef}>
+            {messages.length === 0 && !streamingMsg && (
+              <div className="wren-empty">
+                <span>Ready. What do you need?</span>
+              </div>
+            )}
+            {messages.map(msg => renderMessage(msg, draftSeenRef, totalDrafts))}
+            {streamingMsg && (
+              <div className="wren-msg wren-msg--wren wren-msg--streaming">
+                <div className="wren-msg__label">WREN</div>
+                {streamingMsg.text && (
+                  <div className="wren-msg__text">{stripMarkdown(streamingMsg.text)}</div>
+                )}
+                {streamingMsg.renders.map((r, i) => {
+                  if (r.tool === 'screen_candidate') {
+                    return <ScreenResult key={i} data={r.data} />
+                  }
+                  if (r.tool === 'draft_submittal') {
+                    draftSeenRef.current++
+                    return <SubmittalDraft key={i} data={r.data} isLatest={true} gmailConnected={false} />
+                  }
+                  if (r.tool === 'ingest_input' || r.tool === 'enrich_from_notes') {
+                    return <IngestResult key={i} data={r.data} />
+                  }
+                  if (r.tool === 'connect_google') {
+                    return <GoogleConnectCard key={i} />
+                  }
+                  return null
+                })}
+                {streamingMsg.error && (
+                  <div className="wren-msg__error">{streamingMsg.error}</div>
+                )}
+                {!streamingMsg.text && !streamingMsg.error && (
+                  <WrenMark state="thinking" size={26} />
+                )}
+              </div>
+            )}
+          </div>
+
+          {recruiter && (!recruiter.gmail_access_token || gmailTokenRevoked) && (
+            <div className="wren-gmail-hint">
+              <span>Gmail not connected</span>
+              <button className="wren-gmail-hint__connect" onClick={initiateGoogleOAuth}>
+                Connect
+              </button>
             </div>
           )}
-          <textarea
-            ref={inputRef}
-            className="wren-input"
-            placeholder="Screen a resume, draft a submittal, write outreach, find a network fit — or paste anything."
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            disabled={streaming}
-            rows={1}
-          />
-          <button
-            className="btn-primary wren-send"
-            onClick={sendMessage}
-            disabled={!canSend}
-          >
-            Send
-          </button>
+          <div className="wren-input-bar">
+            {pendingPaste && (
+              <div className="wren-chips">
+                <Chip
+                  type="notes"
+                  label={pendingPaste.label}
+                  onRemove={() => setPendingPaste(null)}
+                />
+              </div>
+            )}
+            <textarea
+              ref={inputRef}
+              className="wren-input"
+              placeholder="Screen a resume, draft a submittal, write outreach, find a network fit — or paste anything."
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              disabled={streaming}
+              rows={1}
+            />
+            <button
+              className="btn-primary wren-send"
+              onClick={sendMessage}
+              disabled={!canSend}
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
     </AppLayout>

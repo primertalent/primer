@@ -4619,9 +4619,87 @@ select.field-input {
 .wren-shell {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
   background: var(--bg);
+}
+
+/* Conversation column — flex child of wren-shell, holds thread + input */
+.wren-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Day history rail */
+.wren-rail {
+  width: 192px;
+  flex-shrink: 0;
+  background: var(--rail);
+  border-right: 1px solid var(--hair);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.wren-rail--closed {
+  display: none;
+}
+.wren-rail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--hair);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+  flex-shrink: 0;
+}
+.wren-rail__toggle {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--mute);
+  line-height: 0;
+  display: flex;
+  align-items: center;
+}
+.wren-rail__toggle:hover { color: var(--ink); }
+.wren-rail__days {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+.wren-rail__day {
+  display: block;
+  width: 100%;
+  padding: 7px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wren-rail__day:hover {
+  background: var(--chip);
+  color: var(--ink);
+}
+.wren-rail__day--active { color: var(--ink); }
+@media (max-width: 900px) {
+  .wren-rail { display: none; }
 }
 
 /* Scrollable message thread */
@@ -4632,6 +4710,7 @@ select.field-input {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  align-items: center;
 }
 
 /* Empty state */
@@ -4648,22 +4727,21 @@ select.field-input {
 
 /* Individual message */
 .wren-msg {
-  max-width: 720px;
+  max-width: 740px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 0 20px;
 }
 
 .wren-msg--user {
   align-self: flex-end;
-  margin-right: 40px;
   align-items: flex-end;
 }
 
 .wren-msg--wren {
   align-self: flex-start;
-  margin-left: 40px;
   align-items: flex-start;
 }
 
@@ -4727,14 +4805,17 @@ select.field-input {
   @keyframes wrenPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 }
 
-/* Fixed input bar */
+/* Fixed input bar — centered to match message column */
 .wren-input-bar {
   border-top: 1px solid var(--hair);
   background: var(--panel);
-  padding: 12px 40px;
+  padding: 12px 20px;
   display: flex;
   gap: 10px;
   align-items: flex-end;
+  max-width: 740px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .wren-input {
@@ -6648,7 +6729,7 @@ select.field-input {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 5px 40px;
+  padding: 5px 20px;
   background: var(--panel);
   border-top: 1px solid var(--hair);
   font-family: var(--font-mono);
@@ -6656,6 +6737,9 @@ select.field-input {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--mute);
+  max-width: 740px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .wren-gmail-hint__connect {
