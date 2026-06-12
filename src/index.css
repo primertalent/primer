@@ -4730,6 +4730,52 @@ select.field-input {
   .wren-rail { display: none; }
 }
 
+/* Desk ticker — pipeline value strip above the conversation thread */
+.wren-ticker {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 0 24px;
+  height: 36px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--hair);
+  background: var(--panel);
+  overflow: hidden;
+}
+.wren-ticker__item {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.wren-ticker__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+}
+.wren-ticker__value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+.wren-ticker__value sup {
+  font-size: 8px;
+  vertical-align: super;
+}
+.wren-ticker__note {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--mute);
+  white-space: nowrap;
+}
+@media (max-width: 899px) {
+  .wren-ticker { display: none; }
+}
+
 /* Scrollable message thread */
 .wren-thread {
   flex: 1;

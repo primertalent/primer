@@ -69,6 +69,78 @@ function stripMarkdown(text) {
   )
 }
 
+// Stage weights for pipeline value — keyed by current_stage.toLowerCase().trim().
+// Zero-weight stages are explicit so only truly unrecognized strings trigger the unknown counter.
+const STAGE_WEIGHTS = {
+  sourced: 0, outreach: 0, applied: 0,
+  screen: 0, screening: 0, 'phone screen': 0, phone_screen: 0,
+  submitted: 0.30, submitting: 0.30, interviewing: 0.30, interview: 0.30,
+  'first interview': 0.30, '1st interview': 0.30, 'phone interview': 0.30,
+  'second interview': 0.40, '2nd interview': 0.40,
+  'final round': 0.55, final_round: 0.55, 'final interview': 0.55,
+  'late stage': 0.55, late_stage: 0.55,
+  verbal: 0.70, 'verbal offer': 0.70,
+  offer: 0.80, 'offer extended': 0.80, offered: 0.80,
+  accepted: 0.95, 'offer accepted': 0.95,
+}
+
+function fmtCurrency(v) {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 10_000)    return `$${Math.round(v / 1_000)}k`
+  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}k`
+  return `$${Math.round(v)}`
+}
+
+function DeskTicker({ ticker }) {
+  let nextLabel = '—'
+  let nextOverdue = false
+  if (ticker.nextMove) {
+    const d = new Date(ticker.nextMove)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    nextOverdue = d < today
+    nextLabel = nextOverdue
+      ? 'overdue'
+      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  return (
+    <div className="wren-ticker">
+      <div className="wren-ticker__item">
+        <span className="wren-ticker__label">WEIGHTED</span>
+        <span className="wren-ticker__value">
+          {ticker.weighted > 0 ? fmtCurrency(ticker.weighted) : '—'}
+          {ticker.unknownCount > 0 && (
+            <sup title={`${ticker.unknownCount} deal${ticker.unknownCount > 1 ? 's' : ''} not weighted — stage not recognized`}>*</sup>
+          )}
+        </span>
+      </div>
+      <div className="wren-ticker__item">
+        <span className="wren-ticker__label">AT RISK</span>
+        <span
+          className="wren-ticker__value"
+          style={ticker.atRisk > 0 ? { color: 'var(--accent)' } : undefined}
+        >
+          {ticker.atRisk > 0 ? fmtCurrency(ticker.atRisk) : '—'}
+        </span>
+      </div>
+      <div className="wren-ticker__item">
+        <span className="wren-ticker__label">NEXT MOVE</span>
+        <span
+          className="wren-ticker__value"
+          style={nextOverdue ? { color: 'var(--accent)' } : undefined}
+        >
+          {nextLabel}
+        </span>
+      </div>
+      {ticker.unknownCount > 0 && (
+        <span className="wren-ticker__note">
+          *{ticker.unknownCount} deal{ticker.unknownCount > 1 ? 's' : ''} unweighted, unknown stage
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function Wren() {
   const { recruiter } = useRecruiter()
   const [conversationId, setConversationId] = useState(null)
@@ -81,6 +153,7 @@ export default function Wren() {
   const [convList, setConvList] = useState([])
   const [railOpen, setRailOpen] = useState(true)
   const [quickOpenOpen, setQuickOpenOpen] = useState(false)
+  const [ticker, setTicker] = useState(null)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const loadedRef = useRef(false)
@@ -90,6 +163,7 @@ export default function Wren() {
     if (!recruiter?.id || loadedRef.current) return
     loadedRef.current = true
     loadMostRecentConversation()
+    loadTickerData()
   }, [recruiter?.id])
 
   useEffect(() => {
@@ -154,6 +228,80 @@ export default function Wren() {
       .order('updated_at', { ascending: false })
       .limit(60)
     if (data) setConvList(data)
+  }
+
+  async function loadTickerData() {
+    if (!recruiter?.id) return
+
+    const [{ data: pipes }, { data: riskActions }] = await Promise.all([
+      supabase
+        .from('pipelines')
+        .select(`
+          id, current_stage, expected_comp, expected_comp_high, next_action_due_at,
+          roles ( placement_fee_pct, placement_fee_flat, target_comp_min, target_comp_max, status )
+        `)
+        .eq('recruiter_id', recruiter.id)
+        .not('current_stage', 'in', '(placed,lost)'),
+      supabase
+        .from('actions')
+        .select('linked_entity_id')
+        .eq('recruiter_id', recruiter.id)
+        .eq('linked_entity_type', 'pipeline')
+        .in('action_type', ['risk_flag', 'follow_up_overdue'])
+        .in('urgency', ['now', 'today'])
+        .is('dismissed_at', null)
+        .is('acted_on_at', null),
+    ])
+
+    const atRiskIds = new Set((riskActions || []).map(a => a.linked_entity_id))
+    let weighted = 0
+    let atRisk = 0
+    let nextMove = null
+    let unknownCount = 0
+
+    for (const p of (pipes || [])) {
+      if (p.roles?.status === 'closed') continue
+
+      const stageKey = (p.current_stage || '').toLowerCase().trim()
+      const weight = STAGE_WEIGHTS[stageKey]
+
+      if (weight === undefined) {
+        unknownCount++
+        console.warn('[ticker] unrecognized stage:', JSON.stringify(p.current_stage), 'pipeline:', p.id)
+        continue
+      }
+      if (weight === 0) continue
+
+      const comp = p.expected_comp
+        ? (p.expected_comp_high
+            ? (Number(p.expected_comp) + Number(p.expected_comp_high)) / 2
+            : Number(p.expected_comp))
+        : (p.roles?.target_comp_min && p.roles?.target_comp_max
+            ? (Number(p.roles.target_comp_min) + Number(p.roles.target_comp_max)) / 2
+            : null)
+
+      const feePct  = p.roles?.placement_fee_pct ?? recruiter.default_placement_fee_pct
+      const feeFlat = p.roles?.placement_fee_flat
+
+      let feeValue = null
+      if (comp && feePct)        feeValue = comp * Number(feePct)
+      else if (feeFlat != null)  feeValue = Number(feeFlat)
+
+      if (feeValue != null && feeValue > 0) {
+        const dealValue = feeValue * weight
+        weighted += dealValue
+        if (atRiskIds.has(p.id)) atRisk += dealValue
+      }
+
+      const isOfferOrAccepted = ['offer', 'offer extended', 'offered', 'verbal', 'verbal offer', 'accepted', 'offer accepted'].includes(stageKey)
+      if (isOfferOrAccepted && p.next_action_due_at) {
+        if (!nextMove || new Date(p.next_action_due_at) < new Date(nextMove)) {
+          nextMove = p.next_action_due_at
+        }
+      }
+    }
+
+    setTicker({ weighted, atRisk, nextMove, unknownCount })
   }
 
   async function switchToDay(convIds) {
@@ -447,6 +595,7 @@ export default function Wren() {
           </nav>
         </aside>
         <div className="wren-col">
+          {ticker && <DeskTicker ticker={ticker} />}
           <div className="wren-thread" ref={threadRef}>
             {messages.length === 0 && !streamingMsg && (
               <div className="wren-empty">
