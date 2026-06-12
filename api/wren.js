@@ -508,6 +508,35 @@ function getToolDefinitions() {
       description: 'Surface the Gmail connect UI. Call this when the recruiter asks about sending email, connecting Gmail, or connecting Google — including when their access was revoked and they need to reconnect.',
       input_schema: { type: 'object', properties: {} },
     },
+    {
+      name: 'create_role',
+      description: "Create a new role record (and its client if it doesn't exist). Call when: (1) the recruiter explicitly says to create or add a role, (2) ingest_input returned action 'ask' for a JD match and the recruiter rejected the proposed match, or (3) a bare instruction names a title and company. Checks for duplicates — returns already_exists if the same title already exists at that company.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          title:   { type: 'string', description: 'Role title.' },
+          company: { type: 'string', description: 'Company / client name.' },
+          location: { type: 'string', description: 'Optional. Company HQ or role location.' },
+          notes:   { type: 'string', description: 'Optional. Raw JD text or any notes to attach to the role record.' },
+        },
+        required: ['title', 'company'],
+      },
+    },
+    {
+      name: 'create_candidate',
+      description: "Create a new candidate record. Call when: (1) the recruiter explicitly says to add or create a candidate, (2) ingest_input returned action 'ask' and the recruiter rejected all alternatives and wants a new record. Pass extracted fields from the ingest_input result when available.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          name:            { type: 'string', description: 'Full name.' },
+          email:           { type: 'string', description: 'Optional.' },
+          current_title:   { type: 'string', description: 'Optional.' },
+          current_company: { type: 'string', description: 'Optional.' },
+          cv_text:         { type: 'string', description: 'Optional. Raw resume text if available.' },
+        },
+        required: ['name'],
+      },
+    },
   ]
 }
 
@@ -522,10 +551,12 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
     case 'add_to_pipeline':   return toolAddToPipeline(input, recruiter)
-    case 'ingest_input':     return toolIngestInput(input, recruiter, convContext)
+    case 'ingest_input':      return toolIngestInput(input, recruiter, convContext)
     case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
-    case 'connect_google':   return { action: 'connect', connected: false }
-    default:                 return { error: `Unknown tool: ${name}` }
+    case 'connect_google':    return { action: 'connect', connected: false }
+    case 'create_role':       return toolCreateRole(input, recruiter)
+    case 'create_candidate':  return toolCreateCandidate(input, recruiter)
+    default:                  return { error: `Unknown tool: ${name}` }
   }
 }
 
@@ -965,6 +996,8 @@ async function ingestResume(text, classification, recruiter, convContext) {
     convContext.candidateIds || new Set()
   )
 
+  const { first_name, last_name } = parseName(c.name)
+
   if (matchResult.action === 'ask') {
     return {
       classification: classification.type,
@@ -972,11 +1005,15 @@ async function ingestResume(text, classification, recruiter, convContext) {
       action: 'ask',
       alternatives: matchResult.alternatives,
       extracted_name: c.name,
+      extracted_first_name: first_name,
+      extracted_last_name: last_name,
+      extracted_email: c.email || null,
+      extracted_current_title: c.current_title || null,
+      extracted_current_company: c.current_company || null,
     }
   }
 
   // Persist candidate (create or enrich)
-  const { first_name, last_name } = parseName(c.name)
   const mergedEnrichment = {
     ...(c.signals        && { signals: c.signals }),
     ...(c.career_summary && { career_summary: c.career_summary }),
@@ -1049,6 +1086,31 @@ async function ingestJd(text, classification, recruiter) {
 
   if (!extracted.role?.title || !extracted.role?.company) {
     return { classification: classification.type, label: classification.label, error: 'No role title or company found in JD' }
+  }
+
+  // If intake matched to an existing role, ask before writing anything (single-write-path)
+  if (extracted.role?.role_id) {
+    const { data: matchedRole } = await supabase
+      .from('roles').select('id, title, clients(name)')
+      .eq('id', extracted.role.role_id).eq('recruiter_id', recruiter.id)
+      .maybeSingle()
+
+    if (matchedRole) {
+      return {
+        classification: classification.type,
+        label: classification.label,
+        action: 'ask',
+        match: {
+          role_id: matchedRole.id,
+          title: matchedRole.title,
+          company: matchedRole.clients?.name,
+        },
+        extracted_title: extracted.role.title,
+        extracted_company: extracted.role.company,
+      }
+    }
+    // Matched role no longer exists — fall through to create
+    delete extracted.role.role_id
   }
 
   const result = await persistRole(extracted, text, recruiter)
@@ -1267,6 +1329,94 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
   if (error) return { error: error.message }
 
   return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'Sourced' }
+}
+
+async function toolCreateRole({ title, company, location, notes }, recruiter) {
+  if (!title?.trim() || !company?.trim()) return { error: 'title and company are required' }
+
+  let clientId
+  const { data: existingClient } = await supabase
+    .from('clients').select('id')
+    .eq('recruiter_id', recruiter.id).ilike('name', company.trim())
+    .maybeSingle()
+
+  if (existingClient) {
+    clientId = existingClient.id
+  } else {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({ recruiter_id: recruiter.id, name: company.trim(), ...(location && { hq_location: location }) })
+      .select('id').single()
+    if (error) return { error: error.message }
+    clientId = data.id
+  }
+
+  const { data: existingRole } = await supabase
+    .from('roles').select('id')
+    .eq('recruiter_id', recruiter.id).eq('client_id', clientId).ilike('title', title.trim())
+    .maybeSingle()
+
+  if (existingRole) {
+    return {
+      action: 'already_exists',
+      entity_type: 'role',
+      role_id: existingRole.id,
+      role_title: title.trim(),
+      company: company.trim(),
+      what_happened: `${title} at ${company} already exists`,
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('roles')
+    .insert({
+      recruiter_id: recruiter.id,
+      client_id: clientId,
+      title: title.trim(),
+      status: 'open',
+      process_steps: ['Sourced', 'Screen', 'Hiring Manager', 'Final Round', 'Offer', 'Placed'],
+      ...(notes && { notes: notes.slice(0, 20000) }),
+    })
+    .select('id').single()
+  if (error) return { error: error.message }
+
+  return {
+    action: 'created',
+    entity_type: 'role',
+    role_id: data.id,
+    client_id: clientId,
+    role_title: title.trim(),
+    company: company.trim(),
+    what_happened: `Created ${title} at ${company}`,
+  }
+}
+
+async function toolCreateCandidate({ name, email, current_title, current_company, cv_text }, recruiter) {
+  if (!name?.trim()) return { error: 'name is required' }
+  const { first_name, last_name } = parseName(name)
+
+  const { data, error } = await supabase
+    .from('candidates')
+    .insert({
+      recruiter_id: recruiter.id,
+      first_name,
+      last_name,
+      ...(email           && { email }),
+      ...(current_title   && { current_title }),
+      ...(current_company && { current_company }),
+      ...(cv_text         && { cv_text }),
+    })
+    .select('id').single()
+  if (error) return { error: error.message }
+
+  const fullName = `${first_name} ${last_name}`.trim()
+  return {
+    action: 'created',
+    entity_type: 'candidate',
+    candidate_id: data.id,
+    name: fullName,
+    what_happened: `Created candidate record for ${fullName}`,
+  }
 }
 
 async function toolEnrichFromNotes({ notes_text, candidate_id }, recruiter, convContext = {}) {
