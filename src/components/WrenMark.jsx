@@ -1,6 +1,6 @@
 export function WrenMark({ size = 28, tone = 'ink', state = 'idle' }) {
   const cls = [
-    'wren',
+    'wren-mark',
     tone,
     state !== 'idle' && 'thinking',
     state === 'working' && 'busy',

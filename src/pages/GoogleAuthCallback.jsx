@@ -65,14 +65,14 @@ export default function GoogleAuthCallback() {
       alignItems: 'center',
       justifyContent: 'center',
       height: '100vh',
-      background: 'var(--bg, #faf8f4)',
+      background: 'var(--bg, #eef1ee)',
     }}>
       <p style={{
         fontFamily: 'var(--font-mono, monospace)',
         fontSize: '12px',
         textTransform: 'uppercase',
         letterSpacing: '0.14em',
-        color: 'var(--mute, #6b655a)',
+        color: 'var(--mute, #55625c)',
       }}>
         Connecting Gmail&hellip;
       </p>

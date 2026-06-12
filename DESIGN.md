@@ -3,6 +3,8 @@
 > The palette and rules below are final. This document is a constraint, not a starting point. If a change violates a rule here, the change is wrong — not the rule.
 >
 > Read `WREN.md` for product context. Read `VISION.md` for why the product feels the way it feels. This file is how it *looks*.
+>
+> **Revision · 2026-06 — Juniper.** The palette moved off the original warm-cream + terracotta direction, which read too close to another product's identity. Wren is now **pale spruce-tinted paper + deep juniper green**, with a true brick-red reserved for verdict/urgency. Same bones — sharp corners, hairlines, Fraunces + JetBrains Mono, the bird. Only the color moved. Additionally, **the bird now flaps while Wren is working** (Rule 8) — the one sanctioned animation.
 
 ---
 
@@ -12,13 +14,13 @@ Wren is an operator-grade tool dressed in editorial clothing. The product's whol
 
 That means:
 
-- **Paper-white, not cream.** Warm enough to feel human, cool enough to not feel like artisanal stationery.
+- **Pale cool paper, not warm cream.** A spruce-tinted paper-white — human enough to live in all day, cool enough to read operator-grade rather than artisanal stationery, and distinctly its own (not a borrowed cream).
 - **Sharp corners, not rounded.** Verdict pills are stamped, not tagged. Tables are ledgers, not dashboards.
 - **Hairlines, not shadows.** Depth comes from hierarchy and type weight, not drop shadows on content.
 - **Editorial typography.** Fraunces for prose and verdicts. JetBrains Mono for labels and data. No system fonts.
 - **The wren bird is the only illustrative element.** No icon set. No emoji. No decorative gradients.
 
-If a design choice softens, decorates, or chromes the product — it's wrong. The bird is small, brown, alert, and precise. The product should be too.
+If a design choice softens, decorates, or chromes the product — it's wrong. The bird is small, alert, and precise. The product should be too.
 
 ---
 
@@ -27,37 +29,39 @@ If a design choice softens, decorates, or chromes the product — it's wrong. Th
 ### Light (default)
 
 ```css
---bg:          #faf8f4;              /* paper white — main canvas */
---panel:       #fdfcf8;              /* cards, panels, modals */
---rail:        #f3f1ec;              /* left composer rail, secondary surfaces */
---ink:         #1a1714;              /* primary text, borders at full strength */
---ink-inverse: #faf8f4;             /* text/icons on dark or accent-filled surfaces */
---mute:        #6b655a;              /* secondary text, mono labels */
---hair:        rgba(26,23,20,0.10); /* default 1px borders */
---hair-2:      rgba(26,23,20,0.18); /* emphasized borders, table rules */
---accent:        #b8451f;              /* PROTECT, urgent — the wren's brick-red mark */
---accent-hover:  #3a342e;              /* the only allowed interaction state for --accent */
---win:           #3d6b3d;              /* PUSH, locked, good news */
---kill:          #8a1f1f;              /* KILL — deep brick, used sparingly */
---chip:          rgba(26,23,20,0.05); /* subtle inline chip backgrounds */
+--bg:          #eef1ee;              /* pale spruce-tinted paper — main canvas */
+--panel:       #f8faf8;              /* cards, panels, modals */
+--rail:        #e4e9e5;              /* left composer rail, secondary surfaces */
+--ink:         #16201d;              /* primary text, borders at full strength — spruce-ink */
+--ink-inverse: #f6f9f6;              /* text/icons on dark or accent-filled surfaces */
+--mute:        #55625c;              /* secondary text, mono labels */
+--hair:        rgba(22,32,29,0.10);  /* default 1px borders */
+--hair-2:      rgba(22,32,29,0.19);  /* emphasized borders, table rules */
+--accent:        #a8392b;            /* PROTECT, urgent — true brick-red (was terracotta) */
+--accent-hover:  #243430;            /* the only allowed interaction state for --accent */
+--win:           #1f5a4d;            /* PUSH, locked, good news — deep juniper spruce */
+--kill:          #7d2a22;            /* KILL — deep brick, used sparingly */
+--chip:          rgba(22,32,29,0.05);/* subtle inline chip backgrounds */
 ```
+
+The signature green of the system is `--win` (deep juniper spruce). It is not decoration — it lives wherever PUSH / locked / good-news state lives. The Juniper character otherwise comes from the **neutrals**: the cool spruce-tinted paper and the spruce-ink, which carry the whole product even before a verdict color appears.
 
 ### Dark (terminal — opt-in via `data-theme="terminal"`)
 
 ```css
---bg:            #0c0e0c;
---panel:         #141714;
---rail:          #181b18;
---ink:           #d9d4c7;
---ink-inverse:   #1a1714;
---mute:          #7a7568;
---hair:          rgba(217,212,199,0.10);
---hair-2:        rgba(217,212,199,0.20);
---accent:        #d97757;              /* warmer in the dark */
---accent-hover:  #c46544;
---win:           #6ba36b;
+--bg:            #0d1311;             /* deep spruce-black */
+--panel:         #141d19;
+--rail:          #18221d;
+--ink:           #cdd8d1;             /* cool bone-green */
+--ink-inverse:   #0d1311;
+--mute:          #768078;
+--hair:          rgba(205,216,209,0.10);
+--hair-2:        rgba(205,216,209,0.20);
+--accent:        #cf5a48;             /* brick, lifted for dark — NOT a warm clay */
+--accent-hover:  #e07a68;
+--win:           #4e9e7a;             /* spruce, lifted for dark */
 --kill:          #c46060;
---chip:          rgba(217,212,199,0.06);
+--chip:          rgba(205,216,209,0.06);
 ```
 
 The terminal palette is for power-user moments — late-night deal triage, the "operator desk" mode, screen-share with a candidate where you want the chrome to disappear. It is not the default.
@@ -79,7 +83,7 @@ Signal colors are for **taxonomic and categorical labels only** — source type,
 --signal-red:    #dc2626;   /* reject rec, missing skill, hard no */
 ```
 
-Signal colors are foreground-only. All badges and pills that use signal colors get `--chip` background and `--hair` border — see Rule 7.
+Signal colors are foreground-only. All badges and pills that use signal colors get `--chip` background and `--hair` border — see Rule 7. They are retained unchanged through the Juniper revision; they read as classification against the cool paper and don't compete with the verdict palette.
 
 ---
 
@@ -122,7 +126,7 @@ The four verdict colors carry meaning. They are not decoration.
 | Token | Verdict | When to use |
 |---|---|---|
 | `--accent` (brick) | **PROTECT** | The deal is at risk. The candidate has leverage. The window is closing. |
-| `--win` (hedge) | **PUSH** | The deal is moving forward. Locked outcomes. Good news. |
+| `--win` (spruce) | **PUSH** | The deal is moving forward. Locked outcomes. Good news. |
 | `--kill` (deep brick) | **KILL** | Walk away. Used sparingly — most "no" decisions are HOLD, not KILL. |
 | `--ink` (full strength) | **HOLD** | Default. Watching, not flagging. |
 
@@ -133,7 +137,7 @@ Do **not** use these colors for:
 - Decoration, ornament, or "to add color"
 - Categorical labels — use signal tokens instead
 
-If a UI element doesn't represent a verdict, it doesn't get a verdict color.
+If a UI element doesn't represent a verdict, it doesn't get a verdict color. (The masthead bird and wordmark are `--ink`, not a verdict color — Wren's identity is carried by the ink and the neutrals, not by `--win`.)
 
 ### 4. Typography roles
 
@@ -171,7 +175,13 @@ This applies universally: source badges, fit badges, screener-rec badges, skill-
 The wren bird mark (`wren-bird-mark.png`) is the brand. Treat it like a stamp:
 
 - It is always a single color — `--ink` on light, `--ink` on dark (the bird inverts with the theme via CSS filter).
-- It does not animate as decoration. It can move when it has something to say (lands on a deal that needs attention; perches on the lock screen when there's a notification).
+- **It is still by default.** It does not animate as decoration. It can move when it has something to say (lands on a deal that needs attention; perches on the lock screen when there's a notification).
+- **It flaps only while Wren is actively working** — the "thinking" state: running the morning loop, drafting a reply, processing an ingest, holding a thought before it answers. This is the **one sanctioned animation** in the product. Motion here means *status*, never decoration. When the work finishes, the wing eases back to its folded rest pose.
+  - **Construction — two layers from the one mark.** `wren-body.png` is the full bird with a transparent, wing-shaped hole on its back; `wren-wing.png` is the wing alone, transparent elsewhere. Both are the same canvas size (501×383). Stacked, they recombine **pixel-exact** to `wren-bird-mark.png` — so the static logo is untouched. Only the wing layer animates; the body never moves. The hole behind the wing is transparent, so the lift reveals whatever the mark sits on (works on light and dark with no variants).
+  - **Pivot — the shoulder.** The wing rotates about `transform-origin: 51.5% 28%` (where it attaches to the body). Positive rotation lifts the tip up and back, breaking the topline like a real flap. Peak rotation **15°**.
+  - **Cadence — two beats + a settle.** Not a constant frantic loop. `1.5s` loop for "thinking," `0.92s` for active "working." Bird and wing keyframes stay in sync.
+  - **Reduced motion.** Respect `prefers-reduced-motion: reduce`: keep the wing folded and signal activity with a gentle opacity pulse on the whole mark instead.
+  - See `bird-flap.css` for the implementation and `wren-body.png` / `wren-wing.png` for the assets.
 - It is not a logo lockup. It does not have a tagline. It does not get a wordmark next to it except in the masthead, where the Fraunces "Wren" sits beside it at 1.5× the bird's height.
 
 ---
@@ -191,7 +201,7 @@ Three surface tones is the budget. Don't introduce a fourth ("slightly darker pa
 
 ## Spacing and density
 
-The system uses an 8px base, but the operator desk runs **dense**: 14px row gaps in tables, 18px between cards, 32px between sections. This is intentional. Recruiters read this product the way traders read a terminal — at a glance, full screen, lots of named entities. Do not "open it up for breathing room." The breathing room is the paper-white background.
+The system uses an 8px base, but the operator desk runs **dense**: 14px row gaps in tables, 18px between cards, 32px between sections. This is intentional. Recruiters read this product the way traders read a terminal — at a glance, full screen, lots of named entities. Do not "open it up for breathing room." The breathing room is the pale paper background.
 
 | Context | Vertical rhythm |
 |---|---|
@@ -218,10 +228,11 @@ Run this checklist any time the codebase changes. Each item is greppable.
 - [ ] No imports from `lucide-react`, `react-icons`, `@heroicons/*`, `phosphor-react`, or similar.
 - [ ] No hardcoded hex colors outside the token tables above. Search for `#` followed by 3 or 6 hex digits.
 - [ ] All prose uses Fraunces. All labels use JetBrains Mono uppercase.
-- [ ] Old cream values are gone: `#f5f1e8`, `#fbf8f0`, `#efe9dc`, `#f0eee9`.
+- [ ] Retired warm-cream / terracotta values are gone: `#faf8f4`, `#fdfcf8`, `#f3f1ec`, `#1a1714`, `#6b655a`, `#b8451f`, `#d97757`, `#3d6b3d`, `#8a1f1f` — and the earlier `#f5f1e8`, `#fbf8f0`, `#efe9dc`, `#f0eee9`.
 - [ ] Urgency overdue/today = `--accent`. Everything else = `--ink`. No third urgency color.
 - [ ] No custom property named `--*-bg` (except `--bg` itself) or `--*-border` — grep `--[a-z].*-bg:` and `--[a-z].*-border:` in `:root` blocks.
 - [ ] No custom property named `--color-*` — the old token prefix is fully retired.
+- [ ] The bird flaps **only** in the thinking/working state (gated on real in-flight agent state), never on load or as ambient decoration. Reduced-motion folds the wing and pulses opacity.
 
 If a violation exists, fix the violation. Do not relax the rule.
 
@@ -235,4 +246,4 @@ If a violation exists, fix the violation. Do not relax the rule.
 
 ---
 
-*Last updated: May 2026. Owner: design.*
+*Last updated: June 2026 — Juniper palette + flapping-bird (thinking) state. Owner: design.*

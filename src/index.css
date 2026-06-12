@@ -5,20 +5,20 @@
 }
 
 :root {
-  /* ── DESIGN.md surface tokens ─────────────────────────── */
-  --bg:          #faf8f4;              /* paper white — main canvas */
-  --panel:       #fdfcf8;              /* cards, panels, modals */
-  --rail:        #f3f1ec;              /* left rail, secondary surfaces */
-  --ink:         #1a1714;              /* primary text, borders at full strength */
-  --ink-inverse: #faf8f4;              /* text/icons on dark or accent-filled surfaces */
-  --mute:        #6b655a;              /* secondary text, mono labels */
-  --hair:        rgba(26,23,20,0.10);  /* default 1px borders */
-  --hair-2:      rgba(26,23,20,0.18);  /* emphasized borders, table rules */
-  --accent:      #b8451f;              /* PROTECT, urgent */
-  --accent-hover:#3a342e;              /* the only allowed interaction state for --accent */
-  --win:         #3d6b3d;              /* PUSH, locked, good news */
-  --kill:        #8a1f1f;              /* KILL — deep brick, used sparingly */
-  --chip:        rgba(26,23,20,0.05);  /* subtle inline chip backgrounds */
+  /* ── DESIGN.md surface tokens — Juniper palette (2026-06) ─ */
+  --bg:          #eef1ee;               /* pale spruce-tinted paper — main canvas */
+  --panel:       #f8faf8;               /* cards, panels, modals */
+  --rail:        #e4e9e5;               /* composer rail, secondary surfaces */
+  --ink:         #16201d;               /* primary text, full-strength borders — spruce-ink */
+  --ink-inverse: #f6f9f6;               /* text/icons on dark or accent-filled surfaces */
+  --mute:        #55625c;               /* secondary text, mono labels */
+  --hair:        rgba(22,32,29,0.10);   /* default 1px borders */
+  --hair-2:      rgba(22,32,29,0.19);   /* emphasized borders, table rules */
+  --accent:        #a8392b;             /* PROTECT, urgent — true brick-red */
+  --accent-hover:  #243430;             /* only allowed interaction state for --accent */
+  --win:           #1f5a4d;             /* PUSH, locked, good news — deep juniper spruce */
+  --kill:          #7d2a22;             /* KILL — deep brick, used sparingly */
+  --chip:          rgba(22,32,29,0.05); /* subtle inline chip backgrounds */
 
   /* ── Signal palette (taxonomic badges — not verdict colors) ── */
   --signal-blue:   #1e40af;
@@ -32,6 +32,23 @@
   --font:       'Inter', ui-sans-serif, -apple-system, system-ui, sans-serif;
   --font-serif: 'Fraunces', Georgia, serif;
   --font-mono:  'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* ── Dark (terminal — opt-in via data-theme="terminal") ───── */
+[data-theme="terminal"] {
+  --bg:            #0d1311;              /* deep spruce-black */
+  --panel:         #141d19;
+  --rail:          #18221d;
+  --ink:           #cdd8d1;              /* cool bone-green */
+  --ink-inverse:   #0d1311;
+  --mute:          #768078;
+  --hair:          rgba(205,216,209,0.10);
+  --hair-2:        rgba(205,216,209,0.20);
+  --accent:        #cf5a48;              /* brick, lifted for dark */
+  --accent-hover:  #e07a68;
+  --win:           #4e9e7a;              /* spruce, lifted for dark */
+  --kill:          #c46060;
+  --chip:          rgba(205,216,209,0.06);
 }
 
 body {
@@ -575,7 +592,7 @@ body {
 }
 .urgency-dot.urgency--overdue  { background: var(--accent); }
 .urgency-dot.urgency--today    { background: var(--accent); }
-.urgency-dot.urgency--upcoming { background: rgba(26,23,20,0.40); }
+.urgency-dot.urgency--upcoming { background: rgba(22,32,29,0.40); }
 
 /* ── Interaction log form ───────────────────────────── */
 
@@ -2979,7 +2996,7 @@ select.field-input {
 
 .wren-command-textarea:focus {
   outline: none;
-  border-color: rgba(26,23,20,0.40);
+  border-color: rgba(22,32,29,0.40);
 }
 
 .wren-command-textarea:disabled {
@@ -3015,7 +3032,7 @@ select.field-input {
 .wren-chip--resume     { background: var(--chip); border-color: var(--hair); color: var(--signal-blue); }
 .wren-chip--jd         { background: var(--chip); border-color: var(--hair); color: var(--signal-green); }
 .wren-chip--transcript { background: var(--chip); border-color: var(--hair); color: var(--signal-purple); }
-.wren-chip--notes      { background: var(--chip); border-color: rgba(26,23,20,0.40); color: var(--mute); }
+.wren-chip--notes      { background: var(--chip); border-color: rgba(22,32,29,0.40); color: var(--mute); }
 .wren-chip--url        { background: var(--chip); border-color: var(--hair); color: var(--signal-amber); }
 .wren-chip--error      { background: var(--chip); border-color: var(--hair); color: var(--signal-red); }
 .wren-chip--hint       { background: var(--panel); border-color: var(--hair); color: var(--ink); cursor: pointer; }
@@ -4780,13 +4797,30 @@ select.field-input {
 }
 
 /* ── Wren bird mark — two-layer animated logo ──────── */
-/* body (.wb) sets the box; wing (.ww) rotates at the shoulder pivot */
-.wren        { position: relative; display: inline-block; line-height: 0; vertical-align: middle; }
-.wren img    { display: block; width: 100%; height: auto; }
-.wren .wb    { position: relative; }
-.wren .ww    { position: absolute; inset: 0; transform-origin: 51.5% 28%; transition: transform .4s cubic-bezier(.4,0,.2,1); }
-.wren.ink  img { filter: brightness(0); }
-.wren.cream img { filter: brightness(0) invert(1); }
+/* Container sized by width + aspect-ratio; both images overlay pixel-exact. */
+/* Wing (.ww) rotates at the shoulder pivot; body (.wb) never moves. */
+.wren-mark {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+  aspect-ratio: 501 / 383;
+}
+.wren-mark img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.wren-mark.ink   img { filter: brightness(0); }
+.wren-mark.cream img { filter: brightness(0) invert(1); }
+
+/* Wing eases back to rest when thinking class is removed */
+.wren-mark .ww {
+  transform-origin: 51.5% 28%;
+  transition: transform .4s cubic-bezier(.4, 0, .2, 1);
+}
 
 @keyframes wrenFlap {
   0%   { transform: rotate(0deg); }
@@ -4801,16 +4835,17 @@ select.field-input {
   9%, 27%  { transform: translateY(-2.2%); }
   18%      { transform: translateY(-0.6%); }
 }
+@keyframes wrenPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 
-.wren.thinking      { animation: wrenBob  1.5s ease-in-out infinite; }
-.wren.thinking .ww  { animation: wrenFlap 1.5s ease-in-out infinite; }
-.wren.thinking.busy,
-.wren.thinking.busy .ww { animation-duration: .92s; }
+.wren-mark.thinking            { animation: wrenBob  1.5s ease-in-out infinite; }
+.wren-mark.thinking .ww        { animation: wrenFlap 1.5s ease-in-out infinite; }
+.wren-mark.thinking.busy,
+.wren-mark.thinking.busy .ww   { animation-duration: .92s; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wren.thinking, .wren.thinking .ww { animation: none; }
-  .wren.thinking { animation: wrenPulse 1.6s ease-in-out infinite; }
-  @keyframes wrenPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  .wren-mark.thinking,
+  .wren-mark.thinking .ww      { animation: none; }
+  .wren-mark.thinking          { animation: wrenPulse 1.6s ease-in-out infinite; }
 }
 
 /* Fixed input bar — centered to match message column */
@@ -6769,7 +6804,7 @@ select.field-input {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgba(26,23,20,0.24);
+  background: rgba(22,32,29,0.24);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -6780,7 +6815,7 @@ select.field-input {
   max-width: calc(100vw - 40px);
   background: var(--panel);
   border: 1px solid var(--hair);
-  box-shadow: 0 8px 32px rgba(26,23,20,0.12);
+  box-shadow: 0 8px 32px rgba(22,32,29,0.12);
   display: flex;
   flex-direction: column;
 }
