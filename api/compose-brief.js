@@ -15,6 +15,7 @@ const URGENCY_RANK = { now: 3, today: 2, this_week: 1 }
 function sanitizeDashes(text) {
   if (typeof text !== 'string') return text
   return text
+    .replace(/ -- /g, ', ')
     .replace(/(\S)[‒–—―](\S)/g, '$1-$2')
     .replace(/ [‒–—―] /g, ', ')
     .replace(/[‒–—―]/g, ' - ')

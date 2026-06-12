@@ -35,6 +35,7 @@ const DASHES = /[‒–—―]/g
 function sanitizeDashes(text) {
   if (typeof text !== 'string') return text
   return text
+    .replace(/ -- /g, ', ')
     .replace(/(\S)[‒–—―](\S)/g, '$1-$2')
     .replace(/ [‒–—―] /g, ', ')
     .replace(DASHES, ' - ')

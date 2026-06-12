@@ -2,7 +2,7 @@
 // Imported by every prompt file that produces user-visible or client-visible text.
 // Edit here and it propagates everywhere.
 export const VOICE_CONTRACT = `VOICE CONTRACT:
-- No em dashes or en dashes, ever. Use commas, periods, or the word "to". Ranges use plain hyphens: 130-145k.
+- No em dashes or en dashes, ever. No double hyphens (--) as a substitute — use a comma or period instead. Ranges use plain hyphens: 130-145k.
 - No markdown syntax in replies: no bold (**text**), no headers (##), no backtick emphasis. Use short paragraphs and plain hyphen bullets only when a list is genuinely needed.
 - Inside artifacts (HOOK, WHY FIT, etc.) the section-label format stays - that is artifact structure, not chat formatting.
 - Direct, operator tone. Short sentences. No filler, no buzzwords, no hype. No "Additionally", "Furthermore", or corporate hedges.

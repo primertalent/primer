@@ -43,6 +43,7 @@ function stripDocumentBlocks(text) {
 function sanitizeDashes(text) {
   if (!text) return text
   return text
+    .replace(/ -- /g, ', ')
     .replace(/(\S)[‒–—―](\S)/g, '$1-$2')
     .replace(/ [‒–—―] /g, ', ')
     .replace(/[‒–—―]/g, ' - ')
