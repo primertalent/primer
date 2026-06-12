@@ -724,7 +724,7 @@ export default function Wren() {
             />
             <button
               className="btn-primary wren-send"
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!canSend}
             >
               Send
