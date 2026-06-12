@@ -10,6 +10,15 @@ import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
 import { supabase } from '../lib/supabase'
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = () => reject(new Error('Could not read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
 function initiateGoogleOAuth() {
   const params = new URLSearchParams({
     client_id:     import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID,
@@ -154,8 +163,10 @@ export default function Wren() {
   const [railOpen, setRailOpen] = useState(true)
   const [quickOpenOpen, setQuickOpenOpen] = useState(false)
   const [ticker, setTicker] = useState(null)
+  const [extracting, setExtracting] = useState(false)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
   const loadedRef = useRef(false)
   const latestConvIdRef = useRef(null)
 
@@ -382,6 +393,44 @@ export default function Wren() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
+    }
+  }
+
+  async function handleFileAttach(file) {
+    if (!file) return
+    setPendingPaste(null)
+    setExtracting(true)
+    try {
+      const base64 = await fileToBase64(file)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not authenticated')
+      const resp = await fetch('/api/extract-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ filename: file.name, content_base64: base64 }),
+      })
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${resp.status}`)
+      }
+      const { text } = await resp.json()
+      setPendingPaste({ text, label: file.name })
+    } catch (err) {
+      console.error('[attach]', err)
+      setMessages(prev => [...prev, {
+        id: 'attach-error-' + Date.now(),
+        role: 'assistant',
+        content: { type: 'text', text: err.message || 'Could not extract the file — try again or paste the resume text directly.' },
+        created_at: new Date().toISOString(),
+        _local: true,
+      }])
+    } finally {
+      setExtracting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -707,14 +756,17 @@ export default function Wren() {
               </button>
             </div>
           )}
-          <div className="wren-input-bar">
-            {pendingPaste && (
+          <div
+            className="wren-input-bar"
+            onDrop={e => { e.preventDefault(); handleFileAttach(e.dataTransfer.files?.[0]) }}
+            onDragOver={e => e.preventDefault()}
+          >
+            {(pendingPaste || extracting) && (
               <div className="wren-chips">
-                <Chip
-                  type="notes"
-                  label={pendingPaste.label}
-                  onRemove={() => setPendingPaste(null)}
-                />
+                {extracting
+                  ? <Chip label="Extracting…" loading />
+                  : <Chip type="notes" label={pendingPaste.label} onRemove={() => setPendingPaste(null)} />
+                }
               </div>
             )}
             <textarea
@@ -728,6 +780,24 @@ export default function Wren() {
               disabled={streaming}
               rows={1}
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              className="wren-attach-input"
+              onChange={e => handleFileAttach(e.target.files?.[0])}
+            />
+            <button
+              className="wren-attach-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={extracting || streaming}
+              title="Attach CV (PDF or Word)"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13.5 6.5L6.5 13.5a4 4 0 01-5.657-5.657L8 0.686" />
+                <path d="M11.5 4.5L5 11a2 2 0 002.828 2.828L14 7.657" />
+              </svg>
+            </button>
             <button
               className="btn-primary wren-send"
               onClick={() => sendMessage()}

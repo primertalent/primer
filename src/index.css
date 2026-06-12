@@ -4935,6 +4935,10 @@ select.field-input {
   opacity: 0.6;
 }
 
+.wren-attach-input {
+  display: none;
+}
+
 .wren-send {
   white-space: nowrap;
   flex-shrink: 0;
