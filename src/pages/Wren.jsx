@@ -4,6 +4,7 @@ import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
 import IngestResult from '../components/wren/IngestResult'
 import GoogleConnectCard from '../components/wren/GoogleConnectCard'
+import QuickOpen from '../components/wren/QuickOpen'
 import { WrenMark } from '../components/WrenMark'
 import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -79,6 +80,7 @@ export default function Wren() {
   const [gmailTokenRevoked, setGmailTokenRevoked] = useState(false)
   const [convList, setConvList] = useState([])
   const [railOpen, setRailOpen] = useState(true)
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const loadedRef = useRef(false)
@@ -109,6 +111,17 @@ export default function Wren() {
         _local: true,
       }])
     }
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setQuickOpenOpen(open => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   async function loadMostRecentConversation() {
@@ -512,6 +525,15 @@ export default function Wren() {
           </div>
         </div>
       </div>
+      {quickOpenOpen && (
+        <QuickOpen
+          onSelect={prompt => {
+            setQuickOpenOpen(false)
+            sendMessage(prompt)
+          }}
+          onClose={() => setQuickOpenOpen(false)}
+        />
+      )}
     </AppLayout>
   )
 }
