@@ -70,7 +70,7 @@ export default function Landing() {
             color: 'var(--ink)',
             margin: 0,
           }}>
-            With your permission, Wren sends emails you explicitly approve from your Gmail — Wren cannot send anything you haven't reviewed first. Wren also reads your Google Calendar to prepare briefing materials before scheduled interviews. See our{' '}
+            With your permission, Wren sends emails you explicitly approve from your Gmail. Wren cannot send anything you haven't reviewed first. Wren also reads your Google Calendar to prepare briefing materials before scheduled interviews. See our{' '}
             <a href="/privacy.html" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
               Privacy Policy
             </a>

@@ -95,7 +95,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
         return
       }
       if (result.error === 'auth_required') {
-        setSendError('Gmail not connected — use the Connect button below.')
+        setSendError('Gmail not connected. Use the Connect button below.')
         setSending(false)
         return
       }
@@ -122,7 +122,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
       <div className="submittal-draft__header" onClick={() => setExpanded(e => !e)}>
         <span className="submittal-draft__label">
           {data.is_revision ? 'REVISED DRAFT' : 'SUBMITTAL DRAFT'}
-          {data.role_title && ` — ${data.role_title}`}
+          {data.role_title && `: ${data.role_title}`}
           {data.client_name && ` / ${data.client_name}`}
         </span>
         {!isLatest && (

@@ -20,7 +20,7 @@ export default function ScreenResult({ data }) {
         </span>
         {data.client_name && (
           <span className="screen-result__role">
-            {data.role_title} — {data.client_name}
+            {data.role_title} · {data.client_name}
           </span>
         )}
       </div>
