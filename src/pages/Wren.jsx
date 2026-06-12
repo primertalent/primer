@@ -677,7 +677,7 @@ export default function Wren() {
   draftSeenRef.current = 0
 
   return (
-    <AppLayout fullBleed thinking={streaming}>
+    <AppLayout fullBleed thinking={streaming || extracting}>
       <div className="wren-shell">
         <aside className={`wren-rail${railOpen ? '' : ' wren-rail--closed'}`}>
           <div className="wren-rail__header">
