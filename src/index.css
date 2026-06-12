@@ -4645,6 +4645,17 @@ select.field-input {
   overflow-x: hidden;
 }
 .wren-rail--closed {
+  width: 28px;
+}
+.wren-rail--closed .wren-rail__header {
+  padding: 10px 0;
+  justify-content: center;
+  border-bottom: none;
+}
+.wren-rail--closed .wren-rail__header span {
+  display: none;
+}
+.wren-rail--closed .wren-rail__days {
   display: none;
 }
 .wren-rail__header {
@@ -4706,11 +4717,10 @@ select.field-input {
 .wren-thread {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 0 16px;
+  padding: 32px max(20px, calc(50% - 370px)) 16px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  align-items: center;
 }
 
 /* Empty state */
@@ -4728,11 +4738,9 @@ select.field-input {
 /* Individual message */
 .wren-msg {
   max-width: 740px;
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 20px;
 }
 
 .wren-msg--user {
@@ -4741,7 +4749,7 @@ select.field-input {
 }
 
 .wren-msg--wren {
-  align-self: flex-start;
+  align-self: stretch;
   align-items: flex-start;
 }
 
