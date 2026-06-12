@@ -1,6 +1,13 @@
 import { buildVoiceBlock, buildRuleZero } from './voiceRules.js'
 import { VOICE_CONTRACT } from './voiceContract.js'
 
+function getToday() {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: 'long', day: 'numeric',
+  }).format(new Date())
+}
+
 // ─── /wren two-surface submittal ─────────────────────────────────────────────
 // Used exclusively by api/wren.js. Desk pages use buildSubmissionMessages below.
 //
@@ -29,7 +36,9 @@ function buildInternalBreakdownMessages(candidate, role, fitScore, voiceSamples)
   const roleSection = buildRoleSection(role)
   const fitSection = fitScore != null ? `\nFit score against this role: ${Math.round(fitScore)}/100` : ''
 
-  const prompt = `You are a technical recruiter producing an internal candidate breakdown before deciding whether to submit.
+  const prompt = `Today's date: ${getToday()}. Use this for tenure and availability calculations.
+
+You are a technical recruiter producing an internal candidate breakdown before deciding whether to submit.
 
 ${ruleZero}
 
@@ -83,7 +92,9 @@ function buildExternalSubmittalMessages(candidate, role, fitScore, format, resol
 
   const formatInstructions = buildExternalFormatInstructions(format)
 
-  const prompt = `You are an expert technical recruiter writing a candidate submission for a hiring manager.
+  const prompt = `Today's date: ${getToday()}. Use this for tenure and availability calculations.
+
+You are an expert technical recruiter writing a candidate submission for a hiring manager.
 
 ${ruleZero}
 

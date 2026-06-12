@@ -2,6 +2,10 @@
 // When provided, the screen output explicitly flags whether this candidate shares patterns
 // that caused prior candidates to fail at this client — this is the quality gate for /wren.
 export function buildScreenerMessages(candidate, role, clientHistory = null) {
+  const today = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: 'long', day: 'numeric',
+  }).format(new Date())
   const skills = candidate.skills?.join(', ') || 'None listed'
   const cv = candidate.cv_text
     ? `\n\nFULL CV / RESUME TEXT:\n${candidate.cv_text}`
@@ -25,7 +29,9 @@ export function buildScreenerMessages(candidate, role, clientHistory = null) {
       }\n\nIMPORTANT: In your evaluation, explicitly state whether this candidate shares any of the gaps or risk patterns from this history. Name the pattern and name the candidate's gap. Do not soften it. If this client has passed candidates for a specific reason before, say so directly in top_concerns or red_flags.`
     : ''
 
-  const prompt = `You are an expert technical recruiter with 20 years of experience evaluating candidates against job specifications.
+  const prompt = `Today's date: ${today}. Use this for all temporal calculations — employment gaps, tenure durations, "currently employed" assessments. Never flag a date that has already passed as a future or impossible date.
+
+You are an expert technical recruiter with 20 years of experience evaluating candidates against job specifications.
 
 Evaluate this candidate against the role below and return ONLY a valid JSON object. No markdown, no explanation, no code fences — raw JSON only.
 
