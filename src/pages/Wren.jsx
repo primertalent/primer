@@ -72,7 +72,7 @@ function stripMarkdown(text) {
 // Stage weights for pipeline value — keyed by current_stage.toLowerCase().trim().
 // Zero-weight stages are explicit so only truly unrecognized strings trigger the unknown counter.
 const STAGE_WEIGHTS = {
-  sourced: 0, outreach: 0, applied: 0,
+  sourced: 0, outreach: 0, applied: 0, shortlisted: 0, shortlist: 0,
   screen: 0, screening: 0, 'phone screen': 0, phone_screen: 0,
   submitted: 0.30, submitting: 0.30, interviewing: 0.30, interview: 0.30,
   'first interview': 0.30, '1st interview': 0.30, 'phone interview': 0.30,
