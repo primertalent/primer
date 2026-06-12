@@ -55,6 +55,7 @@ import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 import { buildInboundEmailClassifierMessages } from '../src/lib/prompts/inboundEmailClassifier.js'
 import { matchRoleFromNotes } from './_lib/matchRoleFromNotes.js'
+import { extractResumeText, MAX_BYTES } from './_lib/extractFile.js'
 import { extractCompFromNotes } from './_lib/extractCompFromNotes.js'
 import { runBackgroundDebrief } from './_lib/runBackgroundDebrief.js'
 import { BUILD_VERSION } from '../src/lib/buildVersion.js'
@@ -622,6 +623,7 @@ function normalizePayload(body) {
       listUnsubscribe: body.headers?.['list-unsubscribe'] || null,
       // Defensive: check all known CloudMailin variants for Message-ID header
       messageId:       body.headers?.['message-id'] || body.headers?.['message_id'] || body.headers?.['Message-ID'] || null,
+      attachments:     Array.isArray(body.attachments) ? body.attachments : [],
     }
   }
   // Flat format (testing + other services)
@@ -633,6 +635,7 @@ function normalizePayload(body) {
     dateStr:         body.date    || null,
     listUnsubscribe: null,
     messageId:       null,
+    attachments:     Array.isArray(body.attachments) ? body.attachments : [],
   }
 }
 
@@ -727,7 +730,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { fromRaw, to, subject, text, dateStr, listUnsubscribe, messageId } = normalizePayload(req.body)
+    const { fromRaw, to, subject, text, dateStr, listUnsubscribe, messageId, attachments } = normalizePayload(req.body)
     const from       = parseFrom(fromRaw)
     const body       = text.trim()
     const occurredAt = parseDate(dateStr)
@@ -819,13 +822,54 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: 'unsubscribe_header' })
     }
 
+    // ── Attachment extraction ────────────────────────────────────────────────
+    // Runs after noise guards — no point extracting from blocked mail.
+    // Extracted text is appended to bodyForClassification only so a bare
+    // "see attached" email with a resume PDF classifies as candidate_communication.
+    // The original body is preserved for the interaction record.
+    let attachmentLog = []
+    let bodyForClassification = body
+
+    for (const att of attachments) {
+      const filename    = att.filename || att.name || ''
+      const contentType = (att.content_type || att.mime_type || '').toLowerCase()
+      const content     = att.content || att.data || ''
+      const size        = att.size ?? (content ? Buffer.byteLength(content, 'base64') : 0)
+
+      const isPdf  = filename.toLowerCase().endsWith('.pdf') || contentType.includes('pdf')
+      const isDocx = filename.toLowerCase().endsWith('.docx') || filename.toLowerCase().endsWith('.doc') ||
+                     contentType.includes('openxml') || contentType.includes('msword')
+      if (!isPdf && !isDocx) continue
+
+      if (!content) {
+        console.warn('[ingest-email] attachment has no inline content, skipping:', filename)
+        attachmentLog.push({ filename, outcome: 'no_content', size })
+        continue
+      }
+      if (size > MAX_BYTES) {
+        console.warn('[ingest-email] attachment too large, skipping:', filename, size)
+        attachmentLog.push({ filename, outcome: 'too_large', size })
+        continue
+      }
+
+      try {
+        const extractedText = await extractResumeText(filename, content)
+        bodyForClassification += `\n\n[Attached: ${filename}]\n${extractedText}`
+        attachmentLog.push({ filename, outcome: 'extracted', size, chars: extractedText.length })
+        console.log('[ingest-email] attachment extracted:', filename, extractedText.length, 'chars')
+      } catch (extractErr) {
+        console.warn('[ingest-email] attachment extraction failed:', filename, extractErr.message)
+        attachmentLog.push({ filename, outcome: 'failed', size, error: extractErr.message })
+      }
+    }
+
     // ── Classify email (Haiku — fast, cheap) ────────────────────────────────
     let classification = null
     try {
       const { system, messages, maxTokens } = buildInboundEmailClassifierMessages({
         from: { name: from.name, email: from.email },
         subject,
-        body,
+        body: bodyForClassification,
       })
       const aiResp = await anthropic.messages.create({
         model:      'claude-haiku-4-5-20251001',
@@ -872,6 +916,7 @@ export default async function handler(req, res) {
             from_name:      from.name  || null,
             from_email:     from.email || null,
             classification: classification ?? null,
+            ...(attachmentLog.length > 0 && { attachments: attachmentLog }),
           },
         })
         .select('id')
@@ -973,6 +1018,7 @@ export default async function handler(req, res) {
           from_email:        from.email || null,
           classification:    classification ?? null,
           candidate_created: candidateCreated,
+          ...(attachmentLog.length > 0 && { attachments: attachmentLog }),
         },
       })
       .select('id')
