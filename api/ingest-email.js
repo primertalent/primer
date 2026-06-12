@@ -728,7 +728,7 @@ export default async function handler(req, res) {
 
   try {
     const { fromRaw, to, subject, text, dateStr, listUnsubscribe, messageId } = normalizePayload(req.body)
-    console.log('[ingest-email] full payload:', JSON.stringify(req.body))
+    console.log('[ingest-email] plain text:', text)
     const from       = parseFrom(fromRaw)
     const body       = text.trim()
     const occurredAt = parseDate(dateStr)
