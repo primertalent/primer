@@ -3,7 +3,10 @@
 
 ---
 
-## Current State (updated 2026-06-10)
+## Current State (updated 2026-06-12)
+
+**Session 34 (2026-06-12) — Gauntlet testing + build sprint:**
+Attachment pipeline shipped: `api/_lib/extractFile.js` + `api/extract-file.js` (JWT-authed POST, PDF via Haiku multimodal, DOCX via mammoth), composer paperclip (Wren.jsx + index.css), email attachment extraction in ingest-email.js (before classifier so "see attached" → correct classification). Send-error surfacing: async code moved inside try, catch injects thread message instead of swallowing silently. Ticker `shortlisted` stage mapped. Rejected-match dead end fixed: `ingestJd` now match-then-ask (no write on role match, deferred until user confirms or rejects); `create_role` and `create_candidate` tools added — serve reject→create path and bare conversational creation ("Create a role: Forward Deployed Engineer at Beacon, $150-180k"). `ingestResume` ask response now includes extracted fields for reject→create. wrenAgent CAPABILITIES updated: conversation is the creation path, no phantom platform. UI polish: bird animates during extraction (streaming || extracting), composer floats 20px off bottom with full border, min-height 72px, font 16px, auto-grows. Placeholder copy cleaned. Em dash audit: 5 hardcoded strings fixed across Wren.jsx, SubmittalDraft, ScreenResult, Landing. Date injection: today's date (America/New_York) injected into resumeScreener, submissionDraft (both surfaces), and wrenAgent — fixes "Dec 2025 impossible date" false red flag. Double-hyphen sanitizer: ` -- ` → `', '` added to all three sanitizeDashes copies; voiceContract updated to explicitly ban `--` substitutes.
 
 **Session 33 (2026-06-10) — Strategy capture + Phase 0 launch:**
 Build plan reset. 4-phase arc: Phase 0 (burn the boats — auth gate + legacy surface deletion + pipeline rename), Phase 1 (One Surface — Wren speaks first, deal ledger artifact, ambient pipeline v1), Phase 2 (Pocket Employee — PWA + push + voice), Phase 3 (Memory That Compounds — outcome write-back + pattern retrieval). Beta (Phase 4) runs parallel starting week of 6/15. Kill list explicit: Tier 2 chip wiring, "Add to a role" diagnosis, all Desk handler work, Gemini Notes polish, extension, Stage 9 cadence engine, Stage 8 closing playbook all dead until after outcome write-back. WREN_JD.md created as roadmap spine — job-coverage thinking replaces feature-list thinking. VISION.md: autonomy ladder (Tier 0–3, earned promotion) replaces three-tier autonomy; three-bucket rule, zero input labor, retrieval is never the response, flywheel added as shape constraints. DECISIONS.md: 6 new entries. Honesty metric (% Wren-initiated) added to brief footer spec.
@@ -549,6 +552,9 @@ If any answer is wrong, redesign or defer.
 - One-click is the bar. More than one motion gets flagged for redesign.
 - The conversation's action surface is the prioritization layer. That is the core loop, not a dashboard feature.
 - Recruiter score and AI score are separate permanent tracks. Don't collapse them.
+
+**React conventions:**
+- Handlers with optional parameters are never passed bare to onClick. Always wrap: `onClick={() => fn(arg)}` not `onClick={fn}`. Two bugs this week from passing `sendMessage` bare — React passes the SyntheticEvent as the first argument, which propagated as `directMsg`, silently corrupting the call. The arrow wrapper is the contract.
 
 ---
 
