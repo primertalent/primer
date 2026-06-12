@@ -418,34 +418,33 @@ export default function Wren() {
       setInputText('')
     }
 
-    if (latestConvIdRef.current && conversationId !== latestConvIdRef.current) {
-      const targetId = latestConvIdRef.current
-      setConversationId(targetId)
-      const { data: histMsgs } = await supabase
-        .from('conversation_messages')
-        .select('id, role, content, created_at')
-        .eq('conversation_id', targetId)
-        .order('created_at', { ascending: true })
-      if (histMsgs) setMessages(histMsgs)
-    }
-
-    setStreaming(true)
-
-    const optimisticUser = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: { type: 'text', text: displayText },
-      created_at: new Date().toISOString(),
-      _optimistic: true,
-    }
-    setMessages(prev => [...prev, optimisticUser])
-    setStreamingMsg({ text: '', renders: [] })
-
-    let accText = ''
-    let accRenders = []
-    let convId = latestConvIdRef.current || conversationId
-
     try {
+      if (latestConvIdRef.current && conversationId !== latestConvIdRef.current) {
+        const targetId = latestConvIdRef.current
+        setConversationId(targetId)
+        const { data: histMsgs } = await supabase
+          .from('conversation_messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', targetId)
+          .order('created_at', { ascending: true })
+        if (histMsgs) setMessages(histMsgs)
+      }
+
+      setStreaming(true)
+
+      const optimisticUser = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: { type: 'text', text: displayText },
+        created_at: new Date().toISOString(),
+        _optimistic: true,
+      }
+      setMessages(prev => [...prev, optimisticUser])
+      setStreamingMsg({ text: '', renders: [] })
+
+      let accText = ''
+      let accRenders = []
+      let convId = latestConvIdRef.current || conversationId
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       if (!token) throw new Error('Not authenticated')
@@ -516,9 +515,16 @@ export default function Wren() {
       }
     } catch (err) {
       console.error('[Wren]', err)
-      setStreamingMsg(prev =>
-        prev ? { ...prev, error: err.message } : null
-      )
+      setMessages(prev => [
+        ...prev,
+        {
+          id: 'send-error-' + Date.now(),
+          role: 'assistant',
+          content: { type: 'text', text: 'Something broke sending that — try again.' },
+          created_at: new Date().toISOString(),
+          _local: true,
+        },
+      ])
     } finally {
       setStreaming(false)
       setStreamingMsg(null)  // clear thinking dots on any close — abrupt or clean
