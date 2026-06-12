@@ -119,7 +119,7 @@ function DeskTicker({ ticker }) {
         <span className="wren-ticker__value">
           {ticker.weighted > 0 ? fmtCurrency(ticker.weighted) : '—'}
           {ticker.unknownCount > 0 && (
-            <sup title={`${ticker.unknownCount} deal${ticker.unknownCount > 1 ? 's' : ''} not weighted — stage not recognized`}>*</sup>
+            <sup title={`${ticker.unknownCount} deal${ticker.unknownCount > 1 ? 's' : ''} not weighted, stage not recognized`}>*</sup>
           )}
         </span>
       </div>
@@ -465,6 +465,7 @@ export default function Wren() {
       ].filter(Boolean).join('  ')
       setPendingPaste(null)
       setInputText('')
+      if (inputRef.current) inputRef.current.style.height = 'auto'
     }
 
     try {
@@ -772,13 +773,18 @@ export default function Wren() {
             <textarea
               ref={inputRef}
               className="wren-input"
-              placeholder="Screen a resume, draft a submittal, write outreach, find a network fit — or paste anything."
+              placeholder="Screen a resume, draft a submittal, write outreach, or paste anything."
               value={inputText}
-              onChange={e => setInputText(e.target.value)}
+              onChange={e => {
+                setInputText(e.target.value)
+                const el = e.target
+                el.style.height = 'auto'
+                el.style.height = `${el.scrollHeight}px`
+              }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               disabled={streaming}
-              rows={1}
+              rows={2}
             />
             <input
               ref={fileInputRef}

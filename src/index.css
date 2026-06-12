@@ -4894,28 +4894,28 @@ select.field-input {
   .wren-mark.thinking          { animation: wrenPulse 1.6s ease-in-out infinite; }
 }
 
-/* Fixed input bar — centered to match message column */
+/* Composer bar — floats above the viewport bottom */
 .wren-input-bar {
-  border-top: 1px solid var(--hair);
+  border: 1px solid var(--hair);
   background: var(--panel);
-  padding: 12px 20px;
+  padding: 12px 14px;
   display: flex;
   gap: 10px;
   align-items: flex-end;
   max-width: 740px;
-  width: 100%;
-  margin: 0 auto;
+  width: calc(100% - 40px);
+  margin: 0 auto 20px;
 }
 
 .wren-input {
   flex: 1;
-  min-height: 40px;
-  max-height: 120px;
+  min-height: 72px;
+  max-height: 160px;
   padding: 10px 12px;
   border: 1px solid var(--hair);
   background: var(--bg);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   font-family: var(--font-serif); /* Rule 4: conversation layer is prose, Fraunces */
   outline: none;
   resize: none;
