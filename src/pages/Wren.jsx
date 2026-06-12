@@ -199,12 +199,27 @@ export default function Wren() {
   }, [])
 
   async function loadMostRecentConversation() {
-    const { data: conv } = await supabase
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    // Find today's conversation (by created_at, local-midnight boundary)
+    let { data: conv } = await supabase
       .from('conversations')
       .select('id')
-      .order('updated_at', { ascending: false })
+      .gte('created_at', todayStart.toISOString())
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // No today conversation — create one so the brief has a home
+    if (!conv) {
+      const { data: created } = await supabase
+        .from('conversations')
+        .insert({ recruiter_id: recruiter.id })
+        .select('id')
+        .single()
+      conv = created
+    }
 
     if (!conv) return
 
@@ -219,6 +234,49 @@ export default function Wren() {
 
     if (msgs) setMessages(msgs)
     loadConversationList()
+
+    // Server decides whether to compose — client always delegates
+    composeMorningBrief(conv.id)
+  }
+
+  async function composeMorningBrief(convId) {
+    setStreaming(true)
+    setStreamingMsg({ text: '', renders: [] })
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+
+      const resp = await fetch('/api/compose-brief', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ conversation_id: convId }),
+      })
+
+      if (!resp.ok) return
+
+      const result = await resp.json()
+
+      if (result.message_id) {
+        // Brief freshly composed and persisted — reload messages to surface it
+        const { data: msgs } = await supabase
+          .from('conversation_messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: true })
+        if (msgs) setMessages(msgs)
+      }
+      // already_composed: brief already in loaded messages, no reload needed
+      // no_actions: empty desk, thread stays empty ("Ready. What do you need?")
+    } catch (err) {
+      console.error('[brief]', err.message)
+    } finally {
+      setStreaming(false)
+      setStreamingMsg(null)
+    }
   }
 
   async function loadConversationList() {
