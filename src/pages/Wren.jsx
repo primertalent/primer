@@ -289,7 +289,7 @@ export default function Wren() {
         .from('pipelines')
         .select(`
           id, current_stage, expected_comp, expected_comp_high,
-          roles ( placement_fee_pct, placement_fee_flat, target_comp_min, target_comp_max, status )
+          roles ( placement_fee_pct, placement_fee_flat, comp_min, comp_max, target_comp_min, target_comp_max, status )
         `)
         .eq('recruiter_id', recruiter.id)
         .not('current_stage', 'in', '(placed,lost)'),
@@ -324,9 +324,11 @@ export default function Wren() {
         ? (p.expected_comp_high
             ? (Number(p.expected_comp) + Number(p.expected_comp_high)) / 2
             : Number(p.expected_comp))
-        : (p.roles?.target_comp_min && p.roles?.target_comp_max
-            ? (Number(p.roles.target_comp_min) + Number(p.roles.target_comp_max)) / 2
-            : null)
+        : (p.roles?.comp_min && p.roles?.comp_max
+            ? (Number(p.roles.comp_min) + Number(p.roles.comp_max)) / 2
+            : (p.roles?.target_comp_min && p.roles?.target_comp_max
+                ? (Number(p.roles.target_comp_min) + Number(p.roles.target_comp_max)) / 2
+                : null))
 
       const feePct  = p.roles?.placement_fee_pct ?? recruiter.default_placement_fee_pct
       const feeFlat = p.roles?.placement_fee_flat

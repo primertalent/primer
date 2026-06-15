@@ -69,6 +69,15 @@ function parseName(fullName) {
   }
 }
 
+// Normalize a placement fee percentage input to a decimal stored value.
+// Strips %, $, commas, whitespace before parsing.
+// n >= 1 → percentage input (20 → 0.20); n < 1 → already decimal (0.20 → 0.20).
+function normalizeFee(raw) {
+  const n = parseFloat(String(raw).replace(/[%,$\s]/g, ''))
+  if (isNaN(n) || n <= 0) return null
+  return n >= 1 ? n / 100 : n
+}
+
 function parseJson(text) {
   try { return JSON.parse(text) } catch {}
   try {
@@ -556,6 +565,36 @@ function getToolDefinitions() {
       },
     },
     {
+      name: 'set_comp',
+      description: "Set expected compensation. Two paths: 'pipeline' writes the deal-specific expected comp for a candidate (pipelines.expected_comp / expected_comp_high). 'role' writes the role pay range (roles.comp_min / comp_max). Pass comp_low, comp_high, or both in dollars (convert k notation before calling: 200k → 200000). For role target, a single number writes both comp_min and comp_max equal — do not leave the tool to guess a half-open range.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          target:       { type: 'string', enum: ['pipeline', 'role'], description: "Required. 'pipeline' for deal-specific expected comp; 'role' for role pay range." },
+          pipeline_id:  { type: 'string', description: 'Pipeline row ID. Use for pipeline target when known from a prior tool call.' },
+          candidate_id: { type: 'string', description: 'Use with role_id for pipeline target when pipeline_id is not known.' },
+          role_id:      { type: 'string', description: 'Required for role target. Also used with candidate_id for pipeline target resolution.' },
+          comp_low:     { type: 'number', description: 'Low end or single-point comp in dollars. 200k → 200000.' },
+          comp_high:    { type: 'number', description: 'High end in dollars. Omit for a single-point comp.' },
+        },
+        required: ['target'],
+      },
+    },
+    {
+      name: 'set_fee',
+      description: "Set the placement fee for a role. Writes roles.placement_fee_pct (normalized to decimal: 20 or '20%' or 0.20 all store as 0.20) and/or roles.placement_fee_flat (integer dollars: 30k → 30000). The tool guards implausible percentages (below 5% or above 60%) and returns action 'implausible' instead of writing — surface the flag to the recruiter before calling again with force: true.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          role_id:            { type: 'string', description: 'Role to set fee on.' },
+          placement_fee_pct:  { type: 'number', description: "Fee as a number: 20, '20%', or 0.20 — all normalized to 0.20." },
+          placement_fee_flat: { type: 'integer', description: 'Flat fee in dollars. 30k → 30000.' },
+          force:              { type: 'boolean', description: 'Pass true only after the recruiter explicitly confirms an implausible percentage.' },
+        },
+        required: ['role_id'],
+      },
+    },
+    {
       name: 'create_candidate',
       description: "Create a new candidate record. Call when: (1) the recruiter explicitly says to add or create a candidate, (2) ingest_input returned action 'ask' and the recruiter rejected all alternatives and wants a new record. Pass extracted fields from the ingest_input result when available.",
       input_schema: {
@@ -591,6 +630,8 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'connect_google':    return { action: 'connect', connected: false }
     case 'create_role':       return toolCreateRole(input, recruiter)
     case 'create_candidate':  return toolCreateCandidate(input, recruiter)
+    case 'set_comp':          return toolSetComp(input, recruiter)
+    case 'set_fee':           return toolSetFee(input, recruiter)
     default:                  return { error: `Unknown tool: ${name}` }
   }
 }
@@ -1639,6 +1680,128 @@ async function toolCreateCandidate({ name, email, current_title, current_company
     candidate_id: data.id,
     name: fullName,
     what_happened: `Created candidate record for ${fullName}`,
+  }
+}
+
+async function toolSetComp(
+  { pipeline_id, candidate_id, role_id, target, comp_low, comp_high },
+  recruiter
+) {
+  if (!target) return { error: "target is required: 'pipeline' or 'role'" }
+  if (comp_low == null && comp_high == null) return { error: 'Provide comp_low, comp_high, or both.' }
+
+  if (target === 'pipeline') {
+    let pipeline
+    if (pipeline_id) {
+      const { data } = await supabase
+        .from('pipelines')
+        .select('id, candidates(first_name, last_name), roles(title, clients(name))')
+        .eq('id', pipeline_id).eq('recruiter_id', recruiter.id).maybeSingle()
+      pipeline = data
+    } else if (candidate_id && role_id) {
+      const { data } = await supabase
+        .from('pipelines')
+        .select('id, candidates(first_name, last_name), roles(title, clients(name))')
+        .eq('candidate_id', candidate_id).eq('role_id', role_id).eq('recruiter_id', recruiter.id).maybeSingle()
+      pipeline = data
+    } else {
+      return { error: 'For pipeline target, provide pipeline_id or both candidate_id and role_id.' }
+    }
+    if (!pipeline) return { error: 'No pipeline entry found.' }
+
+    const update = {}
+    if (comp_low  != null) update.expected_comp      = Math.round(Number(comp_low))
+    if (comp_high != null) update.expected_comp_high = Math.round(Number(comp_high))
+
+    const { data: updated, error } = await supabase
+      .from('pipelines').update(update).eq('id', pipeline.id)
+      .select('expected_comp, expected_comp_high').single()
+    if (error) return { error: error.message }
+
+    const candidateName = [pipeline.candidates?.first_name, pipeline.candidates?.last_name].filter(Boolean).join(' ')
+    return {
+      action: 'set',
+      target: 'pipeline',
+      candidate_name: candidateName,
+      role_title: pipeline.roles?.title,
+      company:    pipeline.roles?.clients?.name,
+      expected_comp:      updated.expected_comp,
+      expected_comp_high: updated.expected_comp_high ?? null,
+    }
+  }
+
+  if (target === 'role') {
+    if (!role_id) return { error: 'For role target, provide role_id.' }
+    const { data: role, error: roleErr } = await supabase
+      .from('roles').select('id, title, clients(name)')
+      .eq('id', role_id).eq('recruiter_id', recruiter.id).maybeSingle()
+    if (roleErr || !role) return { error: 'Role not found.' }
+
+    // Single number → write both so midpoint math and card display are clean.
+    // Both given → write as range.
+    const low  = comp_low  != null ? Number(comp_low)  : Number(comp_high)
+    const high = comp_high != null ? Number(comp_high) : Number(comp_low)
+    const update = { comp_min: low, comp_max: high }
+
+    const { data: updated, error } = await supabase
+      .from('roles').update(update).eq('id', role_id)
+      .select('comp_min, comp_max').single()
+    if (error) return { error: error.message }
+
+    return {
+      action: 'set',
+      target: 'role',
+      role_title: role.title,
+      company:    role.clients?.name,
+      comp_min: updated.comp_min,
+      comp_max: updated.comp_max,
+    }
+  }
+
+  return { error: "target must be 'pipeline' or 'role'" }
+}
+
+async function toolSetFee({ role_id, placement_fee_pct, placement_fee_flat, force }, recruiter) {
+  if (!role_id) return { error: 'role_id is required.' }
+  if (placement_fee_pct == null && placement_fee_flat == null) {
+    return { error: 'Provide placement_fee_pct, placement_fee_flat, or both.' }
+  }
+
+  const { data: role, error: roleErr } = await supabase
+    .from('roles').select('id, title, clients(name)')
+    .eq('id', role_id).eq('recruiter_id', recruiter.id).maybeSingle()
+  if (roleErr || !role) return { error: 'Role not found.' }
+
+  const update = {}
+
+  if (placement_fee_pct != null) {
+    const normalized = normalizeFee(placement_fee_pct)
+    if (normalized === null) return { error: 'Could not parse fee percentage.' }
+    if (!force && (normalized < 0.05 || normalized > 0.60)) {
+      return {
+        action: 'implausible',
+        normalized_fee_pct: normalized,
+        message: `That comes out to ${(normalized * 100).toFixed(1)}% — did you mean something different? Confirm to save anyway.`,
+      }
+    }
+    update.placement_fee_pct = normalized
+  }
+
+  if (placement_fee_flat != null) {
+    update.placement_fee_flat = Math.round(Number(placement_fee_flat))
+  }
+
+  const { data: updated, error } = await supabase
+    .from('roles').update(update).eq('id', role_id)
+    .select('placement_fee_pct, placement_fee_flat').single()
+  if (error) return { error: error.message }
+
+  return {
+    action: 'set',
+    role_title: role.title,
+    company:    role.clients?.name,
+    placement_fee_pct:  updated.placement_fee_pct  ?? null,
+    placement_fee_flat: updated.placement_fee_flat ?? null,
   }
 }
 
