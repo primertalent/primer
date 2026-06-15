@@ -15,7 +15,18 @@ export const LOST_REASONS = [
   'role_closed', 'fell_through', 'unresponsive', 'comp', 'other',
 ]
 
+export const BACKWARD_REASONS = ['client_added_step', 'candidate_bumped', 'correction', 'other']
+
 export const ACTIVE_STAGES = new Set(['submitted', 'first_round', 'middle_round', 'final_round', 'offer'])
+
+export function classifyMove(currentStage, targetStage) {
+  const terminals = new Set(['placed', 'lost'])
+  if (terminals.has(targetStage))  return 'terminal'
+  if (terminals.has(currentStage)) return 'reopen'
+  const currentIdx = STAGES.indexOf(currentStage)
+  const targetIdx  = STAGES.indexOf(targetStage)
+  return targetIdx > currentIdx ? 'forward' : 'backward'
+}
 
 export function guaranteeStatus(startDate) {
   if (!startDate) return null

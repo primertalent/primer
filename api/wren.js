@@ -8,6 +8,7 @@ import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreach
 import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/intake.js'
 import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
 import { matchCandidateWithConfidence, extractConversationCandidateIds } from './_lib/matchWithConfidence.js'
+import { classifyMove, STAGES, LOST_REASONS, BACKWARD_REASONS } from '../src/lib/stages.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -483,7 +484,7 @@ function getToolDefinitions() {
     },
     {
       name: 'add_to_pipeline',
-      description: "Add a candidate to a role's pipeline at Sourced stage. This is the only tool that writes a pipeline entry. Call when: (1) the recruiter explicitly says to add someone to a role, or (2) the recruiter accepts a placement offer after a screen or draft (suggest_pipeline was true and they said yes). Always announce what was done. Never call this without explicit recruiter instruction or acceptance.",
+      description: "Add a candidate to a role's pipeline at the submitted stage. This is the only tool that creates a pipeline entry. Call when: (1) the recruiter explicitly says to add someone to a role, or (2) the recruiter accepts a placement offer after a screen or draft (suggest_pipeline was true and they said yes). Always announce what was done. Never call this without explicit recruiter instruction or acceptance.",
       input_schema: {
         type: 'object',
         properties: {
@@ -491,6 +492,25 @@ function getToolDefinitions() {
           role_id: { type: 'string', description: 'DB role ID.' },
         },
         required: ['candidate_id', 'role_id'],
+      },
+    },
+    {
+      name: 'move_stage',
+      description: "Move a candidate to a new stage in the pipeline. Updates current_stage and writes a pipeline_stage_history row — the velocity clock reads entered_at, so this write is load-bearing. Identify the pipeline by pipeline_id OR by candidate_id + role_id. For backward moves, pass backward_reason. For a 'correction' backward move, the tool attempts to remove the erroneous history row cleanly; if interactions or debriefs were logged since the move, it appends a correction row instead. For terminal 'lost', pass lost_reason. For terminal 'placed', pass start_date (ISO date or omit if unknown) and optionally guarantee_days.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          pipeline_id:     { type: 'string', description: 'Pipeline row ID. Use when known from a prior tool call.' },
+          candidate_id:    { type: 'string', description: 'Candidate ID. Use with role_id when pipeline_id is not known.' },
+          role_id:         { type: 'string', description: 'Role ID. Use with candidate_id when pipeline_id is not known.' },
+          target_stage:    { type: 'string', enum: ['submitted', 'first_round', 'middle_round', 'final_round', 'offer', 'placed', 'lost'], description: 'Stage to move to.' },
+          backward_reason: { type: 'string', enum: ['client_added_step', 'candidate_bumped', 'correction', 'other'], description: 'Required for backward moves.' },
+          lost_reason:     { type: 'string', enum: ['rejected', 'withdrawn', 'counteroffer', 'lost_to_offer', 'role_closed', 'fell_through', 'unresponsive', 'comp', 'other'], description: 'Required when target_stage is "lost".' },
+          start_date:      { type: 'string', description: 'ISO date (YYYY-MM-DD). Candidate start date for placed stage. Omit if unknown — can be added later.' },
+          guarantee_days:  { type: 'integer', description: 'Guarantee period in days. Default 90. Override only when the recruiter specifies.' },
+          notes:           { type: 'string', description: 'Optional context for this transition. Pass if the recruiter volunteers color.' },
+        },
+        required: ['target_stage'],
       },
     },
     {
@@ -565,6 +585,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
     case 'add_to_pipeline':   return toolAddToPipeline(input, recruiter)
+    case 'move_stage':        return toolMoveStage(input, recruiter)
     case 'ingest_input':      return toolIngestInput(input, recruiter, convContext)
     case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
     case 'connect_google':    return { action: 'connect', connected: false }
@@ -1378,16 +1399,159 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
     return { action: 'already_exists', candidate_name: candidateName, role_title: roleTitle, company, stage: existing.current_stage }
   }
 
-  const { error } = await supabase.from('pipelines').insert({
+  const { data: newPipeline, error } = await supabase.from('pipelines').insert({
     recruiter_id: recruiter.id,
     candidate_id,
     role_id,
     current_stage: 'submitted',
     status: 'active',
-  })
+  }).select('id').single()
   if (error) return { error: error.message }
 
+  await supabase.from('pipeline_stage_history').insert({
+    pipeline_id:  newPipeline.id,
+    recruiter_id: recruiter.id,
+    stage:        'submitted',
+    entered_at:   new Date().toISOString(),
+  })
+
   return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'submitted' }
+}
+
+async function toolMoveStage(
+  { pipeline_id, candidate_id, role_id, target_stage, backward_reason, lost_reason, start_date, guarantee_days, notes },
+  recruiter
+) {
+  // Resolve pipeline row
+  let pipeline
+  if (pipeline_id) {
+    const { data } = await supabase
+      .from('pipelines')
+      .select('id, current_stage, candidates(first_name, last_name), roles(title, clients(name))')
+      .eq('id', pipeline_id).eq('recruiter_id', recruiter.id).maybeSingle()
+    pipeline = data
+  } else if (candidate_id && role_id) {
+    const { data } = await supabase
+      .from('pipelines')
+      .select('id, current_stage, candidates(first_name, last_name), roles(title, clients(name))')
+      .eq('candidate_id', candidate_id).eq('role_id', role_id).eq('recruiter_id', recruiter.id).maybeSingle()
+    pipeline = data
+  } else {
+    return { error: 'Provide pipeline_id or both candidate_id and role_id.' }
+  }
+
+  if (!pipeline) return { error: 'No pipeline entry found. Submit them first with add_to_pipeline.' }
+
+  const { id: pid, current_stage } = pipeline
+  const candidateName = [pipeline.candidates?.first_name, pipeline.candidates?.last_name].filter(Boolean).join(' ')
+  const roleTitle = pipeline.roles?.title
+  const company  = pipeline.roles?.clients?.name
+
+  if (!STAGES.includes(target_stage)) {
+    return { error: `Unknown stage: ${target_stage}. Valid stages: ${STAGES.join(', ')}.` }
+  }
+
+  if (current_stage === target_stage) return { error: `Already at ${target_stage}.` }
+
+  const moveType = classifyMove(current_stage, target_stage)
+
+  if (moveType === 'backward' && !backward_reason) {
+    return { error: 'Backward move needs a reason (client_added_step, candidate_bumped, correction, or other) — ask first.' }
+  }
+  if (target_stage === 'lost' && !lost_reason) {
+    return { error: 'Moving to lost needs a reason — ask first.' }
+  }
+
+  const now = new Date().toISOString()
+
+  // Correction path: attempt clean undo, fall back to append if unsafe
+  if (backward_reason === 'correction') {
+    if (moveType === 'terminal') {
+      return { error: 'A correction cannot target a terminal stage. Use a non-correction backward_reason for placed/lost.' }
+    }
+    const { data: histRows } = await supabase
+      .from('pipeline_stage_history')
+      .select('id, stage, entered_at, exited_at')
+      .eq('pipeline_id', pid)
+      .order('entered_at', { ascending: false })
+      .limit(2)
+
+    const openRow  = histRows?.[0]
+    const priorRow = histRows?.[1]
+
+    let hasAttached = false
+    if (openRow?.entered_at) {
+      const [{ count: intCount }, { count: debCount }] = await Promise.all([
+        supabase.from('interactions').select('id', { count: 'exact', head: true })
+          .eq('pipeline_id', pid).gte('created_at', openRow.entered_at),
+        supabase.from('debriefs').select('id', { count: 'exact', head: true })
+          .eq('pipeline_id', pid).gte('created_at', openRow.entered_at),
+      ])
+      hasAttached = (intCount ?? 0) > 0 || (debCount ?? 0) > 0
+    }
+
+    if (priorRow && !hasAttached) {
+      // Clean destructive undo
+      await supabase.from('pipeline_stage_history').delete().eq('id', openRow.id)
+      await supabase.from('pipeline_stage_history').update({ exited_at: null }).eq('id', priorRow.id)
+      await supabase.from('pipelines').update({ current_stage: priorRow.stage, updated_at: now }).eq('id', pid)
+      return {
+        action: 'corrected',
+        candidate_name: candidateName, role_title: roleTitle, company,
+        old_stage: current_stage, new_stage: priorRow.stage,
+        history_note: 'Erroneous move removed from history.',
+      }
+    }
+    // Dirty path: fall through — append correction row
+  }
+
+  // Close the current open history row
+  await supabase.from('pipeline_stage_history')
+    .update({ exited_at: now })
+    .eq('pipeline_id', pid).is('exited_at', null)
+
+  // Open a new history row for the target stage
+  await supabase.from('pipeline_stage_history').insert({
+    pipeline_id:  pid,
+    recruiter_id: recruiter.id,
+    stage:        target_stage,
+    entered_at:   now,
+    ...(backward_reason ? { stage_change_reason: backward_reason } : {}),
+    ...(notes           ? { notes }                                 : {}),
+  })
+
+  // Update the pipeline row
+  const pipelineUpdate = { current_stage: target_stage, updated_at: now }
+
+  if (moveType === 'terminal') {
+    pipelineUpdate.stage_reached = current_stage
+    if (target_stage === 'lost') pipelineUpdate.lost_reason = lost_reason ?? null
+    if (target_stage === 'placed') {
+      pipelineUpdate.start_date = start_date ?? null
+      if (guarantee_days != null) pipelineUpdate.guarantee_days = guarantee_days
+    }
+  }
+
+  if (moveType === 'reopen') {
+    pipelineUpdate.stage_reached = null
+    pipelineUpdate.lost_reason   = null
+    pipelineUpdate.start_date    = null
+  }
+
+  await supabase.from('pipelines').update(pipelineUpdate).eq('id', pid)
+
+  return {
+    action:         'moved',
+    candidate_name: candidateName,
+    role_title:     roleTitle,
+    company,
+    old_stage:      current_stage,
+    new_stage:      target_stage,
+    move_type:      moveType,
+    ...(lost_reason     ? { lost_reason }     : {}),
+    ...(start_date      ? { start_date }      : {}),
+    ...(backward_reason ? { backward_reason } : {}),
+  }
 }
 
 async function toolCreateRole({ title, company, location, notes }, recruiter) {
