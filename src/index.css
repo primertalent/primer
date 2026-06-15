@@ -5434,6 +5434,34 @@ select.field-input {
   color: var(--mute);
 }
 
+.candidate-card__timeline-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.candidate-card__timeline-role {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.candidate-card__timeline-dates {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--mute);
+  letter-spacing: 0.10em;
+}
+
+.candidate-card__last-contact {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-top: 4px;
+}
+
 .candidate-card__chips {
   display: flex;
   flex-direction: column;

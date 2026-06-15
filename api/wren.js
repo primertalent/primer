@@ -700,7 +700,7 @@ async function toolSearchDb({ entity_type, query }, recruiter, convContext = {})
 async function toolGetCandidate({ candidate_id }, recruiter) {
   const { data: candidate, error } = await supabase
     .from('candidates')
-    .select('id, first_name, last_name, current_title, current_company, location, email, phone, skills, cv_text, career_timeline, notes, career_signals')
+    .select('id, first_name, last_name, current_title, current_company, location, email, phone, skills, cv_text, career_timeline, notes, career_signals, enrichment_data')
     .eq('id', candidate_id)
     .eq('recruiter_id', recruiter.id)
     .single()
@@ -721,7 +721,14 @@ async function toolGetCandidate({ candidate_id }, recruiter) {
     .eq('recruiter_id', recruiter.id)
     .not('current_stage', 'in', '(placed,lost)')
 
-  return { ...candidate, recent_interactions: interactions || [], active_pipelines: pipelines || [] }
+  // Merge enrichment_data (old write path) into career_signals (new canonical location).
+  // enrichment_data fills gaps; career_signals wins per key. Strip enrichment_data from result.
+  const resolvedSignals = {
+    ...(candidate.enrichment_data || {}),
+    ...(candidate.career_signals || {}),
+  }
+  const { enrichment_data: _ed, ...candidateRest } = candidate
+  return { ...candidateRest, career_signals: resolvedSignals, recent_interactions: interactions || [], active_pipelines: pipelines || [] }
 }
 
 async function toolGetRole({ role_id }, recruiter) {
@@ -1240,7 +1247,7 @@ async function persistNotesToCandidate(rawText, extracted, candidate, classifica
 
   if (intErr) return { error: intErr.message }
 
-  // Update enrichment_data with any new signals
+  // Write signals to career_signals (canonical location the card reads)
   const newSignals = {}
   if (signals.motivation)         newSignals.motivation = signals.motivation
   if (signals.comp_expectations)  newSignals.comp_expectations = signals.comp_expectations
@@ -1250,9 +1257,9 @@ async function persistNotesToCandidate(rawText, extracted, candidate, classifica
 
   if (Object.keys(newSignals).length > 0) {
     const { data: current } = await supabase
-      .from('candidates').select('enrichment_data').eq('id', candidate.id).single()
+      .from('candidates').select('career_signals').eq('id', candidate.id).single()
     await supabase.from('candidates').update({
-      enrichment_data: { ...(current?.enrichment_data || {}), ...newSignals },
+      career_signals: { ...(current?.career_signals || {}), ...newSignals },
     }).eq('id', candidate.id)
   }
 
