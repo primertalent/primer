@@ -755,7 +755,7 @@ async function toolGetCandidate({ candidate_id }, recruiter) {
 async function toolGetRole({ role_id }, recruiter) {
   const { data: role, error } = await supabase
     .from('roles')
-    .select('id, title, status, notes, process_steps, comp_min, comp_max, comp_type, target_comp_min, target_comp_max, agreement_status, clients(id, name, industry, notes)')
+    .select('id, title, status, notes, comp_min, comp_max, comp_type, target_comp_min, target_comp_max, agreement_status, clients(id, name, industry, notes)')
     .eq('id', role_id)
     .eq('recruiter_id', recruiter.id)
     .single()
