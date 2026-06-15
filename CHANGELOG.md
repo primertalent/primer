@@ -6,6 +6,25 @@ Format: one session per entry. Date, one-line summary, what shipped. Keep it sho
 
 ---
 
+## Session 35 — 2026-06-15
+**Sprint 1, 2a, 2b, 2c-1 complete. Comp/fee write tools. Honesty rule.**
+
+**Sprint 1 — scoring reconciliation + submittal formats (commits 9af6eee, bdff711):** One band map + code-derived recommendation label — 8-and-hold eliminated. Score band determines recommendation with no override path. Submittal format toggle: Bulleted / Email / Slack / LinkedIn (4 formats). Lazy cache per format; send path uses the on-screen format.
+
+**Sprint 2a — entity card primitive (commits af11344, 889186d, dc0bda0):** CandidateCard, RoleCard, CompanyCard summoned into the thread. get_company tool. Computed insights per type. Hardening: enrichment signals → career_signals, expanded CandidateCard fields, entity-pull prose rule — card owns facts, prose compresses to read + move.
+
+**Sprint 2b — canonical stages + move_stage (commits c9ce8fd, f250d67, d3e3620):** stages.js + migration: stage_reached, lost_reason, start_date, guarantee_days, CHECK constraints. 3 pre-submittal rows detached-and-kept. move_stage tool: writes pipeline_stage_history, bidirectional moves, backward-reason capture, correction-undo (clean vs dirty), terminal capture, add_to_pipeline writes first history row. Entity-pull prose discipline extended to all 3 cards; process_steps dropped from get_role payload.
+
+**Sprint 2c-1 — desk ticker rebuild (commit 8c7e81e):** PIPELINE VALUE (weighted), IN PROCESS (active count — inProcess++ above unknown-stage and weight-zero skips), SUBMITTALS THIS WEEK (pipeline_stage_history unique by pipeline_id since Monday 00:00 local). AT RISK / NEXT MOVE removed. Ticker comp resolution fixed: expected_comp → comp_min/max → target_comp_min/max (commit aa7f6d2).
+
+**Stage-aware next-move suppression (commit 9baf418):** Suggestions default to silence. Suppression clause leads; stage map gates the rare warranted suggestion. Stage set explicit for sourced (no pipeline) through placed/lost.
+
+**set_comp + set_fee tools (commit aa7f6d2):** set_comp writes deal-specific expected_comp (target 'pipeline') or role pay range comp_min/comp_max (target 'role'); single number writes both equal on role target. set_fee normalizes (n≥1 → n/100), sanity guard 0.05–0.60 with force bypass, announces from DB-returned values.
+
+**Honesty rule + tool descriptions (commit b9cdc5c):** set_comp and set_fee descriptions added to wrenAgent.js. Rule 8: announce writes from what actually landed in DB; "I don't have a way to save that yet" when no tool exists; never acknowledge a write that did not happen.
+
+---
+
 ## Session 31 — 2026-06-03
 **Voice layer validated on real candidate. Cross-turn memory fix. search_db overhauled.**
 

@@ -10,6 +10,16 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
+6/15 | agent_capability | OPEN. When a role has no placement fee on file, pipeline value is silently reduced with no prompt to add one. Recruiter has no signal that an unpriced role is dragging the weighted total. Flag needed: inline on role card or ticker callout ("N roles missing fee"). | missing_data
+
+6/15 | agent_capability | RESOLVED. Wren pantomimed "updated comp" and "added a fee" with no tool to do either — acknowledged writes that never happened. Fixed: set_comp and set_fee tools added (api/wren.js, commits aa7f6d2 + b9cdc5c). Honesty rule added as Rule 8 to wrenAgent.js (commit b9cdc5c): announce from tool's returned values; say "I don't have a way to save that yet" when no tool exists; surface implausible flags and wait for confirm. | bug
+
+6/15 | agent | RESOLVED. Stage-aware next-move suggestions were firing stale moves — Wren offered to screen or draft a submittal for candidates already past submitted stage. Fixed: suppression clause leads, stage-gated suggestions follow as a constraint on the rare warranted move. (wrenAgent.js, commit 9baf418) | bug
+
+6/15 | agent | RESOLVED. Stale process_steps vocabulary surfaced in role pulls. Output rule: reference data (process steps, JD text, raw notes) suppressed by default; only deal signals surface. (wrenAgent.js + commit d3e3620) | bug
+
+6/15 | agent | RESOLVED. Role pull transcription — entity pull prose was re-listing tool result fields instead of compressing to the one signal worth flagging. Output rule tightened: card owns the facts; prose compresses to the read (what to flag) and the move (what to do). (wrenAgent.js + commit dc0bda0) | shape_problem
+
 6/12 | candidate_enrichment | Contradiction on key facts held silently. During Illia testing, notes said "needs sponsorship" and a later ingestion implied no sponsorship needed — Wren merged both without surfacing the conflict. Model never flagged that a new value contradicted an existing one. Key fields (work auth, comp expectation, notice period, location preference) need ingest-time conflict detection: when a new ingestion contradicts a stored value, surface it to the recruiter before writing. NEXT WEEK'S P1 SLICE. | bug
 
 6/12 | onboarding | Email-connect flow is not beta-shippable. The CloudMailin auto-forward setup requires the recruiter to manually verify a forwarding address through their Gmail settings — no guided flow, no in-app state confirmation, no fallback if they get it wrong. Recruiter drop-off risk is near-certain at this step. BETA BLOCKER. Fix path: guided connect screen with step-by-step instructions + polling for first delivery confirmation, or switch to Google read-scope OAuth (no forwarding required). | shape_problem

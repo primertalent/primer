@@ -74,42 +74,55 @@ pricing page: "Wren took N hours off my desk in week one."
 
 ---
 
-## Current Roadmap (set 2026-06-15)
+## Current Roadmap (updated 2026-06-15)
 
 Sprint sequence. Strict order. Each item maps to a JD row above.
 
-Sprint 1: Magic moment (diagnosed, contained)
+Sprint 1: Magic moment — COMPLETE
 
-- Scoring reconciliation, comprehensive. Two surfaces contradict today:
-  resumeScreener returns match_score + recommendation as independent
-  fields with no reconciliation (an 8 can ship with a hold);
-  candidateScorecard is banded (8-10 advance). Merge into one scale and
-  one recommendation vocabulary. The score must land in the band that
-  matches the call. Hold-an-8 stays legal only at the pipeline/slate
-  layer, never at the single-candidate screen.
-- Submittal formats. Engine already exists in submissionDraft.js
-  (internal/external modes, bulleted/paragraph/concise). UI buries it.
-  Add a format toggle on the card, add an email format, wire the
-  internal -> resolve-flags -> external loop as the explicit path.
+- [x] Scoring reconciliation. One band map, code-derived recommendation — 8-and-hold
+  eliminated. Score band determines the call. (commit 9af6eee)
+- [x] Submittal formats. Bulleted / Email / Slack / LinkedIn toggle. Lazy cache per
+  format. Send uses the on-screen format. (commit bdff711)
 
-Sprint 2: In-flight experience (the deal desk made visible)
+Sprint 2a: Entity card primitive — COMPLETE
 
-- Entity card primitive: candidate, role, company, screen. One container,
-  different insights per type. Summoned into the thread, edited inline or
-  by talking to Wren, saved to Supabase. No detail-page routes. The card
-  is the primitive, not a page.
-- Stages: First / Middle / Final round. Bidirectional moves. Attention
-  level rises per stage.
-- In-flight cards surface in the morning brief.
-- KPIs on the top bar: candidates in process, submittals this week.
-  Pipeline value once real comp data is entered.
+- [x] CandidateCard, RoleCard, CompanyCard summoned into the thread. get_company tool.
+  Computed insights per type. (commit af11344)
+- [x] Hardening: enrichment signals -> career_signals, expanded CandidateCard fields,
+  entity-pull prose discipline -- card owns facts, prose compresses to read + move.
+  (commits 889186d, dc0bda0)
 
-Sprint 3: Brief and beta readiness
+Sprint 2b: Canonical stages + move_stage — COMPLETE
 
-- Brief content and format: time-aware greeting, while-you-were-away,
-  desk state, to-do list, interviewing-today. Bullets, not hyphens.
-- Saturday brief is week in review. Sunday is next-week goals.
+- [x] stages.js + migration: stage_reached, lost_reason, start_date, guarantee_days,
+  CHECK constraints. 3 pre-submittal rows detached-and-kept. (commit c9ce8fd)
+- [x] move_stage tool: writes pipeline_stage_history, bidirectional moves, backward-reason
+  capture, correction-undo, terminal capture, add_to_pipeline writes first history row.
+  (commit f250d67)
+- [x] Entity-pull prose discipline on all 3 cards; process_steps dropped from get_role
+  payload. (commit d3e3620)
+
+Sprint 2c-1: Desk ticker rebuild — COMPLETE
+
+- [x] PIPELINE VALUE (weighted), IN PROCESS (active count), SUBMITTALS THIS WEEK
+  (pipeline_stage_history unique by pipeline_id since Monday 00:00 local). AT RISK /
+  NEXT MOVE removed. (commit 8c7e81e)
+- [x] Ticker comp resolution: expected_comp -> comp_min/max -> target_comp_min/max.
+  (commit aa7f6d2)
+
+Sprint 2c-2: Brief + honesty model — NEXT
+
+- While-you-were-away section in morning brief (deal changes since last session).
+- Saturday brief: week in review. Sunday brief: next-week goals.
+- In-flight deal cards surface in the brief.
+- Honesty model: "I don't have a way to save that yet" pattern extended across tool
+  gaps as they surface in real use.
+
+Sprint 3: Beta readiness
+
 - Onboarding mass upload.
+- Google OAuth read-scope verification (submit now; runs parallel to rest of sprint).
 
 Not this sprint (named so they stop nagging):
 
