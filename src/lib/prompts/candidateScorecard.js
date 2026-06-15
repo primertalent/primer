@@ -1,7 +1,8 @@
-// Returns JSON: { overall_score, verdict, recommendation, dimensions }
+// Returns JSON: { match_score, verdict, dimensions }
 // dimensions: { experience_fit, skills_match, career_trajectory, culture_signals, red_flags }
 // Each dimension: { score: 1-5, rationale: string }
 // red_flags: 5 = clean (none), 1 = serious concerns (inverted scale)
+// recommendation is NOT returned — bandFromScore(match_score) derives it in the caller
 export function buildScorecardMessages(candidate, role, screenerResult) {
   const skills = candidate.skills?.join(', ') || 'None listed'
   const signals = candidate.career_signals ?? []
@@ -97,11 +98,10 @@ red_flags (1-5) — INVERTED: higher is cleaner, lower is more concerning:
 OVERALL SCORE (1-10):
 Weight experience_fit and skills_match most heavily (must-haves). Career trajectory and culture signals are important. Red flags can drag down an otherwise good score significantly.
 
-Recommendation thresholds:
-- 8-10: advance (strong submit candidate)
-- 6-7: hold (qualified, compare with others)
-- 4-5: probe (red flags or gaps need addressing first)
-- 1-3: pass (not a fit)
+Score bands (code derives the label — do not return a recommendation field):
+8-10: advance — fit, trajectory, and risk all support submission
+4-7:  hold — real gaps or risk present, workable, do not decline
+1-3:  pass — genuine no, material mismatch or disqualifying risk
 
 CANDIDATE
 Name: ${candidate.first_name} ${candidate.last_name}
@@ -116,9 +116,8 @@ Client: ${role.clients?.name ?? 'Unknown'}${jdSection}${screenerSection}
 
 Return ONLY a valid JSON object, no markdown, no explanation:
 {
-  "overall_score": <integer 1-10>,
+  "match_score": <integer 1-10>,
   "verdict": "<one sentence — specific, evidence-based, no filler>",
-  "recommendation": "advance" | "hold" | "probe" | "pass",
   "dimensions": {
     "experience_fit":     { "score": <1-5>, "rationale": "<one specific sentence>" },
     "skills_match":       { "score": <1-5>, "rationale": "<one specific sentence>" },

@@ -47,6 +47,13 @@ Title: ${role.title}
 Client: ${role.clients?.name ?? 'Unknown'}
 Hiring Process: ${steps}${jd}${clientHistorySection}
 
+Score meaning — all-things-considered advance confidence, not raw skills overlap. A material gap, missing must-have, or red flag must pull the score down even when skills match is high:
+8-10: advance — fit, trajectory, and risk all support submission. Ready to move.
+4-7:  hold — real gaps or risk present, but workable. Do not decline; park and compare.
+1-3:  pass — genuine no. Material mismatch or disqualifying risk.
+
+Do not include a recommendation field. Score your confidence; the system assigns the label from the band.
+
 Return this exact JSON structure (use null for unknown, empty array [] for none found):
 {
   "match_score": <integer 1–10>,
@@ -56,8 +63,7 @@ Return this exact JSON structure (use null for unknown, empty array [] for none 
   "top_strengths": [<string>, <string>, <string>],
   "top_concerns": [<string>, <string>, <string>],
   "red_flags": [<string>],
-  "recommendation": "advance" | "hold" | "pass",
-  "recommendation_reason": <string — exactly one sentence>
+  "recommendation_reason": <string — exactly one sentence explaining what drove the score>
 }
 
 Red flag framework — check each and include any that apply:

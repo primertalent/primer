@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { buildWrenAgentSystem } from '../src/lib/prompts/wrenAgent.js'
 import { buildScreenerMessages } from '../src/lib/prompts/resumeScreener.js'
+import { bandFromScore } from '../src/lib/scoreBand.js'
 import { buildSubmittalForWren } from '../src/lib/prompts/submissionDraft.js'
 import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreachEmail.js'
 import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/intake.js'
@@ -796,6 +797,8 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
   }
   if (!result) return { error: 'Screen parse failed', raw: raw.slice(0, 300) }
 
+  result.recommendation = bandFromScore(result.match_score)
+
   return {
     ...result,
     from_paste: !!candidateData._from_paste,
@@ -803,7 +806,7 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
     client_name: roleData.clients?.name,
     // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
     suggest_pipeline: !candidateData._from_paste && !!candidate_id
-      && ['advance', 'hold/advance'].includes(result.recommendation),
+      && result.recommendation === 'advance',
   }
 }
 
