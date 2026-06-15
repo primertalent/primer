@@ -5264,6 +5264,59 @@ select.field-input {
   color: var(--accent);
 }
 
+/* ── SubmittalDraft format toggle ───────────────────────── */
+
+.submittal-draft__format-row {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.submittal-draft__format-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+}
+
+.submittal-draft__format-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.submittal-draft__format-btn--active {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.submittal-draft__format-btn--active:disabled {
+  opacity: 1;
+}
+
+.submittal-draft__format-btn--loading {
+  opacity: 0.5;
+}
+
+.submittal-draft__format-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.submittal-draft__format-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--signal-red);
+  margin-left: auto;
+}
+
 /* ── IngestResult inline component ──────────────────────── */
 /* Rule 1: border-radius 0. Rule 4: action label = mono, summary = inherited ink. */
 /* Rule 2: no box-shadow. Rule 5: no emoji (icons live in Chip.jsx as SVG). */

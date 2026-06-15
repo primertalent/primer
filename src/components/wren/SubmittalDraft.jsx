@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import GoogleConnectCard from './GoogleConnectCard'
 
+const FORMAT_LABELS = { bulleted: 'BULLETED', paragraph: 'EMAIL', concise: 'SLACK', linkedin: 'LINKEDIN' }
+const FORMATS = ['bulleted', 'paragraph', 'concise', 'linkedin']
+
 // Returns lines containing unresolved flag markers. Three variants: [NEEDS:, [NOT CAPTURED, [FLAG:
 function findUnresolvedFlags(text) {
   return (text || '')
@@ -24,23 +27,68 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
   const [flagWarning, setFlagWarning] = useState(false)
   const [flagLines, setFlagLines] = useState([])
 
+  // Format toggle state — seeded from the format the card arrived with
+  const initialFormat = data.format ?? 'bulleted'
+  const [activeFormat, setActiveFormat] = useState(initialFormat)
+  const [formatCache, setFormatCache] = useState({ [initialFormat]: data.draft_text })
+  const [loadingFormat, setLoadingFormat] = useState(null)
+  const [formatError, setFormatError] = useState(null)
+
+  // The text currently on screen — tracks the active format cache entry
+  const displayText = formatCache[activeFormat] ?? data.draft_text ?? ''
+
   // Sync expanded when isLatest changes (newer draft arriving collapses older ones)
   if (isLatest && !expanded) setExpanded(true)
 
   function copy() {
-    navigator.clipboard.writeText(data.draft_text || '')
+    navigator.clipboard.writeText(displayText)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function switchFormat(fmt) {
+    if (fmt === activeFormat || loadingFormat) return
+    if (data.from_paste) return
+    setFormatError(null)
+    if (formatCache[fmt] !== undefined) {
+      setActiveFormat(fmt)
+      return
+    }
+    setLoadingFormat(fmt)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not authenticated')
+      const res = await fetch('/api/submittal-format', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          candidate_id:  data.candidate_id,
+          role_id:       data.role_id,
+          format:        fmt,
+          resolved_flags: data.resolved_flags || '',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error || 'Request failed')
+      setFormatCache(prev => ({ ...prev, [fmt]: json.draft_text }))
+      setActiveFormat(fmt)
+    } catch {
+      setFormatError("Couldn't generate that format — try again")
+    } finally {
+      setLoadingFormat(null)
+    }
   }
 
   async function send(override = false) {
     if (!toEmail.trim() || sending) return
 
     // Flag check on first click — show warning and require explicit second click.
-    // override is only set by the SEND ANYWAY button; it is never derivable from
-    // model output or ingested content (the send endpoint is not a tool).
     if (!override) {
-      const found = findUnresolvedFlags(data.draft_text || '')
+      const found = findUnresolvedFlags(displayText)
       if (found.length > 0) {
         setFlagLines(found)
         setFlagWarning(true)
@@ -69,11 +117,11 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          to:           toEmail.trim(),
+          to:            toEmail.trim(),
           subject,
-          body:         data.draft_text || '',
-          pipeline_id:  data.pipeline_id  ?? null,
-          candidate_id: data.candidate_id ?? null,
+          body:          displayText,
+          pipeline_id:   data.pipeline_id  ?? null,
+          candidate_id:  data.candidate_id ?? null,
           user_approved: true,
           override,
         }),
@@ -116,6 +164,7 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
   }
 
   const canSend = !tokenRevoked && (gmailConnected ?? data.gmail_connected)
+  const isPaste = !!data.from_paste
 
   return (
     <div className={`submittal-draft${isLatest ? '' : ' submittal-draft--collapsed'}`}>
@@ -140,7 +189,32 @@ export default function SubmittalDraft({ data, isLatest, gmailConnected, onSent,
 
       {expanded && (
         <>
-          <pre className="submittal-draft__body">{data.draft_text}</pre>
+          {data.mode === 'external' && (
+            <div className="submittal-draft__format-row">
+              {FORMATS.map(fmt => (
+                <button
+                  key={fmt}
+                  className={[
+                    'submittal-draft__format-btn',
+                    activeFormat === fmt   ? 'submittal-draft__format-btn--active'  : '',
+                    loadingFormat === fmt  ? 'submittal-draft__format-btn--loading' : '',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => switchFormat(fmt)}
+                  disabled={
+                    (isPaste && fmt !== activeFormat) ||
+                    (!!loadingFormat && fmt !== activeFormat && fmt !== loadingFormat)
+                  }
+                >
+                  {FORMAT_LABELS[fmt]}{loadingFormat === fmt ? '…' : ''}
+                </button>
+              ))}
+              {formatError && (
+                <span className="submittal-draft__format-error">{formatError}</span>
+              )}
+            </div>
+          )}
+
+          <pre className="submittal-draft__body">{displayText}</pre>
 
           {/* Send form — shown when APPROVE & SEND clicked */}
           {showSendForm && (

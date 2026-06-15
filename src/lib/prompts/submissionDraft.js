@@ -140,6 +140,15 @@ CTA: one line.
 No hook ceremony. No opening pleasantries. No risk. Just signal and ask.`
   }
 
+  if (format === 'linkedin') {
+    return `Write a LinkedIn direct message to a hiring manager who may not have full context on this recruiter or candidate. Under 90 words total.
+Opener: one sentence establishing context. State you are a recruiter, name the candidate, and name the role. Direct, no preamble. ("Reaching out about [Candidate Name] for your [Role Title] opening" is the energy.)
+Signal: 2-3 of the tightest evidence points with real metrics from the data. One sentence each. No fabricated numbers.
+Motivation: candidate's actual stated reason for interest, near the close. Or [NEEDS: stated reason — confirm before sending] if absent.
+CTA: one low-friction close. "Worth a quick chat?" is the target energy.
+Slightly warmer register than Slack — this is a person being messaged, not an internal channel. Recruiter voice. Rule zero applies. No fabrication. No em dashes.`
+  }
+
   // Default: bulleted (Paraform format)
   return `Write the bulleted submission format. Plain text — use – dashes, not markdown. Total under 150 words.
 Structure:

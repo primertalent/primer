@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildWrenAgentSystem } from '../src/lib/prompts/wrenAgent.js'
 import { buildScreenerMessages } from '../src/lib/prompts/resumeScreener.js'
 import { bandFromScore } from '../src/lib/scoreBand.js'
-import { buildSubmittalForWren } from '../src/lib/prompts/submissionDraft.js'
+import { buildSubmittalDraftPayload } from './_lib/buildSubmittalDraft.js'
 import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreachEmail.js'
 import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/intake.js'
 import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
@@ -450,7 +450,7 @@ function getToolDefinitions() {
           candidate_id: { type: 'string', description: 'If candidate is in the system.' },
           resume_text: { type: 'string', description: 'Raw resume text if candidate is not in the system.' },
           mode: { type: 'string', enum: ['internal', 'external'], description: 'Default: internal. Use external when the recruiter asks for the HM-ready version.' },
-          format: { type: 'string', enum: ['bulleted', 'paragraph', 'concise'], description: 'External surface only. Default: bulleted. concise = Slack-ready.' },
+          format: { type: 'string', enum: ['bulleted', 'paragraph', 'concise', 'linkedin'], description: 'External surface only. Default: bulleted. concise = Slack-ready. linkedin = outbound DM, under 90 words.' },
           resolved_flags: { type: 'string', description: 'External mode only. Summarize what was resolved in this conversation before calling — e.g., "comp aligned per recruiter, tenure flag dropped, motivation: leaving because no AE path at current company".' },
           prior_draft: { type: 'string', description: 'Full text of the previous draft when revising.' },
           revision_instruction: { type: 'string', description: "The recruiter's instruction for revising the prior draft." },
@@ -811,85 +811,73 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
 }
 
 async function toolDraftSubmittal({ role_id, candidate_id, resume_text, mode = 'internal', format = 'bulleted', resolved_flags = '', prior_draft, revision_instruction }, recruiter) {
-  const roleData = await toolGetRole({ role_id }, recruiter)
-  if (roleData.error) return roleData
-
-  let candidateData
-  if (candidate_id) {
-    candidateData = await toolGetCandidate({ candidate_id }, recruiter)
-    if (candidateData.error) return candidateData
-  } else if (resume_text) {
-    candidateData = {
-      first_name: 'Candidate', last_name: '(pasted)',
-      current_title: null, current_company: null, location: null,
-      skills: [], cv_text: resume_text, career_timeline: [], notes: null,
-      recent_interactions: [], _from_paste: true,
-    }
-  } else {
-    return { error: 'Provide candidate_id or resume_text' }
-  }
-
-  const { data: voiceSamples } = await supabase
-    .from('voice_samples')
-    .select('channel, subject, body')
-    .eq('recruiter_id', recruiter.id)
-    .in('channel', ['email', 'linkedin'])
-    .limit(3)
-
-  let messages
+  // Revision path — stays inline. A revision rewrites a specific prior draft, not a
+  // source regeneration. Candidate/role are fetched only for return object metadata.
   if (revision_instruction && prior_draft) {
-    messages = buildRevisionMessages(prior_draft, revision_instruction)
-  } else {
-    const fitScore = candidateData.active_pipelines?.find(p => p.roles?.id === role_id)?.fit_score ?? null
-    messages = buildSubmittalForWren(candidateData, roleData, {
+    const roleData = await toolGetRole({ role_id }, recruiter)
+    if (roleData.error) return roleData
+
+    let candidateData
+    if (candidate_id) {
+      candidateData = await toolGetCandidate({ candidate_id }, recruiter)
+      if (candidateData.error) return candidateData
+    } else if (resume_text) {
+      candidateData = {
+        first_name: 'Candidate', last_name: '(pasted)',
+        current_title: null, current_company: null, location: null,
+        skills: [], cv_text: resume_text, career_timeline: [], notes: null,
+        recent_interactions: [], _from_paste: true,
+      }
+    } else {
+      return { error: 'Provide candidate_id or resume_text' }
+    }
+
+    const aiRes = await anthropic.messages.create({
+      model: process.env.AI_MODEL || 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      messages: buildRevisionMessages(prior_draft, revision_instruction),
+    })
+
+    let pipeline_id = null
+    if (candidate_id && role_id && !candidateData._from_paste) {
+      const { data: pl } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('candidate_id', candidate_id)
+        .eq('role_id', role_id)
+        .eq('recruiter_id', recruiter.id)
+        .not('current_stage', 'in', '(placed,lost)')
+        .maybeSingle()
+      pipeline_id = pl?.id ?? null
+    }
+
+    return {
+      draft_text: aiRes.content[0]?.text ?? '',
       mode,
       format,
-      fitScore,
-      resolvedFlags: resolved_flags,
-      voiceSamples: voiceSamples || [],
-    })
+      resolved_flags,
+      from_paste: !!candidateData._from_paste,
+      candidate_id: candidate_id ?? null,
+      role_id,
+      pipeline_id,
+      candidate_name: candidateData._from_paste
+        ? null
+        : `${candidateData.first_name} ${candidateData.last_name}`,
+      role_title: roleData.title,
+      client_name: roleData.clients?.name,
+      is_revision: true,
+      gmail_connected: !!recruiter.gmail_access_token,
+      // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
+      suggest_pipeline: !candidateData._from_paste && !!candidate_id,
+    }
   }
 
-  const aiRes = await anthropic.messages.create({
-    model: process.env.AI_MODEL || 'claude-sonnet-4-6',
-    max_tokens: 1500,
-    messages,
-  })
-
-  const draft_text = aiRes.content[0]?.text ?? ''
-
-  // Look up the active pipeline entry so the send endpoint can stamp submitted_at
-  let pipeline_id = null
-  if (candidate_id && role_id && !candidateData._from_paste) {
-    const { data: pl } = await supabase
-      .from('pipelines')
-      .select('id')
-      .eq('candidate_id', candidate_id)
-      .eq('role_id', role_id)
-      .eq('recruiter_id', recruiter.id)
-      .not('current_stage', 'in', '(placed,lost)')
-      .maybeSingle()
-    pipeline_id = pl?.id ?? null
-  }
-
-  return {
-    draft_text,
-    mode,
-    format,
-    from_paste: !!candidateData._from_paste,
-    candidate_id: candidate_id ?? null,
-    role_id,
-    pipeline_id,
-    candidate_name: candidateData._from_paste
-      ? null
-      : `${candidateData.first_name} ${candidateData.last_name}`,
-    role_title: roleData.title,
-    client_name: roleData.clients?.name,
-    is_revision: !!(revision_instruction && prior_draft),
-    gmail_connected: !!recruiter.gmail_access_token,
-    // Offer pipeline placement — do not auto-place. Only add_to_pipeline writes pipeline.
-    suggest_pipeline: !candidateData._from_paste && !!candidate_id,
-  }
+  // Fresh draft — delegate to shared lib
+  const result = await buildSubmittalDraftPayload(
+    { role_id, candidate_id, resume_text, mode, format, resolved_flags },
+    recruiter
+  )
+  return result.error ? result : { ...result, is_revision: false }
 }
 
 function buildRevisionMessages(priorDraft, instruction) {
