@@ -100,21 +100,10 @@ function fmtCurrency(v) {
 }
 
 function DeskTicker({ ticker }) {
-  let nextLabel = '—'
-  let nextOverdue = false
-  if (ticker.nextMove) {
-    const d = new Date(ticker.nextMove)
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    nextOverdue = d < today
-    nextLabel = nextOverdue
-      ? 'overdue'
-      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
   return (
     <div className="wren-ticker">
       <div className="wren-ticker__item">
-        <span className="wren-ticker__label">WEIGHTED</span>
+        <span className="wren-ticker__label">PIPELINE VALUE</span>
         <span className="wren-ticker__value">
           {ticker.weighted > 0 ? fmtCurrency(ticker.weighted) : '—'}
           {ticker.unknownCount > 0 && (
@@ -123,22 +112,12 @@ function DeskTicker({ ticker }) {
         </span>
       </div>
       <div className="wren-ticker__item">
-        <span className="wren-ticker__label">AT RISK</span>
-        <span
-          className="wren-ticker__value"
-          style={ticker.atRisk > 0 ? { color: 'var(--accent)' } : undefined}
-        >
-          {ticker.atRisk > 0 ? fmtCurrency(ticker.atRisk) : '—'}
-        </span>
+        <span className="wren-ticker__label">IN PROCESS</span>
+        <span className="wren-ticker__value">{ticker.inProcess}</span>
       </div>
       <div className="wren-ticker__item">
-        <span className="wren-ticker__label">NEXT MOVE</span>
-        <span
-          className="wren-ticker__value"
-          style={nextOverdue ? { color: 'var(--accent)' } : undefined}
-        >
-          {nextLabel}
-        </span>
+        <span className="wren-ticker__label">SUBMITTALS THIS WEEK</span>
+        <span className="wren-ticker__value">{ticker.submittalsThisWeek}</span>
       </div>
       {ticker.unknownCount > 0 && (
         <span className="wren-ticker__note">
@@ -301,34 +280,35 @@ export default function Wren() {
   async function loadTickerData() {
     if (!recruiter?.id) return
 
-    const [{ data: pipes }, { data: riskActions }] = await Promise.all([
+    const monday = new Date()
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+    monday.setHours(0, 0, 0, 0)
+
+    const [{ data: pipes }, { data: submittals }] = await Promise.all([
       supabase
         .from('pipelines')
         .select(`
-          id, current_stage, expected_comp, expected_comp_high, next_action_due_at,
+          id, current_stage, expected_comp, expected_comp_high,
           roles ( placement_fee_pct, placement_fee_flat, target_comp_min, target_comp_max, status )
         `)
         .eq('recruiter_id', recruiter.id)
         .not('current_stage', 'in', '(placed,lost)'),
       supabase
-        .from('actions')
-        .select('linked_entity_id')
+        .from('pipeline_stage_history')
+        .select('pipeline_id')
         .eq('recruiter_id', recruiter.id)
-        .eq('linked_entity_type', 'pipeline')
-        .in('action_type', ['risk_flag', 'follow_up_overdue'])
-        .in('urgency', ['now', 'today'])
-        .is('dismissed_at', null)
-        .is('acted_on_at', null),
+        .eq('stage', 'submitted')
+        .gte('entered_at', monday.toISOString()),
     ])
 
-    const atRiskIds = new Set((riskActions || []).map(a => a.linked_entity_id))
     let weighted = 0
-    let atRisk = 0
-    let nextMove = null
+    let inProcess = 0
     let unknownCount = 0
 
     for (const p of (pipes || [])) {
       if (p.roles?.status === 'closed') continue
+
+      inProcess++
 
       const stageKey = (p.current_stage || '').toLowerCase().trim()
       const weight = STAGE_WEIGHTS[stageKey]
@@ -356,19 +336,13 @@ export default function Wren() {
       else if (feeFlat != null)  feeValue = Number(feeFlat)
 
       if (feeValue != null && feeValue > 0) {
-        const dealValue = feeValue * weight
-        weighted += dealValue
-        if (atRiskIds.has(p.id)) atRisk += dealValue
-      }
-
-      if (stageKey === 'offer' && p.next_action_due_at) {
-        if (!nextMove || new Date(p.next_action_due_at) < new Date(nextMove)) {
-          nextMove = p.next_action_due_at
-        }
+        weighted += feeValue * weight
       }
     }
 
-    setTicker({ weighted, atRisk, nextMove, unknownCount })
+    const submittalsThisWeek = new Set((submittals || []).map(r => r.pipeline_id)).size
+
+    setTicker({ weighted, inProcess, submittalsThisWeek, unknownCount })
   }
 
   async function switchToDay(convIds) {
