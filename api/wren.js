@@ -1382,12 +1382,12 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
     recruiter_id: recruiter.id,
     candidate_id,
     role_id,
-    current_stage: 'Sourced',
+    current_stage: 'submitted',
     status: 'active',
   })
   if (error) return { error: error.message }
 
-  return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'Sourced' }
+  return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'submitted' }
 }
 
 async function toolCreateRole({ title, company, location, notes }, recruiter) {

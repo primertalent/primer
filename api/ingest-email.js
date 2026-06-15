@@ -357,14 +357,13 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
           .maybeSingle()
 
         if (!existingPipeline) {
-          const firstStage = matchedRole.process_steps?.[0] ?? 'Sourced'
           const { data: newPipeline, error: pipelineErr } = await supabase
             .from('pipelines')
             .insert({
               recruiter_id:  recruiterId,
               candidate_id:  candidateId,
               role_id:       matchedRole.id,
-              current_stage: firstStage,
+              current_stage: 'submitted',
               status:        'active',
             })
             .select('id')

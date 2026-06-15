@@ -85,16 +85,11 @@ function stripMarkdown(text) {
 // Stage weights for pipeline value — keyed by current_stage.toLowerCase().trim().
 // Zero-weight stages are explicit so only truly unrecognized strings trigger the unknown counter.
 const STAGE_WEIGHTS = {
-  sourced: 0, outreach: 0, applied: 0, shortlisted: 0, shortlist: 0,
-  screen: 0, screening: 0, 'phone screen': 0, phone_screen: 0,
-  submitted: 0.30, submitting: 0.30, interviewing: 0.30, interview: 0.30,
-  'first interview': 0.30, '1st interview': 0.30, 'phone interview': 0.30,
-  'second interview': 0.40, '2nd interview': 0.40,
-  'final round': 0.55, final_round: 0.55, 'final interview': 0.55,
-  'late stage': 0.55, late_stage: 0.55,
-  verbal: 0.70, 'verbal offer': 0.70,
-  offer: 0.80, 'offer extended': 0.80, offered: 0.80,
-  accepted: 0.95, 'offer accepted': 0.95,
+  submitted:    0.30,
+  first_round:  0.40,
+  middle_round: 0.55,
+  final_round:  0.70,
+  offer:        0.85,
 }
 
 function fmtCurrency(v) {
@@ -366,8 +361,7 @@ export default function Wren() {
         if (atRiskIds.has(p.id)) atRisk += dealValue
       }
 
-      const isOfferOrAccepted = ['offer', 'offer extended', 'offered', 'verbal', 'verbal offer', 'accepted', 'offer accepted'].includes(stageKey)
-      if (isOfferOrAccepted && p.next_action_due_at) {
+      if (stageKey === 'offer' && p.next_action_due_at) {
         if (!nextMove || new Date(p.next_action_due_at) < new Date(nextMove)) {
           nextMove = p.next_action_due_at
         }

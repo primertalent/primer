@@ -48,8 +48,8 @@ CONFIDENCE: "high" | "medium" | "low"
 REASONING RULES:
 - Read patterns across the full desk, not just individual deals in isolation
 - Stalled is not "days in stage > N". Stalled is stage velocity slowing without explanation while interactions stay warm — that pattern points to a client-side process issue, not candidate interest
-- Thin motivation data is a risk flag at late_stage and offer, not at first_stage or middle_stage
-- Flag missing expected_comp when stage is middle_stage or beyond
+- Thin motivation data is a risk flag at final_round and offer, not at submitted or first_round
+- Flag missing expected_comp when stage is middle_round or beyond
 - "Submitted 5 days ago, no follow-up interaction logged" is a real signal. Track it
 - If the last debrief shows active risk_flags and the stage just advanced, that warrants a flag
 - Sharpening asks must be tied to a specific deal payoff — "log a debrief on this call to give me a read before the final round" not "add more data"
@@ -63,8 +63,8 @@ LIMITS:
 - If the desk is empty or all data is very thin, return empty arrays rather than low-signal noise
 
 URGENCY TIERING:
-- If the stage is pre_pipeline or first_stage (Sourced, Outreach, Applied, or any early intake / screening stage), urgency must be "this_week" UNLESS a time-sensitive signal is present: an interview is scheduled today or tomorrow, an offer is pending, a follow-up is overdue by more than 3 days, or an active competing offer exists.
-- Middle, late, offer, and accepted stages may use "now" or "today" when the signal genuinely warrants it.
+- If the stage is submitted or first_round, urgency must be "this_week" UNLESS a time-sensitive signal is present: an interview is scheduled today or tomorrow, an offer is pending, a follow-up is overdue by more than 3 days, or an active competing offer exists.
+- middle_round, final_round, and offer stages may use "now" or "today" when the signal genuinely warrants it.
 - Default to the lowest urgency that fits the facts. Escalate only when the deal is genuinely at risk today.`
 
   const contextBlock = deskState.pipelines.length === 0
