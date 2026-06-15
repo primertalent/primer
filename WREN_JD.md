@@ -71,3 +71,54 @@ This stat is the agent-shape test and the anti-SaaS regression alarm.
 Ryan tracks his own desk hours per task for two weeks starting 2026-06-10.
 Real ICP numbers replace the estimates above and become the receipt on the
 pricing page: "Wren took N hours off my desk in week one."
+
+---
+
+## Current Roadmap (set 2026-06-15)
+
+Sprint sequence. Strict order. Each item maps to a JD row above.
+
+Sprint 1: Magic moment (diagnosed, contained)
+
+- Scoring reconciliation, comprehensive. Two surfaces contradict today:
+  resumeScreener returns match_score + recommendation as independent
+  fields with no reconciliation (an 8 can ship with a hold);
+  candidateScorecard is banded (8-10 advance). Merge into one scale and
+  one recommendation vocabulary. The score must land in the band that
+  matches the call. Hold-an-8 stays legal only at the pipeline/slate
+  layer, never at the single-candidate screen.
+- Submittal formats. Engine already exists in submissionDraft.js
+  (internal/external modes, bulleted/paragraph/concise). UI buries it.
+  Add a format toggle on the card, add an email format, wire the
+  internal -> resolve-flags -> external loop as the explicit path.
+
+Sprint 2: In-flight experience (the deal desk made visible)
+
+- Entity card primitive: candidate, role, company, screen. One container,
+  different insights per type. Summoned into the thread, edited inline or
+  by talking to Wren, saved to Supabase. No detail-page routes. The card
+  is the primitive, not a page.
+- Stages: First / Middle / Final round. Bidirectional moves. Attention
+  level rises per stage.
+- In-flight cards surface in the morning brief.
+- KPIs on the top bar: candidates in process, submittals this week.
+  Pipeline value once real comp data is entered.
+
+Sprint 3: Brief and beta readiness
+
+- Brief content and format: time-aware greeting, while-you-were-away,
+  desk state, to-do list, interviewing-today. Bullets, not hyphens.
+- Saturday brief is week in review. Sunday is next-week goals.
+- Onboarding mass upload.
+
+Not this sprint (named so they stop nagging):
+
+- Contradiction detection on key fields (prior P1). Data hygiene, queued.
+- Ctrl-K client-name search, full ingestion logging, delete tool, brief
+  race index. Small, batch later.
+- Anything sourcing-adjacent. Never.
+
+Gates: /api/ai auth gate and pipeline -> pipelines rename both CLOSED
+(session 34). Remaining external-user gate is the email-connect onboarding
+(FRICTION.md 6/12, not beta-shippable), solved in Sprint 3 or by the
+Google read-scope path when OAuth verification clears.

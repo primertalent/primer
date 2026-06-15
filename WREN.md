@@ -3,10 +3,11 @@
 
 ---
 
-## Current State (updated 2026-06-12)
+## Current State (updated 2026-06-15)
 
 **Session 34 (2026-06-12) — Gauntlet testing + build sprint:**
 Attachment pipeline shipped: `api/_lib/extractFile.js` + `api/extract-file.js` (JWT-authed POST, PDF via Haiku multimodal, DOCX via mammoth), composer paperclip (Wren.jsx + index.css), email attachment extraction in ingest-email.js (before classifier so "see attached" → correct classification). Send-error surfacing: async code moved inside try, catch injects thread message instead of swallowing silently. Ticker `shortlisted` stage mapped. Rejected-match dead end fixed: `ingestJd` now match-then-ask (no write on role match, deferred until user confirms or rejects); `create_role` and `create_candidate` tools added — serve reject→create path and bare conversational creation ("Create a role: Forward Deployed Engineer at Beacon, $150-180k"). `ingestResume` ask response now includes extracted fields for reject→create. wrenAgent CAPABILITIES updated: conversation is the creation path, no phantom platform. UI polish: bird animates during extraction (streaming || extracting), composer floats 20px off bottom with full border, min-height 72px, font 16px, auto-grows. Placeholder copy cleaned. Em dash audit: 5 hardcoded strings fixed across Wren.jsx, SubmittalDraft, ScreenResult, Landing. Date injection: today's date (America/New_York) injected into resumeScreener, submissionDraft (both surfaces), and wrenAgent — fixes "Dec 2025 impossible date" false red flag. Double-hyphen sanitizer: ` -- ` → `', '` added to all three sanitizeDashes copies; voiceContract updated to explicitly ban `--` substitutes.
+**Docs reconciled (2026-06-15):** /api/ai JWT gate and pipelines rename confirmed shipped, removed from open lists.
 
 **Session 33 (2026-06-10) — Strategy capture + Phase 0 launch:**
 Build plan reset. 4-phase arc: Phase 0 (burn the boats — auth gate + legacy surface deletion + pipeline rename), Phase 1 (One Surface — Wren speaks first, deal ledger artifact, ambient pipeline v1), Phase 2 (Pocket Employee — PWA + push + voice), Phase 3 (Memory That Compounds — outcome write-back + pattern retrieval). Beta (Phase 4) runs parallel starting week of 6/15. Kill list explicit: Tier 2 chip wiring, "Add to a role" diagnosis, all Desk handler work, Gemini Notes polish, extension, Stage 9 cadence engine, Stage 8 closing playbook all dead until after outcome write-back. WREN_JD.md created as roadmap spine — job-coverage thinking replaces feature-list thinking. VISION.md: autonomy ladder (Tier 0–3, earned promotion) replaces three-tier autonomy; three-bucket rule, zero input labor, retrieval is never the response, flywheel added as shape constraints. DECISIONS.md: 6 new entries. Honesty metric (% Wren-initiated) added to brief footer spec.
@@ -29,14 +30,11 @@ Build plan reset. 4-phase arc: Phase 0 (burn the boats — auth gate + legacy su
 - Phase 2.5 Build 2 complete (2026-05-05 through 2026-05-13): CloudMailin ingestion, classifier-first reorder, new_inbound action cards, Gemini Notes flow (intake_notes_ready → recruiter-triggered submittal_draft_ready → review/approve-copy/approve-and-send).
 
 **Actively broken:**
-- `/api/ai` has no auth gate — any POST with valid body bills the Anthropic key. Pre-beta security blocker. Next PR. Fix: add Supabase JWT check or shared secret. (`/api/wren.js` is already gated via Supabase JWT; `api/ai.js` is the remaining exposure.)
 - "Add to a role" buttons broken across Desk chip, DealStatusBar, and sidebar candidate view. Root cause undiagnosed. Workaround: Pipeline section inside candidate page has a working inline button.
 - Tier 2 chip wiring incomplete: `prep_for_interview`, `prep_call`, `queue_follow_up`, `draft_urgency_note`, `draft_inbound_reply` open the candidate panel but no specific flow auto-opens inside. Recruiter still has to find the action manually.
 - Submittal draft is one-shot generation on Desk — fixed in /wren via multi-turn conversation.
-- `pipeline` table is singular — rename to `pipelines` before beta. Will break any raw SQL using old name.
 
 **Next in queue:**
-- `/api/ai` auth gate — next PR (pre-beta security blocker). `/api/wren.js` is already JWT-gated; `api/ai.js` is the remaining exposure.
 - Screen self-contradiction (session 31 bug): screener and submittal builder each synthesize the same company independently from raw data and reached opposite conclusions — Owner.com flagged as "established venture-backed" in screen concerns, then cited as "early-stage startup" in submittal why-fit. Rule-zero reach. Root cause: tools don't share a resolved fact base. Fix: feed screener output into submittal context so the internal breakdown doesn't re-characterize facts the screen already settled.
 - Motivation data dropout (session 31 bug): motivation present in candidate notes/interactions but not flowing into submittal draft synthesis. Both internal and external drafts returned [NEEDS: stated reason] despite the data existing in the record. Draft builder needs to scan notes and recent interactions for motivation signal, not only structured fields.
 - Search entry path (session 31 bug): natural-language "screen Nick Bulow against Unit SDR role" still failed on first try despite individual lookups working after fixes. Model may be forming a combined search query instead of two separate entity lookups, or the expansion instruction doesn't fire when both entities are in one request. Needs investigation with SSE log visibility.
@@ -45,7 +43,6 @@ Build plan reset. 4-phase arc: Phase 0 (burn the boats — auth gate + legacy su
 - Google OAuth read-scope verification — start this week. Restricted scopes (Gmail read, Calendar, Meet transcripts) trigger Google's app verification review, which takes calendar weeks. Start the submission now, run beta on the test-user allowlist in the meantime. Unblocks Stage 6 (client feedback parsing) and Stage 7 (transcript-driven submittals). Additive to the existing working send flow — not a new build.
 - P4-3 (lower priority): `intake_notes_ready` auto-upgrade on manual pipeline insert.
 - P4-4 (lower priority): "Add to a role" button root-cause diagnosis.
-- P4-5 (pre-beta): `pipeline` → `pipelines` table rename. Audit all raw SQL before executing.
 
 ---
 
