@@ -5346,6 +5346,217 @@ select.field-input {
   color: var(--mute);
 }
 
+/* ── Entity cards (CandidateCard, RoleCard, CompanyCard) ─── */
+/* Rule 1: border-radius 0. Rule 2: no box-shadow. Rule 3: no verdict colors.  */
+/* Rule 4: labels = mono uppercase, values = Fraunces. Rule 7: chips = --chip + --hair. */
+
+.candidate-card,
+.role-card,
+.company-card {
+  border: 1px solid var(--hair-2);
+  background: var(--panel);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.candidate-card__label,
+.role-card__label,
+.company-card__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+/* ── CandidateCard ── */
+.candidate-card__name {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.candidate-card__meta,
+.candidate-card__location {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--mute);
+}
+
+.candidate-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.candidate-card__section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 2px;
+}
+
+.candidate-card__pipeline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.candidate-card__pipeline-role {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.candidate-card__pipeline-stage {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  background: var(--chip);
+  border: 1px solid var(--hair);
+  padding: 2px 6px;
+}
+
+.candidate-card__pipeline-overflow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+}
+
+.candidate-card__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.candidate-card__chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--chip);
+  border: 1px solid var(--hair);
+  padding: 3px 8px;
+  line-height: 1.4;
+}
+
+.candidate-card__chip-key {
+  color: var(--mute);
+  letter-spacing: 0.12em;
+  margin-right: 6px;
+}
+
+/* ── RoleCard ── */
+.role-card__title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.role-card__client {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--mute);
+}
+
+.role-card__comp {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.role-card__insight {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--ink);
+  font-style: italic;
+}
+
+.role-card__agreement {
+  margin-top: 2px;
+}
+
+.role-card__agreement-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--chip);
+  border: 1px solid var(--hair);
+  padding: 3px 7px;
+}
+
+/* ── CompanyCard ── */
+.company-card__name {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.company-card__meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--mute);
+}
+
+.company-card__stats {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.company-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.company-card__section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 2px;
+}
+
+.company-card__role-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.company-card__role-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.company-card__agreement-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--chip);
+  border: 1px solid var(--hair);
+  padding: 2px 6px;
+}
+
 /* ── Debrief ─────────────────────────────────────────────── */
 
 .debrief-btn {

@@ -395,11 +395,11 @@ function getToolDefinitions() {
   return [
     {
       name: 'search_db',
-      description: "Search the recruiter's database for candidates or roles by name, company, or keyword. Use this to resolve a name to an ID before calling get_candidate or get_role.",
+      description: "Search the recruiter's database for candidates, roles, or companies by name, title, or keyword. Use this to resolve a name to an ID before calling get_candidate, get_role, or get_company.",
       input_schema: {
         type: 'object',
         properties: {
-          entity_type: { type: 'string', enum: ['candidate', 'role'] },
+          entity_type: { type: 'string', enum: ['candidate', 'role', 'company'] },
           query: { type: 'string', description: 'Name, company, title, or keyword to search' },
         },
         required: ['entity_type', 'query'],
@@ -425,6 +425,17 @@ function getToolDefinitions() {
           role_id: { type: 'string' },
         },
         required: ['role_id'],
+      },
+    },
+    {
+      name: 'get_company',
+      description: 'Retrieve a company/client record: name, industry, location, open roles with their agreement status, and count of candidates currently in flight.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          client_id: { type: 'string' },
+        },
+        required: ['client_id'],
       },
     },
     {
@@ -549,6 +560,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'search_db':        return toolSearchDb(input, recruiter, convContext)
     case 'get_candidate':    return toolGetCandidate(input, recruiter)
     case 'get_role':         return toolGetRole(input, recruiter)
+    case 'get_company':      return toolGetCompany(input, recruiter)
     case 'screen_candidate': return toolScreenCandidate(input, recruiter)
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
@@ -673,6 +685,15 @@ async function toolSearchDb({ entity_type, query }, recruiter, convContext = {})
     const unique = prioritized.filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i)
     return { results: unique.slice(0, 5) }
   }
+  if (entity_type === 'company') {
+    const { data } = await supabase
+      .from('clients')
+      .select('id, name, industry')
+      .eq('recruiter_id', recruiter.id)
+      .ilike('name', `%${query}%`)
+      .limit(5)
+    return { results: (data || []).map(c => ({ ...c, type: 'company' })) }
+  }
   return { results: [] }
 }
 
@@ -706,11 +727,18 @@ async function toolGetCandidate({ candidate_id }, recruiter) {
 async function toolGetRole({ role_id }, recruiter) {
   const { data: role, error } = await supabase
     .from('roles')
-    .select('id, title, status, notes, process_steps, comp_min, comp_max, comp_type, target_comp_min, target_comp_max, clients(id, name, industry, notes)')
+    .select('id, title, status, notes, process_steps, comp_min, comp_max, comp_type, target_comp_min, target_comp_max, agreement_status, clients(id, name, industry, notes)')
     .eq('id', role_id)
     .eq('recruiter_id', recruiter.id)
     .single()
   if (error || !role) return { error: 'Role not found' }
+
+  const { count: pipelineCount } = await supabase
+    .from('pipelines')
+    .select('id', { count: 'exact', head: true })
+    .eq('role_id', role_id)
+    .eq('recruiter_id', recruiter.id)
+    .not('current_stage', 'in', '(placed,lost)')
 
   const clientId = role.clients?.id
   let clientHistory = { recent_debriefs: [] }
@@ -755,7 +783,39 @@ async function toolGetRole({ role_id }, recruiter) {
     }
   }
 
-  return { ...role, client_history: clientHistory }
+  return { ...role, client_history: clientHistory, pipeline_count: pipelineCount ?? 0 }
+}
+
+async function toolGetCompany({ client_id }, recruiter) {
+  const { data: client, error } = await supabase
+    .from('clients')
+    .select('id, name, industry, hq_location')
+    .eq('id', client_id)
+    .eq('recruiter_id', recruiter.id)
+    .single()
+  if (error || !client) return { error: 'Company not found' }
+
+  const { data: roles } = await supabase
+    .from('roles')
+    .select('id, title, status, agreement_status')
+    .eq('client_id', client_id)
+    .eq('recruiter_id', recruiter.id)
+
+  const openRoles = (roles || []).filter(r => r.status === 'open')
+
+  let candidates_in_flight = 0
+  if (openRoles.length > 0) {
+    const openRoleIds = openRoles.map(r => r.id)
+    const { count } = await supabase
+      .from('pipelines')
+      .select('id', { count: 'exact', head: true })
+      .in('role_id', openRoleIds)
+      .eq('recruiter_id', recruiter.id)
+      .not('current_stage', 'in', '(placed,lost)')
+    candidates_in_flight = count ?? 0
+  }
+
+  return { ...client, open_roles: openRoles, candidates_in_flight }
 }
 
 async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recruiter) {

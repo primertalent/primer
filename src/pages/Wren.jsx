@@ -4,6 +4,9 @@ import ScreenResult from '../components/wren/ScreenResult'
 import SubmittalDraft from '../components/wren/SubmittalDraft'
 import IngestResult from '../components/wren/IngestResult'
 import GoogleConnectCard from '../components/wren/GoogleConnectCard'
+import CandidateCard from '../components/wren/CandidateCard'
+import RoleCard from '../components/wren/RoleCard'
+import CompanyCard from '../components/wren/CompanyCard'
 import QuickOpen from '../components/wren/QuickOpen'
 import { WrenMark } from '../components/WrenMark'
 import Chip from '../components/Chip'
@@ -649,6 +652,15 @@ export default function Wren() {
           if (r.tool === 'connect_google') {
             return <GoogleConnectCard key={i} />
           }
+          if (r.tool === 'get_candidate') {
+            return <CandidateCard key={i} data={r.data} />
+          }
+          if (r.tool === 'get_role') {
+            return <RoleCard key={i} data={r.data} />
+          }
+          if (r.tool === 'get_company') {
+            return <CompanyCard key={i} data={r.data} />
+          }
           return null
         })}
       </div>
@@ -737,6 +749,15 @@ export default function Wren() {
                   }
                   if (r.tool === 'connect_google') {
                     return <GoogleConnectCard key={i} />
+                  }
+                  if (r.tool === 'get_candidate') {
+                    return <CandidateCard key={i} data={r.data} />
+                  }
+                  if (r.tool === 'get_role') {
+                    return <RoleCard key={i} data={r.data} />
+                  }
+                  if (r.tool === 'get_company') {
+                    return <CompanyCard key={i} data={r.data} />
                   }
                   return null
                 })}
