@@ -38,47 +38,47 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 6/3 | ingestion | Pasting large text blocks (resume, JD, notes) dumps raw text into the thread instead of converting to a chip. Claude converts pastes to chips — same pattern should apply here. The chip is the natural attachment point for ingestion: resume chip → candidate record, JD chip → company + role, notes chip → candidate enrichment. Pair paste-to-chip with the auto-create-record work — they solve the same root cause together. | shape_problem
 
-6/3 | submittal_draft | Format choice dropped (feature regression). Three formats were deliberately built: bulleted, paragraph (email), concise (Slack). Wren produced one without offering the choice or prompting for it. Format parameter likely not reaching the model or defaulting silently. | shape_problem
+6/3 | submittal_draft | RESOLVED (commit bdff711 — four-format builder in submissionDraft.js; toggle endpoint api/submittal-format.js; internal/external two-surface flow in wren.js). Format choice dropped (feature regression). Three formats were deliberately built: bulleted, paragraph (email), concise (Slack). Wren produced one without offering the choice or prompting for it. Format parameter likely not reaching the model or defaulting silently. | shape_problem
 
 6/3 | screen_evaluation | Rule-zero miss on pedigree claim. Wren wrote "University of Minnesota, top-10 CS program" in both internal and external drafts. Minnesota clears the client's actual top-100 bar (true) but "top-10" is invented — not in the resume, not in call notes. Fabricated ranking reached the HM-ready external surface. Motivation guard fired correctly on the same draft; pedigree claim did not get the same scrutiny. Fix: state the school plainly or tie to the real requirement, never invent a ranking. | bug
 
-6/3 | ui | Rendered submittal output had poor line breaks and strange formatting. Two-surface content was correct (moat behavior confirmed, Annie/Fulcrum) but the render needs a polish pass before any external use. | shape_problem
+6/3 | ui | STALE (Desk surface deleted, commit 54fd414 — /wren submittal renders via SubmittalDraft.jsx). Rendered submittal output had poor line breaks and strange formatting. Two-surface content was correct (moat behavior confirmed, Annie/Fulcrum) but the render needs a polish pass before any external use. | shape_problem
 
 6/3 | intake | "Screen Nick Bulow against the Unit SDR role" returned empty on both candidate and role on first try. "View candidate Nick Bulow" then worked, and screening proceeded via the pipeline role ID. The screen-path search may not be applying the name-split and role-expansion fixes the same way the direct candidate lookup does, or deploy lag. Search fix confirmed at DB level (Nick stored first/last correctly, role is "Sales Development Representative" at client "Unit") but the combined screen-against-role entry path still failed first. | bug
 
 6/3 | candidate_enrichment | Motivation present in the candidate record but dropped from the submittal synthesis. The candidate-view surfaced "Nick is leaving due to organizational shifts and in-person office mandates, Unit is remote, clean motivation story," but the internal and external drafts both returned motivation as NOT CAPTURED / [NEEDS: stated reason]. The data exists in the record and did not flow into the draft. The motivation is the strongest external selling line and it got dropped. | missing_data
 
-6/3 | screen_evaluation | Screen contradicted itself on the same fact. For Nick Bulow against Unit SDR, the screen listed "no early-stage experience, Owner.com and Meltwater are established venture-backed companies" as a concern, then the internal submittal listed "Owner.com is an SMB/mid-market restaurant tech startup, early-stage, high-velocity" as a why-fit bullet. Same company, opposite claims. Rule-zero reach: Wren asserted a fit it had just flagged as a concern. | bug
+6/3 | screen_evaluation | RESOLVED (commit 9d3d40b — buildRuleZero extended with company characterization clause; resumeScreener.js now imports and applies it; same rule reaches all submittal paths). Screen contradicted itself on the same fact. For Nick Bulow against Unit SDR, the screen listed "no early-stage experience, Owner.com and Meltwater are established venture-backed companies" as a concern, then the internal submittal listed "Owner.com is an SMB/mid-market restaurant tech startup, early-stage, high-velocity" as a why-fit bullet. Same company, opposite claims. Rule-zero reach: Wren asserted a fit it had just flagged as a concern. | bug
 
 5/21 | all | RESOLVED. Session 2 card lifecycle fixes validated in real use on Gemini Notes intake smoke test: P4-1 auto-match, P4-2 comp extract on confirmed matches, debrief auto-fire on ingestion path, Tier 1 and Tier 2 inline chip handlers all working. No navigation off Desk observed. | bug
 
 5/21 | intake | Gemini Notes email body contains summaries only, not full transcripts. Full meeting content sits behind "Open meeting notes" link in Google Docs. Wren extracts what it has but signal quality is limited by Gemini's email surface. Not a Wren bug — Gemini is the wrong tool for transcript-quality intake. Path forward: recommend Fathom/Granola/Otter in onboarding materials, or build Google Docs OAuth + fetch (V2+). | external_limitation
 
-5/21 | submittal_draft | "Save to queue" button appears after submittal draft creation but no queue exists — queue was deleted per Phase 2 strip-down. Dead button or stale label mapped to a removed surface. Needs diagnosis: either remove the button or remap to a current surface. | bug
+5/21 | submittal_draft | STALE (queue removed, Desk surface deleted, commit 54fd414). "Save to queue" button appears after submittal draft creation but no queue exists — queue was deleted per Phase 2 strip-down. Dead button or stale label mapped to a removed surface. Needs diagnosis: either remove the button or remap to a current surface. | bug
 
 5/21 | agent_loop | RESOLVED. Loop failures from 5/20 traced to Vercel Hobby 10s timeout with real data in the DB. Fix A (batched dedup in agent-loop-runner.js, commit 8ab4efc) brought execution under the ceiling. Pro upgrade deferred. Watch for re-occurrence as data grows. | bug
 
-5/20 | desk_handlers | Partial fix on Tier 2 chips: prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter stays on /desk URL but still has to find the relevant action inside the panel. Future session needs dedicated modals or wiring to existing surfaces. | shape_problem
+5/20 | desk_handlers | STALE (Desk surface deleted, commit 54fd414). Partial fix on Tier 2 chips: prep_for_interview, prep_call, queue_follow_up, draft_urgency_note, draft_inbound_reply open the candidate panel but no specific flow auto-opens. Recruiter stays on /desk URL but still has to find the relevant action inside the panel. Future session needs dedicated modals or wiring to existing surfaces. | shape_problem
 
-5/20 | submittal_draft | STRATEGIC. Submittal drafting must be multi-turn collaboration, not one-shot generation. Recruiter spent a full Claude session iterating on a real submittal as back-and-forth refinement to get it right. The submittal is Wren's highest-stakes output and the moat moment — treating it as fire-and-forget breaks the product promise. | feature_pattern
+5/20 | submittal_draft | RESOLVED (internal/external two-surface flow in buildSubmittalForWren; revision path in toolDraftSubmittal, wren.js; format toggle for further iteration). STRATEGIC. Submittal drafting must be multi-turn collaboration, not one-shot generation. Recruiter spent a full Claude session iterating on a real submittal as back-and-forth refinement to get it right. The submittal is Wren's highest-stakes output and the moat moment — treating it as fire-and-forget breaks the product promise. | feature_pattern
 5/20 | intake | Candidate 2 re-attempt produced the same name parse failure after discard and re-forward — same bad output, no recovery path. | bug
 5/20 | intake | Candidate 2 Gemini Notes contained a very limited summary; likely root cause of parse failure. | missing_data
 5/20 | intake | Candidate 2 parsed as recruiter's own name instead of the candidate's — sender vs. candidate confusion in forwarded Gemini Notes. | bug
-5/20 | pipeline_stage | No clear mechanism on Desk to move a candidate through pipeline stages or see stage status at a glance. | shape_problem
-5/20 | pipeline_stage | "Log debrief" CTA navigates away from Desk to candidate page instead of staying in context. | shape_problem
-5/20 | pipeline_stage | Action card "no interactions logged" appeared after shortlisting a candidate whose point of entry was an interview call. | bug
+5/20 | pipeline_stage | RESOLVED (commits c9ce8fd + f250d67 — canonical stages, move_stage tool in wren.js, stage history writes). No clear mechanism on Desk to move a candidate through pipeline stages or see stage status at a glance. | shape_problem
+5/20 | pipeline_stage | STALE (Desk surface deleted, commit 54fd414). "Log debrief" CTA navigates away from Desk to candidate page instead of staying in context. | shape_problem
+5/20 | pipeline_stage | STALE (Desk/action cards deleted, commit 54fd414). Action card "no interactions logged" appeared after shortlisting a candidate whose point of entry was an interview call. | bug
 5/20 | screen_evaluation | Screen-against-role scored the same candidate 6/10 while the original screen returned 9/10 — inconsistent signal from the same data. | bug
-5/20 | submittal_draft | Submittal generation is one-shot — no multi-turn refinement or collaboration with Wren to iterate toward the right output. | shape_problem
-5/20 | submittal_draft | Bullet-format submittal output is noticeably weaker than the email-format equivalent. | shape_problem
-5/20 | submittal_draft | After navigating to the candidate page, recruiter had to locate "draft submission" a second time — double-click moment. | shape_problem
-5/20 | submittal_draft | Clicking "draft submission" from the action card navigates off Desk to the candidate page in Network. | shape_problem
+5/20 | submittal_draft | RESOLVED (see STRATEGIC entry above — same fix). Submittal generation is one-shot — no multi-turn refinement or collaboration with Wren to iterate toward the right output. | shape_problem
+5/20 | submittal_draft | RESOLVED (commit bdff711 — buildExternalFormatInstructions provides structured bulleted format; old Desk bullet path deleted). Bullet-format submittal output is noticeably weaker than the email-format equivalent. | shape_problem
+5/20 | submittal_draft | STALE (Desk surface deleted, commit 54fd414). After navigating to the candidate page, recruiter had to locate "draft submission" a second time — double-click moment. | shape_problem
+5/20 | submittal_draft | STALE (Desk surface deleted, commit 54fd414). Clicking "draft submission" from the action card navigates off Desk to the candidate page in Network. | shape_problem
 5/20 | candidate_enrichment | Resume chip processing was noticeably slower than the role drop chip. | shape_problem
-5/20 | candidate_enrichment | No clear surface to attach a resume — recruiter defaulted to dropping it on the main Desk. | shape_problem
+5/20 | candidate_enrichment | RESOLVED (commit 71097a7 — composer paperclip, file-to-paste attachment path). No clear surface to attach a resume — recruiter defaulted to dropping it on the main Desk. | shape_problem
 5/20 | candidate_enrichment | Limited candidate signals generated from call notes despite substantial notes available. | missing_data
-5/20 | candidate_enrichment | Debrief did not trigger automatically after Gemini Notes were parsed. | manual_step
+5/20 | candidate_enrichment | STALE (Desk surface deleted, commit 54fd414 — 5/21 confirmed debrief auto-fire worked on the Desk path before deletion). Debrief did not trigger automatically after Gemini Notes were parsed. | manual_step
 5/20 | candidate_enrichment | Comp details were not auto-parsed from forwarded Gemini call notes. | missing_data
-5/20 | role_creation | Action card "add fee to role" persisted after fee was saved; recruiter had to manually X it out. | bug
-5/20 | role_creation | Agreement modal does not follow design rules. | shape_problem
-5/20 | role_creation | Fee-setting modal does not follow design rules. | shape_problem
-5/20 | role_creation | JD reformatting was visible to the recruiter as it happened — should run silently in the background. | shape_problem
-5/20 | role_creation | Ghost action card from an old build appeared alongside the new role creation card after role drop. | bug
+5/20 | role_creation | STALE (Desk/action cards deleted, commit 54fd414). Action card "add fee to role" persisted after fee was saved; recruiter had to manually X it out. | bug
+5/20 | role_creation | STALE (Desk surface deleted, commit 54fd414). Agreement modal does not follow design rules. | shape_problem
+5/20 | role_creation | STALE (Desk surface deleted, commit 54fd414). Fee-setting modal does not follow design rules. | shape_problem
+5/20 | role_creation | STALE (Desk surface deleted, commit 54fd414). JD reformatting was visible to the recruiter as it happened — should run silently in the background. | shape_problem
+5/20 | role_creation | STALE (Desk/action cards deleted, commit 54fd414). Ghost action card from an old build appeared alongside the new role creation card after role drop. | bug
