@@ -259,7 +259,7 @@ export default function Wren() {
         if (msgs) setMessages(msgs)
       }
       // already_composed: brief already in loaded messages, no reload needed
-      // no_actions: empty desk, thread stays empty ("Ready. What do you need?")
+      // brief always generates — no no_actions early-out (daily ritual, never silent)
     } catch (err) {
       console.error('[brief]', err.message)
     } finally {
