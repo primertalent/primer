@@ -34,29 +34,47 @@ export function useRecruiter() {
         return
       }
 
-      if (data) {
-        setRecruiter(data)
-        setLoading(false)
-        return
+      let row = data
+
+      if (!row) {
+        // No record yet — create one. full_name will be updated when they set up their profile.
+        const { data: created, error: insertError } = await supabase
+          .from('recruiters')
+          .insert({
+            user_id: user.id,
+            email: user.email,
+            full_name: nameFromEmail(user.email),
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          setError(insertError)
+          setLoading(false)
+          return
+        }
+
+        row = created
       }
 
-      // No record yet — create one. full_name will be updated when they set up their profile.
-      const { data: created, error: insertError } = await supabase
-        .from('recruiters')
-        .insert({
-          user_id: user.id,
-          email: user.email,
-          full_name: nameFromEmail(user.email),
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        setError(insertError)
-      } else {
-        setRecruiter(created)
+      // Auto-detect timezone from browser and self-correct if the stored value is still
+      // the system default (timezone_confirmed = false). Correct in-memory first so this
+      // session is right regardless of whether the persist succeeds. A failed write leaves
+      // the DB as-is (still unconfirmed), so the correction retries on next login.
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (!row.timezone_confirmed && browserTz && browserTz !== row.timezone) {
+        row = { ...row, timezone: browserTz }
+        try {
+          await supabase
+            .from('recruiters')
+            .update({ timezone: browserTz })
+            .eq('id', row.id)
+        } catch (tzErr) {
+          console.warn('[useRecruiter] timezone auto-correct write failed:', tzErr?.message)
+        }
       }
 
+      setRecruiter(row)
       setLoading(false)
     }
 
