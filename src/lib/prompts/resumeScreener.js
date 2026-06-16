@@ -1,3 +1,5 @@
+import { buildRuleZero } from './voiceRules.js'
+
 // clientHistory: optional { recent_debriefs: [{ candidate_name, outcome, summary, risk_flags, date }] }
 // When provided, the screen output explicitly flags whether this candidate shares patterns
 // that caused prior candidates to fail at this client — this is the quality gate for /wren.
@@ -29,7 +31,16 @@ export function buildScreenerMessages(candidate, role, clientHistory = null) {
       }\n\nIMPORTANT: In your evaluation, explicitly state whether this candidate shares any of the gaps or risk patterns from this history. Name the pattern and name the candidate's gap. Do not soften it. If this client has passed candidates for a specific reason before, say so directly in top_concerns or red_flags.`
     : ''
 
+  const clientIndustryLine = role.clients?.industry ? `\nClient industry: ${role.clients.industry}` : ''
+  const clientNotesLine    = role.clients?.notes    ? `\nClient notes: ${role.clients.notes.slice(0, 500)}` : ''
+  const hasCompanyContext  = !!(role.clients?.industry || role.clients?.notes)
+  const companyGapNote     = !hasCompanyContext
+    ? `"No company context on file for ${role.clients?.name ?? 'this client'} — evaluated on role fit only."`
+    : null
+
   const prompt = `Today's date: ${today}. Use this for all temporal calculations — employment gaps, tenure durations, "currently employed" assessments. Never flag a date that has already passed as a future or impossible date.
+
+${buildRuleZero()}
 
 You are an expert technical recruiter with 20 years of experience evaluating candidates against job specifications.
 
@@ -44,10 +55,10 @@ Notes: ${candidate.notes || 'None'}${cv}
 
 ROLE SPECIFICATION
 Title: ${role.title}
-Client: ${role.clients?.name ?? 'Unknown'}
+Client: ${role.clients?.name ?? 'Unknown'}${clientIndustryLine}${clientNotesLine}
 Hiring Process: ${steps}${jd}${clientHistorySection}
 
-Score meaning — all-things-considered advance confidence, not raw skills overlap. A material gap, missing must-have, or red flag must pull the score down even when skills match is high:
+${companyGapNote ? `When no client industry or notes are in context, include this as the final item in top_concerns: ${companyGapNote}\n\n` : ''}Score meaning — all-things-considered advance confidence, not raw skills overlap. A material gap, missing must-have, or red flag must pull the score down even when skills match is high:
 8-10: advance — fit, trajectory, and risk all support submission. Ready to move.
 4-7:  hold — real gaps or risk present, but workable. Do not decline; park and compare.
 1-3:  pass — genuine no. Material mismatch or disqualifying risk.

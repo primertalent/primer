@@ -17,7 +17,7 @@ export async function buildSubmittalDraftPayload(
 ) {
   const { data: roleData, error: roleErr } = await supabase
     .from('roles')
-    .select('id, title, notes, process_steps, comp_min, comp_max, comp_type, clients(name)')
+    .select('id, title, notes, process_steps, comp_min, comp_max, comp_type, clients(name, industry, notes)')
     .eq('id', role_id)
     .eq('recruiter_id', recruiter.id)
     .single()

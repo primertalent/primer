@@ -199,10 +199,12 @@ function buildRoleSection(role) {
   const steps = Array.isArray(role.process_steps)
     ? role.process_steps.join(' → ')
     : (role.process_steps || '')
-  const jdSection = role.notes ? `\nJD:\n${role.notes.slice(0, 3000)}` : ''
+  const jdSection          = role.notes            ? `\nJD:\n${role.notes.slice(0, 3000)}`               : ''
+  const industryLine       = role.clients?.industry ? `\nClient industry: ${role.clients.industry}`       : ''
+  const clientNotesLine    = role.clients?.notes    ? `\nClient notes: ${role.clients.notes.slice(0, 500)}` : ''
 
   return `Title: ${role.title}
-Company: ${role.clients?.name ?? 'Unknown'}${comp ? `\nComp range: ${comp}` : ''}${steps ? `\nProcess: ${steps}` : ''}${jdSection}`
+Company: ${role.clients?.name ?? 'Unknown'}${industryLine}${clientNotesLine}${comp ? `\nComp range: ${comp}` : ''}${steps ? `\nProcess: ${steps}` : ''}${jdSection}`
 }
 
 // ─── Desk callers (unchanged) ─────────────────────────────────────────────────
@@ -271,7 +273,12 @@ Structure:
 - Body: 2-3 strengths mapped to the role requirements, with metrics where available
 - Closing: current situation and availability (only what you know)`
 
+  const industryLine    = role.clients?.industry ? `\nClient industry: ${role.clients.industry}`        : ''
+  const clientNotesLine = role.clients?.notes    ? `\nClient notes: ${role.clients.notes.slice(0, 500)}` : ''
+
   const prompt = `You are an expert technical recruiter writing a candidate submission for a client or ATS.
+
+${buildRuleZero()}
 
 ${HUMAN_WRITING_RULES}
 
@@ -285,7 +292,7 @@ Skills: ${skills}${fitSection}${timelineSection}${cvSection}
 
 ROLE
 Title: ${role.title}
-Company: ${role.clients?.name ?? 'Unknown'}${comp ? `\nComp: ${comp}` : ''}${jdSection}
+Company: ${role.clients?.name ?? 'Unknown'}${industryLine}${clientNotesLine}${comp ? `\nComp: ${comp}` : ''}${jdSection}
 
 Write only the submission text. No subject line, no greeting, no signature. Just the body copy the recruiter will send to the hiring manager.`
 
@@ -352,6 +359,8 @@ The candidate just completed a recruiter screening call. The notes below were au
 
 If the call notes do not contain enough detail to write a strong, specific submittal, output this exact line and nothing else:
 "Insufficient signal for a strong submittal. Recommend a follow-up call before submitting."
+
+${buildRuleZero()}
 
 ${HUMAN_WRITING_RULES}
 
