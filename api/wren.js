@@ -8,6 +8,7 @@ import { buildOutreachEmailMessages } from '../src/lib/prompts/candidateOutreach
 import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/intake.js'
 import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
 import { matchCandidateWithConfidence, extractConversationCandidateIds } from './_lib/matchWithConfidence.js'
+import { getCandidate } from './_lib/getCandidate.js'
 import { classifyMove, STAGES, LOST_REASONS, BACKWARD_REASONS } from '../src/lib/stages.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -617,7 +618,7 @@ function getToolDefinitions() {
 async function executeTool(name, input, recruiter, convContext = {}) {
   switch (name) {
     case 'search_db':        return toolSearchDb(input, recruiter, convContext)
-    case 'get_candidate':    return toolGetCandidate(input, recruiter)
+    case 'get_candidate':    return getCandidate(supabase, input.candidate_id, recruiter.id)
     case 'get_role':         return toolGetRole(input, recruiter)
     case 'get_company':      return toolGetCompany(input, recruiter)
     case 'screen_candidate': return toolScreenCandidate(input, recruiter)
@@ -759,39 +760,7 @@ async function toolSearchDb({ entity_type, query }, recruiter, convContext = {})
   return { results: [] }
 }
 
-async function toolGetCandidate({ candidate_id }, recruiter) {
-  const { data: candidate, error } = await supabase
-    .from('candidates')
-    .select('id, first_name, last_name, current_title, current_company, location, email, phone, skills, cv_text, career_timeline, notes, career_signals, enrichment_data')
-    .eq('id', candidate_id)
-    .eq('recruiter_id', recruiter.id)
-    .single()
-  if (error || !candidate) return { error: 'Candidate not found' }
-
-  const { data: interactions } = await supabase
-    .from('interactions')
-    .select('type, direction, body, occurred_at')
-    .eq('candidate_id', candidate_id)
-    .eq('recruiter_id', recruiter.id)
-    .order('occurred_at', { ascending: false })
-    .limit(5)
-
-  const { data: pipelines } = await supabase
-    .from('pipelines')
-    .select('id, current_stage, fit_score, expected_comp, roles(id, title, clients(name))')
-    .eq('candidate_id', candidate_id)
-    .eq('recruiter_id', recruiter.id)
-    .not('current_stage', 'in', '(placed,lost)')
-
-  // Merge enrichment_data (old write path) into career_signals (new canonical location).
-  // enrichment_data fills gaps; career_signals wins per key. Strip enrichment_data from result.
-  const resolvedSignals = {
-    ...(candidate.enrichment_data || {}),
-    ...(candidate.career_signals || {}),
-  }
-  const { enrichment_data: _ed, ...candidateRest } = candidate
-  return { ...candidateRest, career_signals: resolvedSignals, recent_interactions: interactions || [], active_pipelines: pipelines || [] }
-}
+// toolGetCandidate extracted to api/_lib/getCandidate.js — imported above.
 
 async function toolGetRole({ role_id }, recruiter) {
   const { data: role, error } = await supabase
@@ -893,7 +862,7 @@ async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recru
 
   let candidateData
   if (candidate_id) {
-    candidateData = await toolGetCandidate({ candidate_id }, recruiter)
+    candidateData = await getCandidate(supabase, candidate_id, recruiter.id)
     if (candidateData.error) return candidateData
   } else if (resume_text) {
     candidateData = {
@@ -948,7 +917,7 @@ async function toolDraftSubmittal({ role_id, candidate_id, resume_text, mode = '
 
     let candidateData
     if (candidate_id) {
-      candidateData = await toolGetCandidate({ candidate_id }, recruiter)
+      candidateData = await getCandidate(supabase, candidate_id, recruiter.id)
       if (candidateData.error) return candidateData
     } else if (resume_text) {
       candidateData = {
@@ -1025,7 +994,7 @@ Apply the instruction. Return only the revised draft — no intro, no "here's th
 }
 
 async function toolDraftOutreach({ candidate_id, role_id }, recruiter) {
-  const candidateData = await toolGetCandidate({ candidate_id }, recruiter)
+  const candidateData = await getCandidate(supabase, candidate_id, recruiter.id)
   if (candidateData.error) return candidateData
 
   let roleData = null
