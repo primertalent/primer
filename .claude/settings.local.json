@@ -87,7 +87,16 @@
       "Bash(grep -v \"^.*--\\\\|rgba\\\\|^.*\\\\/\\\\*\")",
       "Bash(awk '/\\\\.wren-|\\\\.screen-result|\\\\.submittal-draft|\\\\.ingest-result/{found=1} found && /border-radius/{print NR\": \"$0} /^}$/{found=0}' src/index.css)",
       "Bash(awk '/\\\\.wren-|\\\\.screen-result|\\\\.submittal-draft|\\\\.ingest-result/{found=1} found && /box-shadow/{print NR\": \"$0} /^}$/{found=0}' src/index.css)",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "PowerShell(New-Item *)",
+      "Bash(grep -n \"–\\\\|—\\\\|\\\\\\\\\\\\\\\\u2013\\\\|\\\\\\\\\\\\\\\\u2014\" src/lib/prompts/submissionDraft.js)",
+      "Bash(ls *.md)",
+      "Bash(cat DECISIONS.md)",
+      "Bash(python3 -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(dir src *)",
+      "Bash(findstr vite.svg)",
+      "Bash(npx supabase *)"
     ]
   }
 }
