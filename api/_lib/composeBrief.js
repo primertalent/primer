@@ -351,7 +351,7 @@ Voice: operator tone, direct. Coffee-cup read. No em dashes, no fluff. Do not fo
       { data: placedForGuarantee },
     ] = await Promise.all([
       supabase.from('actions')
-        .select('id, action_type, urgency, why, suggested_next_step')
+        .select('id, action_type, urgency, why, suggested_next_step, context')
         .eq('recruiter_id', recruiter.id)
         .is('briefed_at', null)
         .is('dismissed_at', null)
@@ -400,7 +400,13 @@ Voice: operator tone, direct. Coffee-cup read. No em dashes, no fluff. Do not fo
       .slice(0, 10)
     const todoNoticed    = noticed.slice(0, 3)
     const contextNoticed = noticed.slice(3)
-    todoIds = todoNoticed.map(a => a.id)
+    // intake_notes_ready actions carrying a pending role proposal must resurface
+    // in the brief until the recruiter approves or dismisses them — never stamp
+    // them briefed. Drawn exactly at "has a role match" (context.proposed_match):
+    // no-match intake notes and every other action type stamp normally.
+    todoIds = todoNoticed
+      .filter(a => !(a.action_type === 'intake_notes_ready' && a.context?.proposed_match != null))
+      .map(a => a.id)
 
     // Guarantee check-ins: placed candidates with a 30/60/90 milestone in the coming 7 days
     const nextWeekEnd = new Date(Date.now() + 7 * 86400000)
@@ -511,7 +517,7 @@ Voice: planning mode, operator tone, direct. "Here is what next week needs." No 
       { data: activePipelinesRaw },
     ] = await Promise.all([
       supabase.from('actions')
-        .select('id, action_type, urgency, why, suggested_next_step')
+        .select('id, action_type, urgency, why, suggested_next_step, context')
         .eq('recruiter_id', recruiter.id)
         .is('briefed_at', null)
         .is('dismissed_at', null)
@@ -579,7 +585,13 @@ Voice: planning mode, operator tone, direct. "Here is what next week needs." No 
       .slice(0, 10)
     const todoNoticed    = noticed.slice(0, 3)
     const contextNoticed = noticed.slice(3)
-    todoIds = todoNoticed.map(a => a.id)
+    // intake_notes_ready actions carrying a pending role proposal must resurface
+    // in the brief until the recruiter approves or dismisses them — never stamp
+    // them briefed. Drawn exactly at "has a role match" (context.proposed_match):
+    // no-match intake notes and every other action type stamp normally.
+    todoIds = todoNoticed
+      .filter(a => !(a.action_type === 'intake_notes_ready' && a.context?.proposed_match != null))
+      .map(a => a.id)
 
     const timeOfDay = (() => {
       const h = parseInt(

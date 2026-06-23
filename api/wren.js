@@ -1425,6 +1425,23 @@ async function toolAddToPipeline({ candidate_id, role_id }, recruiter) {
     entered_at:   new Date().toISOString(),
   })
 
+  // Close the intake proposal this approval satisfies. Intake (Tier 0) proposes a
+  // role match and writes no pipeline row; the proposal resurfaces in the brief
+  // until acted on or dismissed. Creating the pipeline here IS that approval —
+  // stamp acted_on_at so the proposal stops resurfacing. Precise match: same
+  // candidate, same role. context->>role_id is null on no-match intake notes, so
+  // the .eq cleanly excludes them (null = uuid is never true), never errors.
+  const { error: closeErr } = await supabase
+    .from('actions')
+    .update({ acted_on_at: new Date().toISOString() })
+    .eq('recruiter_id', recruiter.id)
+    .eq('action_type', 'intake_notes_ready')
+    .eq('linked_entity_id', candidate_id)
+    .eq('context->>role_id', role_id)
+    .is('acted_on_at', null)
+    .is('dismissed_at', null)
+  if (closeErr) console.warn('[wren] intake proposal close-out failed:', closeErr.message)
+
   return { action: 'created', candidate_name: candidateName, role_title: roleTitle, company, stage: 'submitted' }
 }
 

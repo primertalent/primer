@@ -322,8 +322,11 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
   const candidateFullName = [candidateRecord.first_name, candidateRecord.last_name].filter(Boolean).join(' ')
 
   // ── Outcome B: candidate found, no active pipeline ───────────────────────
-  // P4-1: attempt role match before writing the action card.
-  // Match result determines three states: auto-create (≥90), propose (60-89), no match.
+  // P4-1 attempts a role match, but intake PROPOSES — it never writes a pipeline
+  // row. Submittal = pipeline entry = Tier 1 (recruiter approves, per VISION.md),
+  // so the autonomous submit is gone. Match intelligence stays. Three states:
+  // proposed match (confident ≥90 / tentative 60-89), already-pipelined (dedup),
+  // or no match. The pipeline write happens only on approval, via add_to_pipeline.
   if (!activePipelines?.length) {
     const matchResult = await matchRoleFromNotes({
       supabase,
@@ -336,93 +339,70 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       },
     })
 
-    let pipelineId    = null
-    let autoMatched   = false
-    let proposedMatch = null
-    let matchType     = null
-    let matchConf     = null
+    let proposedMatch    = null
+    let alreadyPipelined = null   // { role_title, client_name, stage } when dedup hits
+    let matchType        = null
+    let matchConf        = null
 
     if (matchResult) {
       const { role: matchedRole, confidence, matchType: mType } = matchResult
       matchType = mType
       matchConf = confidence
 
-      if (confidence >= 90) {
-        // Dedup: unique constraint on (candidate_id, role_id) — check before insert.
-        const { data: existingPipeline } = await supabase
-          .from('pipelines')
-          .select('id')
-          .eq('candidate_id', candidateId)
-          .eq('role_id', matchedRole.id)
-          .maybeSingle()
+      // Dedup (Q4): never propose a match the candidate is already pipelined on.
+      // Acknowledge the existing state instead of offering a duplicate submittal.
+      const { data: existingPipeline } = await supabase
+        .from('pipelines')
+        .select('id, current_stage')
+        .eq('candidate_id', candidateId)
+        .eq('role_id', matchedRole.id)
+        .maybeSingle()
 
-        if (!existingPipeline) {
-          const { data: newPipeline, error: pipelineErr } = await supabase
-            .from('pipelines')
-            .insert({
-              recruiter_id:  recruiterId,
-              candidate_id:  candidateId,
-              role_id:       matchedRole.id,
-              current_stage: 'submitted',
-              status:        'active',
-            })
-            .select('id')
-            .single()
-
-          if (!pipelineErr && newPipeline) {
-            pipelineId  = newPipeline.id
-            autoMatched = true
-          }
+      if (existingPipeline) {
+        alreadyPipelined = {
+          role_title:  matchedRole.title,
+          client_name: matchedRole.clients?.name ?? null,
+          stage:       existingPipeline.current_stage,
         }
-        // existingPipeline found: unique constraint would fire — skip auto-create,
-        // fall through to no-match (add to role) behavior.
       } else {
-        // 60-89: propose with one-click confirm
+        // Propose for BOTH tiers — no pipeline row, ever. Confidence drives copy
+        // certainty only (confident ≥90 vs tentative 60-89); same propose path.
         proposedMatch = {
           role_id:     matchedRole.id,
           role_title:  matchedRole.title,
           client_name: matchedRole.clients?.name ?? null,
           confidence,
-        }
-      }
-
-      // Link the interaction to the new pipeline if created
-      if (pipelineId) {
-        await supabase.from('interactions').update({ pipeline_id: pipelineId }).eq('id', interaction.id)
-      }
-    }
-
-    // ── P4-2: Auto-extract expected comp from call notes ──────────────────────
-    // Only fires when pipelineId exists (pipeline auto-created by P4-1 match).
-    // Skips when no pipeline — no row to write to, no orphan signal.
-    let compResult = null
-    if (pipelineId) {
-      compResult = await extractCompFromNotes({ anthropic, notesBody: body, motivationSummary })
-      if (compResult) {
-        try {
-          await supabase
-            .from('pipelines')
-            .update({ expected_comp: compResult.low, expected_comp_high: compResult.high ?? null })
-            .eq('id', pipelineId)
-        } catch (err) {
-          console.warn('[ingest-email] comp auto-write (B) failed:', err.message)
+          confident:   confidence >= 90,
         }
       }
     }
+
+    // ── P4-2: comp extraction is Tier 0 capture — it runs whether or not a
+    // pipeline exists. No pipeline is created at intake now, so the extracted
+    // comp is stashed in the action context (auto_comp_* below) and written to
+    // the pipeline later, on approval (add_to_pipeline). Degrades cleanly: a
+    // null result stashes nulls, no error, nothing lost.
+    const compResult = await extractCompFromNotes({ anthropic, notesBody: body, motivationSummary })
 
     const matchedRole = matchResult?.role ?? null
 
-    // Build action copy and linked entity based on match state
+    // Build action copy. Three states: already pipelined, proposed match
+    // (confident vs tentative), or no match. No pipeline row exists at intake,
+    // so the action always links to the candidate.
     let why, suggestedNextStep
-    const linkedEntityId   = pipelineId ?? candidateId
-    const linkedEntityType = pipelineId ? 'pipeline' : 'candidate'
+    const linkedEntityId   = candidateId
+    const linkedEntityType = 'candidate'
 
-    if (autoMatched && matchedRole) {
-      why               = `Intake call notes for ${candidateFullName}, matched to ${matchedRole.title} at ${matchedRole.clients?.name ?? 'the client'} — pipeline created.`
-      suggestedNextStep = 'Read notes or draft the submittal'
+    if (alreadyPipelined) {
+      const stageLabel  = (alreadyPipelined.stage || '').replace(/_/g, ' ')
+      why               = `Intake notes captured for ${candidateFullName}. Already in pipeline for ${alreadyPipelined.role_title} at ${alreadyPipelined.client_name ?? 'the client'}, ${stageLabel}.`
+      suggestedNextStep = 'Read notes'
+    } else if (proposedMatch && proposedMatch.confident) {
+      why               = `Intake call notes for ${candidateFullName}. I'm confident this is ${proposedMatch.role_title} at ${proposedMatch.client_name ?? 'the client'}. Add to pipeline?`
+      suggestedNextStep = 'Confirm to add to the pipeline, or choose a different role'
     } else if (proposedMatch) {
-      why               = `Intake call notes for ${candidateFullName}. Looks like ${proposedMatch.role_title} at ${proposedMatch.client_name ?? 'the client'} — right role?`
-      suggestedNextStep = 'Confirm to create the pipeline, or choose a different role'
+      why               = `Intake call notes for ${candidateFullName}. Looks like ${proposedMatch.role_title} at ${proposedMatch.client_name ?? 'the client'}. Right role?`
+      suggestedNextStep = 'Confirm to add to the pipeline, or choose a different role'
     } else {
       why               = `Intake call notes captured for ${candidateFullName}. Add to a role to draft the submittal.`
       suggestedNextStep = 'Read notes or add to a role'
@@ -445,18 +425,20 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
           interaction_id: interaction.id,
           candidate_id:   candidateId,
           candidate_name: candidateFullName,
-          pipeline_id:    pipelineId   ?? null,
+          pipeline_id:    null,
           role_id:        matchedRole?.id    ?? null,
           role_title:     matchedRole?.title ?? null,
           client_name:    matchedRole?.clients?.name ?? null,
           notes_body:     body || '',
-          // P4-1 match calibration — seed for V2 confidence calibration loop
-          auto_matched:          autoMatched,
+          // P4-1 match calibration — seed for V2 confidence calibration loop.
+          // auto_matched is permanently false: intake proposes, never submits.
+          auto_matched:          false,
           auto_match_confidence: matchConf,
           auto_match_type:       matchType,
           proposed_match:        proposedMatch,
+          already_pipelined:     alreadyPipelined,
           matched_at:            matchResult ? new Date().toISOString() : null,
-          // P4-2 comp calibration — always present, even when extraction returned null
+          // P4-2 comp stash — written to the pipeline on approval (add_to_pipeline)
           auto_comp_extracted:      !!compResult,
           auto_comp_confidence:     compResult?.confidence      ?? null,
           auto_comp_value_low:      compResult?.low             ?? null,
@@ -467,12 +449,13 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         build_version:       BUILD_VERSION,
       })
     } catch (err) {
-      console.warn('[ingest-email] intake_notes_ready (B+match) action insert failed:', err.message)
+      console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message)
     }
 
     // ── Background debrief extraction (Outcome B) ────────────────────────────
-    // Fires when notes are substantive. pipelineId is set for auto-matches (≥90%),
-    // null for proposed matches — debrief still saves, next_action skipped when null.
+    // No pipeline at intake now — pipelineId is always null here. The debrief
+    // still saves; the next_action write is skipped internally when pipelineId
+    // is null.
     try {
       await runBackgroundDebrief({
         supabase,
@@ -484,7 +467,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         },
         recruiterId,
         candidateId,
-        pipelineId:    pipelineId ?? null,
+        pipelineId:    null,
         interactionId: interaction.id,
         notesBody:     body,
       })
@@ -494,11 +477,11 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
 
     triggerLoop(host, recruiterId)
     return {
-      outcome:        'B',
-      candidate_id:   candidateId,
-      candidate_name: candidateFullName,
-      auto_matched:   autoMatched,
-      proposed_match: proposedMatch ?? null,
+      outcome:           'B',
+      candidate_id:      candidateId,
+      candidate_name:    candidateFullName,
+      proposed_match:    proposedMatch    ?? null,
+      already_pipelined: alreadyPipelined ?? null,
     }
   }
 
