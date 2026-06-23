@@ -9,7 +9,7 @@ import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/i
 import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
 import { matchCandidateWithConfidence, extractConversationCandidateIds } from './_lib/matchWithConfidence.js'
 import { getCandidate } from './_lib/getCandidate.js'
-import { classifyMove, STAGES, LOST_REASONS, BACKWARD_REASONS } from '../src/lib/stages.js'
+import { classifyMove, STAGES, STAGE_LABELS, ACTIVE_STAGES, LOST_REASONS, BACKWARD_REASONS } from '../src/lib/stages.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -440,13 +440,26 @@ function getToolDefinitions() {
     },
     {
       name: 'get_company',
-      description: 'Retrieve a company/client record: name, industry, location, open roles with their agreement status, and count of candidates currently in flight.',
+      description: 'Retrieve a company/client record: name, industry, location, open roles with their agreement status, the count of candidates currently in flight, and a roster of those candidates (name + stage + role).',
       input_schema: {
         type: 'object',
         properties: {
           client_id: { type: 'string' },
         },
         required: ['client_id'],
+      },
+    },
+    {
+      name: 'list_pipeline',
+      description: "List the candidates currently in process (the pipeline roster), not just a count. Use for \"who's in process\", \"who's at [company]\", \"who's in [stage]\", \"who's in process for [role]\". All filters are optional and combine: role_id (one role), client_id (all open roles at one company), stage (one stage). With no filter, returns everyone in process across the whole desk. Active stages only by default (submitted through offer); placed and lost are excluded unless you pass that stage explicitly. Resolve a role or company name to its ID with search_db first. Returns each candidate's name, current_stage, role title, client name, and days_in_stage.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          role_id:   { type: 'string', description: 'Optional. Limit to one role. Wins over client_id if both are passed.' },
+          client_id: { type: 'string', description: 'Optional. Limit to all open roles at one company.' },
+          stage:     { type: 'string', enum: STAGES, description: 'Optional. Limit to one stage. Pass a terminal stage (placed/lost) to see it; otherwise placed/lost are excluded.' },
+        },
+        required: [],
       },
     },
     {
@@ -621,6 +634,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'get_candidate':    return getCandidate(supabase, input.candidate_id, recruiter.id)
     case 'get_role':         return toolGetRole(input, recruiter)
     case 'get_company':      return toolGetCompany(input, recruiter)
+    case 'list_pipeline':    return toolListPipeline(input, recruiter)
     case 'screen_candidate': return toolScreenCandidate(input, recruiter)
     case 'draft_submittal':  return toolDraftSubmittal(input, recruiter)
     case 'draft_outreach':   return toolDraftOutreach(input, recruiter)
@@ -771,12 +785,23 @@ async function toolGetRole({ role_id }, recruiter) {
     .single()
   if (error || !role) return { error: 'Role not found' }
 
-  const { count: pipelineCount } = await supabase
+  // Roster, not just a count: the candidates in process for this role. Same scan
+  // the count ran, returning the rows instead of discarding them (count without
+  // the names was the bug). Name + stage only — days_in_stage stays in
+  // list_pipeline. Active stages only, mirroring the ticker; placed/lost excluded.
+  const { data: rolePipelineRows } = await supabase
     .from('pipelines')
-    .select('id', { count: 'exact', head: true })
+    .select('candidate_id, current_stage, candidates(first_name, last_name)')
     .eq('role_id', role_id)
     .eq('recruiter_id', recruiter.id)
-    .not('current_stage', 'in', '(placed,lost)')
+    .eq('status', 'active')
+    .in('current_stage', [...ACTIVE_STAGES])
+  const pipelineRoster = (rolePipelineRows || []).map(p => ({
+    candidate_id:  p.candidate_id,
+    name:          [p.candidates?.first_name, p.candidates?.last_name].filter(Boolean).join(' '),
+    current_stage: STAGE_LABELS[p.current_stage] || p.current_stage,
+  }))
+  const pipelineCount = pipelineRoster.length
 
   const clientId = role.clients?.id
   let clientHistory = { recent_debriefs: [] }
@@ -821,7 +846,7 @@ async function toolGetRole({ role_id }, recruiter) {
     }
   }
 
-  return { ...role, client_history: clientHistory, pipeline_count: pipelineCount ?? 0 }
+  return { ...role, client_history: clientHistory, pipeline_count: pipelineCount, pipeline_roster: pipelineRoster }
 }
 
 async function toolGetCompany({ client_id }, recruiter) {
@@ -841,19 +866,125 @@ async function toolGetCompany({ client_id }, recruiter) {
 
   const openRoles = (roles || []).filter(r => r.status === 'open')
 
-  let candidates_in_flight = 0
+  // Roster, not just a count: the candidates in process across this client's open
+  // roles. Same scan the count ran, returning the rows (count without the names
+  // was the frustration). Name + stage + role title — days_in_stage stays in
+  // list_pipeline. Active stages only, mirroring the ticker; placed/lost excluded.
+  let roster = []
   if (openRoles.length > 0) {
     const openRoleIds = openRoles.map(r => r.id)
-    const { count } = await supabase
+    const { data: companyPipelineRows } = await supabase
       .from('pipelines')
-      .select('id', { count: 'exact', head: true })
+      .select('candidate_id, current_stage, candidates(first_name, last_name), roles(title)')
       .in('role_id', openRoleIds)
       .eq('recruiter_id', recruiter.id)
-      .not('current_stage', 'in', '(placed,lost)')
-    candidates_in_flight = count ?? 0
+      .eq('status', 'active')
+      .in('current_stage', [...ACTIVE_STAGES])
+    roster = (companyPipelineRows || []).map(p => ({
+      candidate_id:  p.candidate_id,
+      name:          [p.candidates?.first_name, p.candidates?.last_name].filter(Boolean).join(' '),
+      current_stage: STAGE_LABELS[p.current_stage] || p.current_stage,
+      role_title:    p.roles?.title ?? null,
+    }))
+  }
+  const candidates_in_flight = roster.length
+
+  return { ...client, open_roles: openRoles, candidates_in_flight, roster }
+}
+
+// Stage rank for "furthest-along first" ordering. Terminal stages sort last.
+const PIPELINE_STAGE_RANK = { offer: 5, final_round: 4, middle_round: 3, first_round: 2, submitted: 1, placed: 0, lost: 0 }
+
+async function toolListPipeline({ role_id, client_id, stage }, recruiter) {
+  // Read-only roster of the pipeline. Tier 0 — only SELECTs, no writes, no side
+  // effects, no loop trigger. Reads real pipeline rows ONLY; proposed matches
+  // (pending approval) write no pipeline row and live in actions.context, so they
+  // cannot appear here. The two layers stay distinct.
+  if (stage && !STAGES.includes(stage)) {
+    return { error: `Unknown stage: ${stage}. Valid stages: ${STAGES.join(', ')}.` }
   }
 
-  return { ...client, open_roles: openRoles, candidates_in_flight }
+  let q = supabase
+    .from('pipelines')
+    .select('id, candidate_id, current_stage, updated_at, candidates(first_name, last_name), roles(id, title, clients(id, name))')
+    .eq('recruiter_id', recruiter.id)
+
+  // role_id wins over client_id (more specific). Client filter resolves to the
+  // client's role IDs first — mirrors get_role's client-history pattern.
+  if (role_id) {
+    q = q.eq('role_id', role_id)
+  } else if (client_id) {
+    const { data: clientRoles } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('client_id', client_id)
+      .eq('recruiter_id', recruiter.id)
+    const roleIds = (clientRoles || []).map(r => r.id)
+    if (roleIds.length === 0) {
+      return { count: 0, filter: { role_id: null, client_id, stage: stage ?? null }, candidates: [] }
+    }
+    q = q.in('role_id', roleIds)
+  }
+
+  // Default: active stages only (in process), placed/lost excluded. An explicit
+  // stage reaches any single stage — including terminal — only when asked.
+  if (stage) {
+    q = q.eq('current_stage', stage)
+  } else {
+    q = q.eq('status', 'active').in('current_stage', [...ACTIVE_STAGES])
+  }
+
+  // Cap at 200 (safety bound for a flooded desk). Order by recent activity so the
+  // truncation selects live deals; final presentation order is stage-rank below.
+  q = q.order('updated_at', { ascending: false }).limit(200)
+
+  const { data: rows, error } = await q
+  if (error) return { error: error.message }
+  if (!rows?.length) {
+    return { count: 0, filter: { role_id: role_id ?? null, client_id: client_id ?? null, stage: stage ?? null }, candidates: [] }
+  }
+
+  // days_in_stage from open stage-history rows (exited_at IS NULL) — same source as
+  // the ticker and brief. Fallback to updated_at with an approx flag when no row.
+  const pipelineIds = rows.map(r => r.id)
+  const { data: histRows } = await supabase
+    .from('pipeline_stage_history')
+    .select('pipeline_id, entered_at')
+    .in('pipeline_id', pipelineIds)
+    .is('exited_at', null)
+    .order('entered_at', { ascending: false })
+  const enteredMap = {}
+  for (const h of (histRows || [])) {
+    if (!enteredMap[h.pipeline_id]) enteredMap[h.pipeline_id] = h.entered_at
+  }
+
+  const now = Date.now()
+  const candidates = rows.map(r => {
+    const entered = enteredMap[r.id]
+    const refTime = new Date(entered || r.updated_at).getTime()
+    return {
+      candidate_id:  r.candidate_id,
+      name:          [r.candidates?.first_name, r.candidates?.last_name].filter(Boolean).join(' '),
+      current_stage: STAGE_LABELS[r.current_stage] || r.current_stage,
+      role_title:    r.roles?.title ?? null,
+      client_name:   r.roles?.clients?.name ?? null,
+      days_in_stage: Math.floor((now - refTime) / 86400000),
+      approx:        !entered,
+      _rank:         PIPELINE_STAGE_RANK[r.current_stage] ?? 0,
+    }
+  })
+
+  // Furthest-along first, then longest in stage. "Who's in process" is a
+  // where-do-live-deals-stand question — near-close candidates lead.
+  candidates.sort((a, b) => (b._rank - a._rank) || (b.days_in_stage - a.days_in_stage))
+  candidates.forEach(c => { delete c._rank })
+
+  return {
+    count:     candidates.length,
+    truncated: rows.length >= 200,
+    filter:    { role_id: role_id ?? null, client_id: client_id ?? null, stage: stage ?? null },
+    candidates,
+  }
 }
 
 async function toolScreenCandidate({ role_id, candidate_id, resume_text }, recruiter) {
