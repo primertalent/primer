@@ -147,11 +147,16 @@ export default function Wren() {
   // record/detail views (Chunk 2) slot in without a refactor. 'conversation' is
   // home — the brief lands in the thread; Desk is opt-in via the view switch.
   const [view, setView] = useState('conversation')
+  // Reply indicator on the WREN tab while the recruiter is on DESK: the bird
+  // flaps while composing (driven by `streaming`), then holds a static alert
+  // once the reply has landed unread. Clears on switch back to the conversation.
+  const [unreadReply, setUnreadReply] = useState(false)
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
   const loadedRef = useRef(false)
   const latestConvIdRef = useRef(null)
+  const viewRef = useRef(view)
 
   useEffect(() => {
     if (!recruiter?.id || loadedRef.current) return
@@ -180,6 +185,13 @@ export default function Wren() {
       }])
     }
   }, [])
+
+  // Mirror view into a ref so async stream handlers read the live view, and clear
+  // the unread-reply alert the moment the recruiter lands on the conversation.
+  useEffect(() => {
+    viewRef.current = view
+    if (view === 'conversation') setUnreadReply(false)
+  }, [view])
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -426,10 +438,6 @@ export default function Wren() {
   async function sendMessage(directMsg = null) {
     if (directMsg != null ? streaming : !canSend) return
 
-    // Asking Wren about whatever view you're on flows into the same thread —
-    // flip back to the conversation so the answer is visible.
-    setView('conversation')
-
     let messageText
     let displayText
     if (directMsg != null) {
@@ -541,6 +549,9 @@ export default function Wren() {
             setMessages(prev => [...prev, finalMsg])
             setStreamingMsg(null)
             loadConversationList()
+            // Reply landed while the recruiter is on DESK — mark it unread so the
+            // WREN tab holds the alert until they switch over to read it.
+            if (viewRef.current === 'home') setUnreadReply(true)
           } else if (evtType === 'error') {
             throw new Error(payload.message || 'Stream error')
           }
@@ -558,6 +569,9 @@ export default function Wren() {
           _local: true,
         },
       ])
+      // Error lands in the thread too — alert on DESK so a silent failure
+      // doesn't leave the recruiter waiting on a reply that never came.
+      if (viewRef.current === 'home') setUnreadReply(true)
     } finally {
       setStreaming(false)
       setStreamingMsg(null)  // clear thinking dots on any close — abrupt or clean
@@ -711,6 +725,8 @@ export default function Wren() {
                 onClick={() => setView('conversation')}
               >
                 Wren
+                {view === 'home' && streaming && <WrenMark state="working" size={14} />}
+                {view === 'home' && !streaming && unreadReply && <WrenMark state="alert" size={14} />}
               </button>
               <button
                 type="button"

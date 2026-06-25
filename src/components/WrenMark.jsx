@@ -2,8 +2,9 @@ export function WrenMark({ size = 28, tone = 'ink', state = 'idle' }) {
   const cls = [
     'wren-mark',
     tone,
-    state !== 'idle' && 'thinking',
+    (state === 'thinking' || state === 'working') && 'thinking',
     state === 'working' && 'busy',
+    state === 'alert' && 'alert',
   ].filter(Boolean).join(' ')
 
   return (

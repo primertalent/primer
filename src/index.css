@@ -4751,6 +4751,9 @@ select.field-input {
   border: 1px solid var(--hair);
 }
 .wren-viewswitch__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
@@ -5139,6 +5142,19 @@ select.field-input {
 .wren-mark.thinking .ww        { animation: wrenFlap 1.5s ease-in-out infinite; }
 .wren-mark.thinking.busy,
 .wren-mark.thinking.busy .ww   { animation-duration: .92s; }
+
+/* Static unread-reply marker — taxonomic, no animation. Circle (Rule 1 dot
+   exception), --ink (neutral, not a verdict). */
+.wren-mark.alert::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .wren-mark.thinking,
