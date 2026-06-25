@@ -3,7 +3,15 @@
 
 ---
 
-## Current State (updated 2026-06-15)
+## Current State (updated 2026-06-25)
+
+**Session 36 (2026-06-25) — Intake proposes (autonomy-ladder fix), list_pipeline recall, dashboard Desk view:**
+Intake proposes instead of auto-submitting (commit 916ce24): removed the ≥90% auto-create-pipeline block in ingest-email.js. High-confidence email matches route into the proposedMatch path (no pipeline write); the write fires only on recruiter approval via add_to_pipeline. Fixes the autonomy-ladder violation (a Tier 1 write firing at Tier 0). Single write path now has one gate (add_to_pipeline), no leaks. Comp extracts unconditionally at intake and stashes in action context for write-on-approval. Dedup guard prevents re-proposing an already-pipelined candidate.
+Proposal persistence + close (commit 916ce24): proposals (intake_notes_ready with a role match) are exempt from briefed_at stamping so they resurface in the brief until acted on; toolAddToPipeline stamps acted_on_at on the matching proposal so approval closes it. wrenAgent rule: approving a proposal resolves candidate + role as separate search_db calls, then add_to_pipeline.
+list_pipeline + rosters (commit d9a8efb): new Tier 0 read-only tool returning the pipeline roster (who's in process), filters by role/client/stage, active stages default. get_role/get_company now return rosters (names), not just counts. Fixes the recall gap. wrenAgent routes "who's in process" to it.
+Dashboard home view, Chunk 1 (commits 34e0a35, f116d86): new DESK view in the canvas above the persistent Wren shell — candidates in process (ledger) + active roles. Architecture: one composer, one thread; views swap above the shared shell (WREN | DESK toggle, WREN default/home). Reads client-side, RLS-scoped (loadTickerData precedent), no model call. Read-only/anti-CRM: enrich by talking to Wren. Stage colors via signal tokens (submitted blue, first teal, middle purple, final green); offer = --win (documented recruiter override — reaching offer is itself a PUSH verdict; see DECISIONS.md). New file: src/components/wren/DashboardHome.jsx. Ledger polish: column alignment via deterministic grid tracks, type scale normalized (mono 10/12/18, Fraunces 18/14), toggle order WREN | DESK.
+DESK interaction (commit c63834b): killed the auto-flip on send (asking about the desk yanked you off it). The wren bird on the WREN tab is the reply indicator: flaps (reused working cadence) while composing, holds a static --ink alert dot when a reply lands unread on DESK (success or error), clears on switch to WREN. WrenMark gained a static alert state, no new animation.
+Dashboard Chunks 2 (browsable record) and 3 (nav polish) pending — tracked in FRICTION.
 
 **Session 35 (2026-06-15) — Scoring reconciliation, entity cards, stages, ticker, comp/fee tools:**
 Sprint 1 — scoring reconciliation + submittal formats (commits 9af6eee, bdff711): One band map + code-derived recommendation label — 8-and-hold eliminated, score band determines recommendation with no override path. Submittal format toggle: Bulleted / Email / Slack / LinkedIn (4 formats), lazy cache per format so revisiting a tab doesn't regenerate, send path uses the on-screen format.
@@ -196,7 +204,7 @@ The nine stages of a candidate in Wren. Every build decision should name which s
 | Stage | Description | Wren involvement | Status |
 |---|---|---|---|
 | 1 — Sourcing | LinkedIn, referrals, Paraform. Recruiter finds candidate. | Dormant. Out of scope. | Outside Wren |
-| 2 — Intake call | Recruiter speaks with candidate. Gemini Notes captures. Wren extracts fields, auto-creates candidate record, matches to active role, and auto-writes expected comp. | **P4-1 + P4-2 live.** Auto-match fires on 90%+ confidence. Proposed match at 60–89%. Comp auto-extracted from notes on high confidence (regex ≥90, Haiku ≥80); recruiter overrides if wrong. | Live |
+| 2 — Intake call | Recruiter speaks with candidate. Gemini Notes captures. Wren extracts fields, auto-creates the candidate record, matches to active role, and proposes the pipeline (no auto-write). | **Proposes, write-on-approval (commit 916ce24).** High-confidence matches route to the proposedMatch path; the pipeline write fires only on approval via add_to_pipeline (autonomy-ladder fix, was auto-creating at ≥90%). Comp extracts at intake, stashed in action context for write-on-approval. | Live |
 | 3 — Resume arrives | CV lands via email or paste. Wren enriches candidate record, flags gaps. | Pattern same as P4-1. Next logical build after P4-2. | Not shipped |
 | 4 — Submittal drafted | Wren drafts the pitch from notes + JD on explicit trigger. Recruiter reviews, approves, copies. | Live (Build 2 Piece 3). | Live |
 | 5 — Submittal sent | Recruiter sends to client. Wren's job: confirmation, timing, follow-up reminder. | Human action today. Future: Wren-with-approval (Build 3). | Partial |

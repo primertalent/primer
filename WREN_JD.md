@@ -22,7 +22,7 @@ Target tier refers to the autonomy ladder in VISION.md.
 
 | Task | Est hrs/wk | Coverage today | Target tier | Notes |
 |---|---|---|---|---|
-| Intake capture + data entry | 3-4 | Live (Gemini path, P4-1/P4-2, paste) | 0 (silent) | Ambient via transcripts post read-scope |
+| Intake capture + data entry | 3-4 | Live (Gemini path, paste); intake now proposes, write-on-approval (not auto-creating pipeline) | 0 (silent) | Proposal path fixes the Tier-0/Tier-1 violation (commit 916ce24); ambient via transcripts post read-scope |
 | Screening against role | 2-3 | Live, two moat bugs open | 1 (approve) | Shared fact base fix required |
 | Submittal writing | 2-4 | Live, multi-turn, voice layer | 1 forever | Never above Tier 1 per VISION.md email rule |
 | Chasing (client + candidate) | 3-4 | Partial (loop flags, drafts) | 2 (act + report) | Earned promotion only |
@@ -74,7 +74,7 @@ pricing page: "Wren took N hours off my desk in week one."
 
 ---
 
-## Current Roadmap (updated 2026-06-15)
+## Current Roadmap (updated 2026-06-25)
 
 Sprint sequence. Strict order. Each item maps to a JD row above.
 
@@ -118,6 +118,23 @@ Sprint 2c-2: Brief + honesty model — NEXT
 - In-flight deal cards surface in the brief.
 - Honesty model: "I don't have a way to save that yet" pattern extended across tool
   gaps as they surface in real use.
+
+Intake autonomy + recall — COMPLETE (2026-06-25)
+
+- [x] Intake proposes instead of auto-submitting; proposal persists in the brief and
+  closes on approval. Autonomy-ladder fix (a Tier 1 write no longer fires at Tier 0).
+  Single write path, one gate (add_to_pipeline). (commit 916ce24)
+- [x] list_pipeline tool (Tier 0 roster) + get_role/get_company rosters (names, not just
+  counts). Closes the "who's in process" recall gap. (commit d9a8efb)
+
+Dashboard surface — Chunk 1 COMPLETE (2026-06-25), Chunks 2-3 pending
+
+- [x] Chunk 1: DESK home view above the persistent shell — candidates-in-process ledger +
+  active roles. One composer/one thread, WREN|DESK toggle, read-only/anti-CRM, client-side
+  RLS reads. (commits 34e0a35, f116d86) Reply indicator: bird flaps composing, static
+  alert on unread, no auto-flip. (commit c63834b)
+- [ ] Chunk 2: the Record — browsable all candidates/roles/companies + read-only detail.
+- [ ] Chunk 3: nav polish.
 
 Sprint 3: Beta readiness
 

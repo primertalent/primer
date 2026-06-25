@@ -10,7 +10,19 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
-6/25 | dashboard/enrichment | Candidate avatars: framed circle with photo, initials fallback when no photo. DESIGN-sanctioned (avatars are a sharp-corner exception). Initials-only is cheap and on-thesis — fold into dashboard roster + record views. Photo SOURCE is coupled to the LinkedIn question below. | enhancement
+6/25 | intake | RESOLVED (commit 916ce24). Phantom pipeline write — intake auto-created a pipeline at ≥90% match confidence, a Tier 1 write firing at Tier 0 (autonomy-ladder violation). Now proposes via the proposedMatch path; pipeline writes only on recruiter approval through add_to_pipeline. One gate, no leaks. | bug
+
+6/25 | recall | RESOLVED (commit d9a8efb). "Who's in process" was unanswerable — get_role/get_company returned counts without names and no tool listed the roster. Added list_pipeline (Tier 0; filters by role/client/stage) plus rosters (names) on get_role/get_company. | missing_data
+
+6/25 | dashboard | OPEN. Chunk 2 — the browsable Record: all candidates/roles/companies, read-only detail. Chunk 1 (DESK home view) shipped (commit 34e0a35); Chunk 2 pending. | enhancement
+
+6/25 | dashboard | OPEN. Chunk 3 — nav polish for the dashboard surface. Pending after Chunk 2. | enhancement
+
+6/25 | dashboard/interaction | OPEN (watching). If flip-to-read nags in real use, build the one-line reply peek on DESK (Option A). Option B (bird flap + static unread alert, no auto-flip) shipped first (commit c63834b); peek only if alert-then-switch proves to nag. | enhancement
+
+6/25 | doc-drift | OPEN. Stale confirm_role_match / Desk references in extract-comp.js header comment + CHANGELOG — dead-code doc drift from deleted surfaces. Clean up in a docs pass. | bug
+
+6/25 | dashboard/enrichment | Candidate avatars: framed circle with photo, initials fallback when no photo. DESIGN-sanctioned (avatars are a sharp-corner exception). Initials-only is cheap and on-thesis — fold into Chunk 2 record views. Photo SOURCE is coupled to the LinkedIn question below. | enhancement
 
 6/25 | strategic/ingestion | LinkedIn Chrome-extension profile parsing (sourcing capture) + LI profile photos. HIGH capture value, core to ingestion thesis. BUT reopens the closed "No LinkedIn API (too locked down)" constraint — extension scraping is a different mechanism, same ToS/legal gray zone LinkedIn defends (suits, C&Ds, extension breakage). Needs its own evaluation: does extension parsing clear the bar the API constraint set? ToS/legal exposure? Chrome-store risk? Worth it? NOT a queue item — a strategic decision session. | strategic-decision
 
