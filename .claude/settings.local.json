@@ -96,7 +96,12 @@
       "Bash(python -c ' *)",
       "Bash(dir src *)",
       "Bash(findstr vite.svg)",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Bash(node --check api/ingest-email.js)",
+      "Bash(node --check api/wren.js)",
+      "Bash(node --check api/_lib/composeBrief.js)",
+      "Bash(node --check src/lib/prompts/wrenAgent.js)",
+      "Bash(node --check src/lib/stages.js)"
     ]
   }
 }
