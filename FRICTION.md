@@ -10,6 +10,8 @@ Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / 
 
 <!-- Append new entries below, newest at top -->
 
+6/25 | brief | RESOLVED (commit 85ed2a6). "9am email not sending even when not logged in" — root cause was the already_briefed skip firing before the email step: seeing the brief in-app (app load writes a morning_brief row) marked the recruiter briefed and suppressed the cron email. Model A removes that skip; the brief always emails at 9am. Was working-as-designed (model B) mistaken for a regression; we chose A deliberately. | bug
+
 6/25 | intake | RESOLVED (commit 916ce24). Phantom pipeline write — intake auto-created a pipeline at ≥90% match confidence, a Tier 1 write firing at Tier 0 (autonomy-ladder violation). Now proposes via the proposedMatch path; pipeline writes only on recruiter approval through add_to_pipeline. One gate, no leaks. | bug
 
 6/25 | recall | RESOLVED (commit d9a8efb). "Who's in process" was unanswerable — get_role/get_company returned counts without names and no tool listed the roster. Added list_pipeline (Tier 0; filters by role/client/stage) plus rosters (names) on get_role/get_company. | missing_data
