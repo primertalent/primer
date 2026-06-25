@@ -109,18 +109,12 @@ export default async function handler(req, res) {
   // Permanent test path: bypasses the 9am hour filter so it works any time.
   const dryRun = req.query.dryRun === '1'
 
-  const today = new Date().toISOString().slice(0, 10)
-
-  // ── Recruiters who already have a brief today ────────────────────────────
-  const { data: briefedRows } = await supabase
-    .from('conversation_messages')
-    .select('recruiter_id')
-    .eq('role', 'assistant')
-    .filter('content->>type', 'eq', 'morning_brief')
-    .filter('content->>brief_date', 'eq', today)
-  const briefedIds = new Set((briefedRows || []).map(r => r.recruiter_id))
-
   // ── All recruiters ───────────────────────────────────────────────────────
+  // Model A: the brief always emails at 9am local — seeing it in-app does NOT
+  // suppress the email. Generate-once-deliver-twice: composeBrief returns the
+  // existing brief if one was already composed today (e.g. on app load), so the
+  // inbox brief matches the in-app brief exactly. emailed_at is the only guard
+  // against a duplicate send.
   // recruiters.email = login email, used for brief delivery.
   // If brief-delivery-email needs to differ from login-email in future,
   // add a brief_email column and prefer it here.
@@ -135,11 +129,6 @@ export default async function handler(req, res) {
   const results = []
 
   for (const recruiter of (recruiters || [])) {
-    if (briefedIds.has(recruiter.id)) {
-      results.push({ id: recruiter.id, status: 'already_briefed' })
-      continue
-    }
-
     const hour = localHour(recruiter.timezone)
     if (!dryRun && hour !== 9) {
       results.push({ id: recruiter.id, status: 'not_9am', local_hour: hour })
@@ -251,7 +240,7 @@ export default async function handler(req, res) {
     total:       results.length,
     sent:        results.filter(r => r.status === 'sent').length,
     dry_run_ok:  results.filter(r => r.status === 'dry_run_ok').length,
-    skipped:     results.filter(r => ['already_briefed', 'not_9am', 'no_email', 'already_emailed'].includes(r.status)).length,
+    skipped:     results.filter(r => ['not_9am', 'no_email', 'already_emailed'].includes(r.status)).length,
     errors:      results.filter(r => r.status === 'error' || r.status === 'send_failed').length,
     results,
   }
