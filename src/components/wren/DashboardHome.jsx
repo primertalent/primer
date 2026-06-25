@@ -174,7 +174,7 @@ export default function DashboardHome({ recruiter }) {
               <span>Candidate</span>
               <span>Stage</span>
               <span>Role</span>
-              <span className="dash-roster__days">Days</span>
+              <span>Days</span>
             </div>
             {rows.map(c => (
               <div key={c.id} className="dash-roster__row">

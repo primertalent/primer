@@ -706,20 +706,20 @@ export default function Wren() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={view === 'home'}
-                className={`wren-viewswitch__btn${view === 'home' ? ' is-active' : ''}`}
-                onClick={() => setView('home')}
-              >
-                Desk
-              </button>
-              <button
-                type="button"
-                role="tab"
                 aria-selected={view === 'conversation'}
                 className={`wren-viewswitch__btn${view === 'conversation' ? ' is-active' : ''}`}
                 onClick={() => setView('conversation')}
               >
                 Wren
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'home'}
+                className={`wren-viewswitch__btn${view === 'home' ? ' is-active' : ''}`}
+                onClick={() => setView('home')}
+              >
+                Desk
               </button>
             </div>
             {ticker && <DeskTicker ticker={ticker} />}

@@ -4841,7 +4841,7 @@ select.field-input {
 }
 .dash-section__count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--mute);
 }
 
@@ -4861,7 +4861,10 @@ select.field-input {
 .dash-roster__head,
 .dash-roster__row {
   display: grid;
-  grid-template-columns: 1.6fr auto 2fr 52px;
+  /* Deterministic tracks: fixed Stage column (fits the widest chip) + minmax(0,fr)
+     so name/role distribute by ratio regardless of content. Every row and the
+     header resolve identically — the columns line up. */
+  grid-template-columns: minmax(0, 1.6fr) 128px minmax(0, 2fr) 56px;
   align-items: center;
   gap: 16px;
   padding: 10px 8px;
@@ -4876,6 +4879,9 @@ select.field-input {
   letter-spacing: 0.14em;
   color: var(--mute);
 }
+.dash-roster__head > span:last-child {
+  text-align: right;
+}
 .dash-roster__row {
   border-bottom: 1px solid var(--hair);
 }
@@ -4883,8 +4889,10 @@ select.field-input {
   background: var(--chip);
 }
 .dash-roster__name {
+  min-width: 0;
   font-family: var(--font-serif);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -4894,7 +4902,9 @@ select.field-input {
   justify-self: start;
 }
 .dash-roster__role {
-  font-size: 13px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -4918,7 +4928,7 @@ select.field-input {
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.14em;
   padding: 2px 7px;
   background: var(--chip);
   border: 1px solid var(--hair);
@@ -4938,7 +4948,9 @@ select.field-input {
 }
 .dash-role-card {
   display: grid;
-  grid-template-columns: 1.4fr auto 1.8fr;
+  /* Fixed stat column so the stage-spread column lines up across rows (the count
+     digits no longer drift it). minmax(0,fr) for title and spread. */
+  grid-template-columns: minmax(0, 1.4fr) 132px minmax(0, 1.8fr);
   align-items: center;
   gap: 16px;
   padding: 12px 8px;
@@ -4955,7 +4967,8 @@ select.field-input {
 }
 .dash-role-card__title {
   font-family: var(--font-serif);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -4965,7 +4978,7 @@ select.field-input {
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--mute);
 }
 .dash-role-card__stat {
@@ -4983,7 +4996,7 @@ select.field-input {
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--mute);
 }
 .dash-role-card__spread {
@@ -4993,7 +5006,7 @@ select.field-input {
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   color: var(--mute);
 }
 .dash-role-card__spread-item {
@@ -5007,7 +5020,7 @@ select.field-input {
 
 @media (max-width: 720px) {
   .dash-role-card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .dash-role-card__spread {
     grid-column: 1 / -1;
