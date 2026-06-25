@@ -4,11 +4,15 @@ Live log of friction encountered during real use. Capture, don't fix mid-session
 
 Format: `Date | Stage | What happened | Tag`
 
-Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / `feature_pattern` / `external_limitation`
+Tags: `manual_step` / `bug` / `missing_data` / `shape_problem` / `saas_shape` / `feature_pattern` / `external_limitation` / `enhancement` / `strategic-decision`
 
 ---
 
 <!-- Append new entries below, newest at top -->
+
+6/25 | dashboard/enrichment | Candidate avatars: framed circle with photo, initials fallback when no photo. DESIGN-sanctioned (avatars are a sharp-corner exception). Initials-only is cheap and on-thesis — fold into dashboard roster + record views. Photo SOURCE is coupled to the LinkedIn question below. | enhancement
+
+6/25 | strategic/ingestion | LinkedIn Chrome-extension profile parsing (sourcing capture) + LI profile photos. HIGH capture value, core to ingestion thesis. BUT reopens the closed "No LinkedIn API (too locked down)" constraint — extension scraping is a different mechanism, same ToS/legal gray zone LinkedIn defends (suits, C&Ds, extension breakage). Needs its own evaluation: does extension parsing clear the bar the API constraint set? ToS/legal exposure? Chrome-store risk? Worth it? NOT a queue item — a strategic decision session. | strategic-decision
 
 6/15 | agent_capability | OPEN. When a role has no placement fee on file, pipeline value is silently reduced with no prompt to add one. Recruiter has no signal that an unpriced role is dragging the weighted total. Flag needed: inline on role card or ticker callout ("N roles missing fee"). | missing_data
 
