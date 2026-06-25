@@ -4730,16 +4730,50 @@ select.field-input {
   .wren-rail { display: none; }
 }
 
-/* Desk ticker — pipeline value strip above the conversation thread */
-.wren-ticker {
+/* Top bar — persistent strip above the canvas: view switch (always) + ticker. */
+.wren-topbar {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
   padding: 0 24px;
   height: 36px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--hair);
   background: var(--panel);
+  overflow: hidden;
+}
+
+/* View switch — Desk | Wren. Sharp, hairline, mono. Lives ticker-left, stays
+   visible below 900px even when the ticker stats hide. */
+.wren-viewswitch {
+  display: flex;
+  flex-shrink: 0;
+  border: 1px solid var(--hair);
+}
+.wren-viewswitch__btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 5px 12px;
+  background: none;
+  border: none;
+  color: var(--mute);
+  cursor: pointer;
+  line-height: 1;
+}
+.wren-viewswitch__btn + .wren-viewswitch__btn {
+  border-left: 1px solid var(--hair);
+}
+.wren-viewswitch__btn:hover { color: var(--ink); background: var(--chip); }
+.wren-viewswitch__btn.is-active { color: var(--ink); background: var(--chip); }
+
+/* Desk ticker — pipeline value strip; the stats group inside the top bar. */
+.wren-ticker {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-width: 0;
   overflow: hidden;
 }
 .wren-ticker__item {
@@ -4774,6 +4808,211 @@ select.field-input {
 }
 @media (max-width: 899px) {
   .wren-ticker { display: none; }
+}
+
+/* ---- Dashboard home (Desk view) — read-only desk-state glance ---- */
+.dash-home {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px max(24px, calc(50% - 470px)) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.dash-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dash-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hair-2);
+}
+.dash-section__title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.dash-section__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--mute);
+}
+
+.dash-empty {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--mute);
+  padding: 14px 8px;
+}
+
+/* Candidates in process — operator ledger */
+.dash-roster {
+  display: flex;
+  flex-direction: column;
+}
+.dash-roster__head,
+.dash-roster__row {
+  display: grid;
+  grid-template-columns: 1.6fr auto 2fr 52px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 8px;
+}
+.dash-roster__head {
+  padding-top: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hair);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--mute);
+}
+.dash-roster__row {
+  border-bottom: 1px solid var(--hair);
+}
+.dash-roster__row:hover {
+  background: var(--chip);
+}
+.dash-roster__name {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-roster__stage {
+  justify-self: start;
+}
+.dash-roster__role {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-roster__client {
+  color: var(--mute);
+}
+.dash-roster__days {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--mute);
+  text-align: right;
+}
+
+/* Stage chip — taxonomic signal tokens, except offer. Offer is the one stage
+   that IS a verdict: reaching offer is a winning-state (PUSH), so it earns --win
+   by meaning, not decoration. Documented recruiter decision. */
+.stage-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  padding: 2px 7px;
+  background: var(--chip);
+  border: 1px solid var(--hair);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.stage-chip--submitted { color: var(--signal-blue); }
+.stage-chip--first     { color: var(--signal-teal); }
+.stage-chip--middle    { color: var(--signal-purple); }
+.stage-chip--final     { color: var(--signal-green); }
+.stage-chip--offer     { color: var(--win); }
+
+/* Active roles — ledger row: role + client, count, stage spread */
+.dash-roles {
+  display: flex;
+  flex-direction: column;
+}
+.dash-role-card {
+  display: grid;
+  grid-template-columns: 1.4fr auto 1.8fr;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--hair);
+}
+.dash-role-card:hover {
+  background: var(--chip);
+}
+.dash-role-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-role-card__title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-role-card__client {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+}
+.dash-role-card__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.dash-role-card__count {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--ink);
+}
+.dash-role-card__count-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mute);
+}
+.dash-role-card__spread {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mute);
+}
+.dash-role-card__spread-item {
+  white-space: nowrap;
+}
+.dash-role-card__spread-item:not(:last-child)::after {
+  content: '·';
+  padding: 0 8px;
+  color: var(--hair-2);
+}
+
+@media (max-width: 720px) {
+  .dash-role-card {
+    grid-template-columns: 1fr auto;
+  }
+  .dash-role-card__spread {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
 }
 
 /* Scrollable message thread */

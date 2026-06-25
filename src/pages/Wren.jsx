@@ -8,6 +8,7 @@ import CandidateCard from '../components/wren/CandidateCard'
 import RoleCard from '../components/wren/RoleCard'
 import CompanyCard from '../components/wren/CompanyCard'
 import QuickOpen from '../components/wren/QuickOpen'
+import DashboardHome from '../components/wren/DashboardHome'
 import { WrenMark } from '../components/WrenMark'
 import Chip from '../components/Chip'
 import { useRecruiter } from '../hooks/useRecruiter'
@@ -142,6 +143,10 @@ export default function Wren() {
   const [quickOpenOpen, setQuickOpenOpen] = useState(false)
   const [ticker, setTicker] = useState(null)
   const [extracting, setExtracting] = useState(false)
+  // Canvas view above the persistent shell. Keyed string (not boolean) so the
+  // record/detail views (Chunk 2) slot in without a refactor. 'conversation' is
+  // home — the brief lands in the thread; Desk is opt-in via the view switch.
+  const [view, setView] = useState('conversation')
   const threadRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -421,6 +426,10 @@ export default function Wren() {
   async function sendMessage(directMsg = null) {
     if (directMsg != null ? streaming : !canSend) return
 
+    // Asking Wren about whatever view you're on flows into the same thread —
+    // flip back to the conversation so the answer is visible.
+    setView('conversation')
+
     let messageText
     let displayText
     if (directMsg != null) {
@@ -692,7 +701,31 @@ export default function Wren() {
           </nav>
         </aside>
         <div className="wren-col">
-          {ticker && <DeskTicker ticker={ticker} />}
+          <div className="wren-topbar">
+            <div className="wren-viewswitch" role="tablist" aria-label="View">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'home'}
+                className={`wren-viewswitch__btn${view === 'home' ? ' is-active' : ''}`}
+                onClick={() => setView('home')}
+              >
+                Desk
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'conversation'}
+                className={`wren-viewswitch__btn${view === 'conversation' ? ' is-active' : ''}`}
+                onClick={() => setView('conversation')}
+              >
+                Wren
+              </button>
+            </div>
+            {ticker && <DeskTicker ticker={ticker} />}
+          </div>
+          {view === 'home' && <DashboardHome recruiter={recruiter} />}
+          {view === 'conversation' && (
           <div className="wren-thread" ref={threadRef}>
             {messages.length === 0 && !streamingMsg && (
               <div className="wren-empty">
@@ -740,6 +773,7 @@ export default function Wren() {
               </div>
             )}
           </div>
+          )}
 
           {recruiter && (!recruiter.gmail_access_token || gmailTokenRevoked) && (
             <div className="wren-gmail-hint">
