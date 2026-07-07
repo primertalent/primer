@@ -184,6 +184,39 @@ function buildCandidateSection(candidate) {
         .join('\n')}`
     : ''
 
+  // career_signals is a JSONB object (keys like motivation, comp_expectations,
+  // timeline). May arrive parsed, as a JSON string, null, or undefined — the
+  // pasted-resume path never sets it. No-op cleanly in every non-object case.
+  const signalsSection = (() => {
+    const raw = candidate.career_signals
+    const obj = typeof raw === 'string'
+      ? (() => { try { return JSON.parse(raw) } catch { return null } })()
+      : raw
+    if (!obj || typeof obj !== 'object') return ''
+    const lines = Object.entries(obj)
+      .filter(([, v]) => v != null && (Array.isArray(v) ? v.length : String(v).trim()))
+      .map(([k, v]) => `– ${k}: ${(Array.isArray(v) ? v.join(', ') : String(v)).slice(0, 200)}`)
+    return lines.length ? `\nCareer signals:\n${lines.join('\n').slice(0, 600)}` : ''
+  })()
+
+  // recent_debriefs: up to 3 rows fetched by buildSubmittalDraftPayload. Undefined
+  // on the pasted-resume path, empty when the candidate has no debriefs — no-op either
+  // way. Motivation/risk are the richest captured signal; render them verbatim.
+  const debriefsSection = candidate.recent_debriefs?.length
+    ? `\nRecent debriefs (from screening/interview calls):\n${candidate.recent_debriefs
+        .map(d => {
+          const motivation = Array.isArray(d.motivation_signals) ? d.motivation_signals.join(' | ') : ''
+          const risk = Array.isArray(d.risk_flags) ? d.risk_flags.join(' | ') : ''
+          return [
+            `– ${d.outcome ?? 'neutral'} ${d.captured_at?.slice(0, 10) ?? ''}`.trim(),
+            d.summary ? `  Summary: ${d.summary.slice(0, 200)}` : '',
+            motivation ? `  Motivation: ${motivation.slice(0, 300)}` : '',
+            risk ? `  Risk: ${risk.slice(0, 300)}` : '',
+          ].filter(Boolean).join('\n')
+        })
+        .join('\n')}`
+    : ''
+
   const cvSection = candidate.cv_text
     ? `\nCV text:\n${candidate.cv_text.slice(0, 5000)}`
     : ''
@@ -191,7 +224,7 @@ function buildCandidateSection(candidate) {
   return `Name: ${candidate.first_name} ${candidate.last_name}
 Current: ${candidate.current_title ?? 'Unknown'} at ${candidate.current_company ?? 'Unknown'}
 Location: ${candidate.location ?? 'Not specified'}
-Skills: ${skills}${notesSection}${timelineSection}${interactionsSection}${cvSection}`
+Skills: ${skills}${notesSection}${timelineSection}${interactionsSection}${signalsSection}${debriefsSection}${cvSection}`
 }
 
 function buildRoleSection(role) {

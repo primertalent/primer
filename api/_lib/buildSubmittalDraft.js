@@ -33,7 +33,7 @@ export async function buildSubmittalDraftPayload(
       .single()
     if (candErr || !candidate) return { error: 'Candidate not found' }
 
-    const [{ data: interactions }, { data: pipelines }] = await Promise.all([
+    const [{ data: interactions }, { data: pipelines }, { data: debriefs }] = await Promise.all([
       supabase
         .from('interactions')
         .select('type, direction, body, occurred_at')
@@ -47,12 +47,22 @@ export async function buildSubmittalDraftPayload(
         .eq('candidate_id', candidate_id)
         .eq('recruiter_id', recruiter.id)
         .not('current_stage', 'in', '(placed,lost)'),
+      // Debrief signal — the richest motivation source. candidate_id is a direct
+      // column on debriefs (indexed candidate_id, captured_at desc). Most recent 3.
+      supabase
+        .from('debriefs')
+        .select('outcome, summary, motivation_signals, risk_flags, captured_at')
+        .eq('candidate_id', candidate_id)
+        .eq('recruiter_id', recruiter.id)
+        .order('captured_at', { ascending: false })
+        .limit(3),
     ])
 
     candidateData = {
       ...candidate,
       recent_interactions: interactions || [],
       active_pipelines: pipelines || [],
+      recent_debriefs: debriefs || [],
     }
   } else if (resume_text) {
     candidateData = {
