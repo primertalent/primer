@@ -171,7 +171,7 @@ ${(notesBody || '').slice(0, 3000)}`,
 //   B — candidate resolved, no active pipeline → intake_notes_ready (no pipeline context)
 //   C — candidate resolved + active pipeline → intake_notes_ready (full pipeline context)
 
-async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, messageId, host }) {
+async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurredAt, messageId, host }, log) {
   // For forwarded Gemini Notes the From: display name is the recruiter, not the candidate.
   // Pass it as a hint so extractCandidateNameRegex can filter the recruiter out when both
   // persons appear in the "between X and Y" subject. For direct delivery from
@@ -203,6 +203,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       .single()
 
     if (intErr) throw intErr
+    log.interaction_id = interaction.id
 
     try {
       await supabase.from('actions').insert({
@@ -220,11 +221,13 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         context: { interaction_id: interaction.id, subject: subject || null, extracted_name: null },
         build_version:       BUILD_VERSION,
       })
+      log.action_type = 'notes_pending_match'
     } catch (err) {
       console.warn('[ingest-email] notes_pending_match action insert failed:', err.message)
     }
 
     triggerLoop(host, recruiterId)
+    log.outcome_path = 'gemini_notes_A'
     return { outcome: 'A', candidate_name: null }
   }
 
@@ -282,6 +285,10 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     candidateCreated = true
   }
 
+  log.matched_entity_type = 'candidate'
+  log.matched_entity_id   = candidateId
+  log.candidate_created   = candidateCreated
+
   // ── Write interaction (candidate_id always set at this point) ────────────
   const { data: interaction, error: intErr } = await supabase
     .from('interactions')
@@ -307,6 +314,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     .single()
 
   if (intErr) throw intErr
+  log.interaction_id = interaction.id
 
   // ── Active pipeline lookup (with role + client context for Outcome C) ────
   const { data: activePipelines } = await supabase
@@ -448,6 +456,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
         },
         build_version:       BUILD_VERSION,
       })
+      log.action_type = 'intake_notes_ready'
     } catch (err) {
       console.warn('[ingest-email] intake_notes_ready (B) action insert failed:', err.message)
     }
@@ -474,6 +483,11 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     } catch (err) {
       console.warn('[ingest-email] background debrief (B) failed:', err.message)
     }
+
+    log.outcome_path             = 'gemini_notes_B'
+    log.detail.proposal_raised   = !!proposedMatch
+    log.detail.already_pipelined = !!alreadyPipelined
+    log.detail.match_confidence  = matchConf ?? null
 
     triggerLoop(host, recruiterId)
     return {
@@ -543,6 +557,7 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
       },
       build_version:       BUILD_VERSION,
     })
+    log.action_type = 'intake_notes_ready'
   } catch (err) {
     console.warn('[ingest-email] intake_notes_ready (C) action insert failed:', err.message)
   }
@@ -567,6 +582,8 @@ async function handleGeminiNotesPath({ recruiterId, subject, body, from, occurre
     console.warn('[ingest-email] background debrief (C) failed:', err.message)
   }
 
+  log.outcome_path       = 'gemini_notes_C'
+  log.detail.pipeline_id = pipeline.id
   triggerLoop(host, recruiterId)
   return { outcome: 'C', candidate_id: candidateId, pipeline_id: pipeline.id }
 }
@@ -660,22 +677,39 @@ function isBlocklistedAddress(email) {
   return false
 }
 
-// ── ingestion_log writer (fire-and-forget — never blocks response) ────────────
+// ── ingestion_log ─────────────────────────────────────────────────────────────
+// One row per inbound (success, discard, failure), written once from the handler's
+// finally block. Awaited there so the serverless invocation doesn't freeze before
+// the insert lands; the try/catch here means a log failure can never throw into
+// ingestion or the already-sent response. Logged content is bounded and inert —
+// it is never read back into any prompt (injection-defense posture).
 
-async function writeIngestionLog(recruiterId, fromEmail, subject, classification, reason, rawBody) {
+function boundedPayload(rawBody) {
+  return {
+    from:         rawBody.from  || rawBody.envelope?.from  || rawBody.headers?.from  || null,
+    to:           rawBody.to    || rawBody.envelope?.to    || rawBody.headers?.to    || null,
+    subject:      (rawBody.subject || rawBody.headers?.subject || '').slice(0, 300),
+    body_preview: (rawBody.plain  || rawBody.text || '').slice(0, 500),
+  }
+}
+
+async function writeIngestionLog(log) {
   try {
     await supabase.from('ingestion_log').insert({
-      recruiter_id:   recruiterId,
-      from_email:     fromEmail || null,
-      subject:        (subject || '').slice(0, 300) || null,
-      classification,
-      reason,
-      raw_payload: {
-        from:         rawBody.from  || rawBody.envelope?.from  || rawBody.headers?.from  || null,
-        to:           rawBody.to    || rawBody.envelope?.to    || rawBody.headers?.to    || null,
-        subject:      (rawBody.subject || rawBody.headers?.subject || '').slice(0, 300),
-        body_preview: (rawBody.plain  || rawBody.text || '').slice(0, 300),
-      },
+      recruiter_id:        log.recruiter_id,
+      from_email:          log.from_email || null,
+      subject:             log.subject,
+      classification:      log.classification,
+      reason:              log.reason,
+      outcome_path:        log.outcome_path,
+      matched_entity_type: log.matched_entity_type,
+      matched_entity_id:   log.matched_entity_id,
+      action_type:         log.action_type,
+      interaction_id:      log.interaction_id,
+      candidate_created:   log.candidate_created,
+      error:               log.error,
+      detail:              log.detail && Object.keys(log.detail).length ? log.detail : null,
+      raw_payload:         log.raw_payload,
     })
   } catch (err) {
     console.warn('[ingest-email] ingestion_log write failed:', err.message)
@@ -711,13 +745,40 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  // ── ingestion_log accumulator — one row per inbound, written once in finally.
+  // Each branch sets outcome_path as early as it's known, then refines. If a branch
+  // set its label and then threw, the label is preserved and the error column
+  // carries the throw; outcome_path only falls back to 'error' when nothing labelled.
+  const log = {
+    recruiter_id:        null,
+    from_email:          null,
+    subject:             null,
+    classification:      null,
+    reason:              null,
+    outcome_path:        null,
+    matched_entity_type: null,
+    matched_entity_id:   null,
+    action_type:         null,
+    interaction_id:      null,
+    candidate_created:   false,
+    error:               null,
+    detail:              {},
+    raw_payload:         null,
+  }
+
   try {
     const { fromRaw, to, subject, text, dateStr, listUnsubscribe, messageId, attachments } = normalizePayload(req.body)
     const from       = parseFrom(fromRaw)
     const body       = text.trim()
     const occurredAt = parseDate(dateStr)
 
+    log.from_email  = from.email || null
+    log.subject     = (subject || '').slice(0, 300) || null
+    log.raw_payload = boundedPayload(req.body)
+
     if (!from.email) {
+      log.outcome_path = 'missing_sender'
+      log.reason       = 'missing_sender'
       return res.status(400).json({ error: 'Missing sender email' })
     }
 
@@ -744,11 +805,14 @@ export default async function handler(req, res) {
     }
 
     if (!recruiter) {
+      log.outcome_path = 'no_recruiter_match'
+      log.reason       = 'no_recruiter_match'
       console.warn('[ingest-email] no recruiter matched for to:', to)
       return res.status(200).json({ ok: true, skipped: 'no_recruiter_match' })
     }
 
     const recruiterId = recruiter.id
+    log.recruiter_id  = recruiterId
 
     // ── Message-ID dedup (webhook retry protection) ──────────────────────────
     // CloudMailin retries when it doesn't receive a 200 within its timeout.
@@ -762,6 +826,10 @@ export default async function handler(req, res) {
         .eq('message_id', messageId)
         .maybeSingle()
       if (dupInteraction) {
+        log.outcome_path      = 'duplicate_message_id'
+        log.reason            = 'duplicate_message_id'
+        log.interaction_id    = dupInteraction.id
+        log.detail.message_id = messageId
         return res.status(200).json({ ok: true, skipped: 'duplicate_message_id', interaction_id: dupInteraction.id })
       }
     }
@@ -772,6 +840,8 @@ export default async function handler(req, res) {
     // The self-send guard would silently discard it. Gemini Notes detection
     // runs first so forwarded meet recap emails are always processed.
     if (isGeminiNotesEmail(from.email, subject, body)) {
+      log.classification = 'candidate_communication'
+      log.outcome_path   = 'gemini_notes'   // refined to _A/_B/_C inside; preserved if it throws first
       const result = await handleGeminiNotesPath({
         recruiterId,
         subject,
@@ -780,27 +850,33 @@ export default async function handler(req, res) {
         occurredAt,
         messageId,
         host: req.headers.host || 'localhost:3000',
-      })
+      }, log)
       return res.status(200).json({ ok: true, gemini_notes: true, ...result })
     }
 
     // ── Guard 2: self-send ───────────────────────────────────────────────────
     // Protects against forwarding loops and the recruiter emailing themselves.
     if (recruiter.email && from.email === recruiter.email.toLowerCase()) {
+      log.outcome_path = 'self_send'
+      log.reason       = 'self_send'
       return res.status(200).json({ ok: true, skipped: 'self_send' })
     }
 
     // ── Guard 3: domain blocklist ────────────────────────────────────────────
     // Hard-coded noise sources — skip classifier API call entirely.
     if (isBlocklistedAddress(from.email)) {
-      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'blocklist', req.body)
+      log.classification = 'noise'
+      log.outcome_path   = 'blocklist'
+      log.reason         = 'blocklist'
       return res.status(200).json({ ok: true, skipped: 'blocklist' })
     }
 
     // ── Guard 4: List-Unsubscribe header ─────────────────────────────────────
     // Newsletters and marketing emails almost always include this header.
     if (listUnsubscribe) {
-      writeIngestionLog(recruiterId, from.email, subject, 'noise', 'unsubscribe_header', req.body)
+      log.classification = 'noise'
+      log.outcome_path   = 'unsubscribe_header'
+      log.reason         = 'unsubscribe_header'
       return res.status(200).json({ ok: true, skipped: 'unsubscribe_header' })
     }
 
@@ -845,6 +921,10 @@ export default async function handler(req, res) {
       }
     }
 
+    if (attachmentLog.length > 0) {
+      log.detail.attachments = attachmentLog.map(a => ({ filename: (a.filename || '').slice(0, 200), outcome: a.outcome }))
+    }
+
     // ── Classify email (Haiku — fast, cheap) ────────────────────────────────
     let classification = null
     try {
@@ -872,10 +952,9 @@ export default async function handler(req, res) {
 
     // ── Branch: noise (or classifier failure) ────────────────────────────────
     if (kind === 'noise' || kind === null) {
-      writeIngestionLog(recruiterId, from.email, subject,
-        kind || 'unknown',
-        kind === 'noise' ? 'classified_noise' : 'classifier_failed',
-        req.body)
+      log.classification = kind || 'unknown'
+      log.outcome_path   = kind === 'noise' ? 'noise' : 'classifier_failed'
+      log.reason         = kind === 'noise' ? 'classified_noise' : 'classifier_failed'
       return res.status(200).json({ ok: true, skipped: kind || 'unknown', classification })
     }
 
@@ -883,6 +962,8 @@ export default async function handler(req, res) {
     // Write interaction without a candidate (candidate_id is now nullable).
     // No candidate match or creation. Loop fires to update any related pipelines.
     if (kind === 'client_communication') {
+      log.classification = 'client_communication'
+      log.outcome_path   = 'client_communication'
       const { data: interaction, error: intErr } = await supabase
         .from('interactions')
         .insert({
@@ -905,6 +986,7 @@ export default async function handler(req, res) {
         .single()
 
       if (intErr) throw intErr
+      log.interaction_id = interaction.id
 
       triggerLoop(req.headers.host || 'localhost:3000', recruiterId)
 
@@ -917,6 +999,8 @@ export default async function handler(req, res) {
     }
 
     // ── Branch: candidate_communication — full path ──────────────────────────
+    log.classification = 'candidate_communication'
+    log.outcome_path   = 'candidate_communication'
     let candidateId      = null
     let candidateCreated = false
 
@@ -968,6 +1052,10 @@ export default async function handler(req, res) {
       candidateCreated = true
     }
 
+    log.matched_entity_type = 'candidate'
+    log.matched_entity_id   = candidateId
+    log.candidate_created   = candidateCreated
+
     // ── Active pipeline lookup ───────────────────────────────────────────────
     // Build 1 heuristic: link to the most recently-updated active pipeline.
     const { data: activePipelines } = await supabase
@@ -981,6 +1069,7 @@ export default async function handler(req, res) {
       .limit(1)
 
     const pipelineId = activePipelines?.[0]?.id ?? null
+    if (pipelineId) log.detail.pipeline_id = pipelineId
 
     // ── Write interaction ────────────────────────────────────────────────────
     const { data: interaction, error: intErr } = await supabase
@@ -1007,6 +1096,7 @@ export default async function handler(req, res) {
       .single()
 
     if (intErr) throw intErr
+    log.interaction_id = interaction.id
 
     // ── Write new_inbound action card (immediate — no loop wait) ─────────────
     // Surfaces the email on the Desk Tray the moment it arrives, even if the
@@ -1035,6 +1125,7 @@ export default async function handler(req, res) {
         },
         build_version:       BUILD_VERSION,
       })
+      log.action_type = 'new_inbound'
     } catch (actionErr) {
       console.warn('[ingest-email] new_inbound action insert failed:', actionErr.message)
     }
@@ -1053,7 +1144,13 @@ export default async function handler(req, res) {
     })
 
   } catch (err) {
+    log.error        = err.message
+    log.outcome_path = log.outcome_path ?? 'error'
     console.error('[ingest-email] error:', err)
     return res.status(500).json({ error: err.message })
+  } finally {
+    // Awaited so the invocation doesn't freeze before the row lands; writeIngestionLog
+    // swallows its own errors, so this can never break ingestion or the sent response.
+    await writeIngestionLog(log)
   }
 }
