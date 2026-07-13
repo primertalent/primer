@@ -5,7 +5,9 @@
  * Validates the Supabase JWT, exchanges the authorization code for tokens,
  * and stores them on the recruiter row.
  *
- * Scope requested: https://www.googleapis.com/auth/gmail.send
+ * Scopes are requested by the frontend consent URL (src/lib/googleOAuth.js), not
+ * here. This endpoint only exchanges the code and stores whatever Google grants,
+ * recording the granted scope set in recruiters.google_scopes.
  *
  * GET /api/google-auth?code=CODE&redirect_uri=URI
  * Headers: Authorization: Bearer <supabase_access_token>
@@ -61,12 +63,26 @@ export default async function handler(req, res) {
 
   const expiry = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString()
 
+  // Token write invariant — the consent flow MUST keep prompt=consent (set in
+  // src/lib/googleOAuth.js). Google returns a refresh_token only on first consent OR
+  // when prompt=consent forces a fresh one; with prompt=consent it comes back on
+  // every exchange. The `?? null` below means an exchange that returns NO
+  // refresh_token would WIPE the stored one — breaking gmail-send's refresh path.
+  // prompt=consent guarantees tokens.refresh_token is present here, so this is safe.
+  // If prompt=consent is ever dropped, rework this write to preserve the existing
+  // refresh_token on absence instead of nulling it.
+  //
+  // google_scopes records the space-delimited set Google actually granted. One
+  // account = one token set covering all granted scopes, so re-consent for read
+  // scopes overwrites the send-only token with a superset — send keeps working, and
+  // read features check google_scopes to know what this token covers.
   const { error: updateErr } = await supabase
     .from('recruiters')
     .update({
       gmail_access_token:  tokens.access_token,
       gmail_refresh_token: tokens.refresh_token ?? null,
       gmail_token_expiry:  expiry,
+      google_scopes:       tokens.scope ?? null,
     })
     .eq('user_id', user.id)
 

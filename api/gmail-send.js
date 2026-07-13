@@ -46,6 +46,11 @@ function buildRaw({ from, to, subject, body }) {
     .replace(/=+$/, '')
 }
 
+// NOTE: a read-only mirror of this refresh contract lives in api/_lib/googleToken.js
+// (getFreshAccessToken), used by list_calendar and future read features. This send
+// path is intentionally left on its own inline copy so the verified production send
+// flow stays unchanged. If these ever need to converge, unify onto the helper in a
+// dedicated refactor with send re-verification — not as a side effect of a read build.
 async function refreshAccessToken(refreshToken) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

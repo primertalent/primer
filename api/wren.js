@@ -9,6 +9,7 @@ import { buildClassifyMessages, buildIntakeMessages } from '../src/lib/prompts/i
 import { buildNotesExtractionMessages } from '../src/lib/prompts/notesExtraction.js'
 import { matchCandidateWithConfidence, extractConversationCandidateIds } from './_lib/matchWithConfidence.js'
 import { getCandidate } from './_lib/getCandidate.js'
+import { getFreshAccessToken } from './_lib/googleToken.js'
 import { classifyMove, STAGES, STAGE_LABELS, ACTIVE_STAGES, LOST_REASONS, BACKWARD_REASONS } from '../src/lib/stages.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -130,6 +131,17 @@ function truncateForHistory(toolName, result) {
       // Keep all structured fields; drop alternatives array (not needed in history)
       const { alternatives, ...rest } = result
       return rest
+    }
+    case 'list_calendar': {
+      // Bound the persisted copy — cap events and attendees so a busy week doesn't
+      // bloat turn_steps. Live tool output is already bounded; this trims history.
+      return {
+        ...result,
+        events: (result.events || []).slice(0, 20).map(e => ({
+          ...e,
+          attendees: (e.attendees || []).slice(0, 8),
+        })),
+      }
     }
     default:
       return result
@@ -565,6 +577,16 @@ function getToolDefinitions() {
       input_schema: { type: 'object', properties: {} },
     },
     {
+      name: 'list_calendar',
+      description: "List the recruiter's upcoming Google Calendar events. Call for \"what's on my calendar\", \"what meetings do I have\", \"who am I meeting\", \"what does my week look like\". Default window is today through 7 days out; pass day (YYYY-MM-DD) to narrow to a single date. Returns per event: title, start (recruiter's timezone), attendees (name + email), and whether a Meet link is present. Read-only, never writes. If the recruiter's Google connection lacks calendar access the result is action 'calendar_not_connected' — offer the connect flow, never invent events.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          day: { type: 'string', description: 'Optional. Single date to list (YYYY-MM-DD). Omit for the default today-through-7-days window.' },
+        },
+      },
+    },
+    {
       name: 'create_role',
       description: "Create a new role record (and its client if it doesn't exist). Call when: (1) the recruiter explicitly says to create or add a role, (2) ingest_input returned action 'ask' for a JD match and the recruiter rejected the proposed match, or (3) a bare instruction names a title and company. Checks for duplicates — returns already_exists if the same title already exists at that company.",
       input_schema: {
@@ -643,6 +665,7 @@ async function executeTool(name, input, recruiter, convContext = {}) {
     case 'ingest_input':      return toolIngestInput(input, recruiter, convContext)
     case 'enrich_from_notes': return toolEnrichFromNotes(input, recruiter, convContext)
     case 'connect_google':    return { action: 'connect', connected: false }
+    case 'list_calendar':     return toolListCalendar(input, recruiter)
     case 'create_role':       return toolCreateRole(input, recruiter)
     case 'create_candidate':  return toolCreateCandidate(input, recruiter)
     case 'set_comp':          return toolSetComp(input, recruiter)
@@ -984,6 +1007,128 @@ async function toolListPipeline({ role_id, client_id, stage }, recruiter) {
     truncated: rows.length >= 200,
     filter:    { role_id: role_id ?? null, client_id: client_id ?? null, stage: stage ?? null },
     candidates,
+  }
+}
+
+// Offset (ms) between tz's wall clock and UTC at a given instant: (wall-as-UTC) - utc.
+// For America/New_York in winter this is -5h. Uses Intl so it covers any IANA zone
+// and DST without a date library.
+function tzOffsetMs(utcMs, tz) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+  const p = {}
+  for (const part of dtf.formatToParts(new Date(utcMs))) p[part.type] = part.value
+  const wallAsUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  return wallAsUtc - utcMs
+}
+
+// UTC instant (ms) of local midnight for calendar date y-m-d in tz.
+function zonedMidnightUtcMs(y, m, d, tz) {
+  const naive = Date.UTC(y, m - 1, d, 0, 0, 0)
+  const guess = naive - tzOffsetMs(naive, tz)
+  // One refinement pass for the DST-transition edge where the offset at the naive
+  // instant differs from the offset at true local midnight.
+  return naive - tzOffsetMs(guess, tz)
+}
+
+async function toolListCalendar({ day }, recruiter) {
+  // Tier 0 — read-only. No writes, no side effects. Reads the recruiter's Google
+  // Calendar via REST using the stored OAuth token (refreshed on demand by the shared
+  // helper). Scope coverage is checked against recruiters.google_scopes BEFORE any
+  // network call: a NULL (pre-expansion) or send-only token short-circuits to the
+  // not-connected error so Wren offers the upgrade instead of firing a guaranteed 403.
+  const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly'
+  const isDay = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)
+
+  const { data: rec } = await supabase
+    .from('recruiters')
+    .select('google_scopes, timezone')
+    .eq('id', recruiter.id)
+    .single()
+
+  const scopes = (rec?.google_scopes || '').split(/\s+/).filter(Boolean)
+  if (!scopes.includes(CAL_SCOPE)) {
+    return { action: 'calendar_not_connected', reason: 'missing_scope' }
+  }
+
+  const { accessToken, error: tokenErr } = await getFreshAccessToken(supabase, recruiter.id)
+  if (tokenErr) return { action: 'calendar_not_connected', reason: tokenErr }
+
+  const tz = rec?.timezone || 'America/New_York'
+
+  // Window: default now → +7 days. A specific day narrows to that date's span in the
+  // recruiter's timezone (NOT UTC) — an Eastern "today" must run local-midnight to
+  // local-midnight, otherwise the query is offset by the tz gap and returns the wrong
+  // events. Boundaries are computed independently so DST-transition days (23h/25h)
+  // stay correct rather than assuming a fixed 24h span.
+  let timeMin, timeMax
+  if (isDay) {
+    const [y, m, d] = day.split('-').map(Number)
+    const next = new Date(Date.UTC(y, m - 1, d + 1))  // calendar +1 day, tz-agnostic
+    timeMin = new Date(zonedMidnightUtcMs(y, m, d, tz)).toISOString()
+    timeMax = new Date(zonedMidnightUtcMs(
+      next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), tz
+    )).toISOString()
+  } else {
+    const now = Date.now()
+    timeMin = new Date(now).toISOString()
+    timeMax = new Date(now + 7 * 86400000).toISOString()
+  }
+
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: 'true',   // expand recurring events into instances
+    orderBy:      'startTime',
+    maxResults:   '25',
+  })
+
+  const calRes = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+
+  if (!calRes.ok) {
+    // 401/403 = token lacks calendar scope or was revoked at Google → offer reconnect.
+    if (calRes.status === 401 || calRes.status === 403) {
+      return { action: 'calendar_not_connected', reason: 'api_denied' }
+    }
+    return { error: `calendar_api_error_${calRes.status}` }
+  }
+
+  const payload = await calRes.json()
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  })
+
+  // Bounded projection — title, start (tz-formatted), attendees, Meet presence only.
+  // No descriptions, no attachments, no raw event bodies. Calendar text is external
+  // data: it lands in the tool_result as structured fields, never as instructions.
+  const events = (payload.items || [])
+    .filter(e => e.status !== 'cancelled')
+    .map(e => {
+      const allDay   = !e.start?.dateTime
+      const startRaw = e.start?.dateTime || e.start?.date || null
+      return {
+        title:         e.summary || '(no title)',
+        start:         allDay ? (startRaw || null) : (startRaw ? fmt.format(new Date(startRaw)) : null),
+        all_day:       allDay,
+        attendees:     (e.attendees || [])
+                         .filter(a => !a.resource)   // drop rooms / equipment
+                         .map(a => ({ name: a.displayName || null, email: a.email || null })),
+        has_meet_link: !!(e.hangoutLink || e.conferenceData),
+      }
+    })
+
+  return {
+    window:   isDay ? { day } : { from: 'today', days: 7 },
+    timezone: tz,
+    count:    events.length,
+    events,
   }
 }
 
