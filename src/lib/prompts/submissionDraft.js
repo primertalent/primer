@@ -88,7 +88,13 @@ function buildExternalSubmittalMessages(candidate, role, fitScore, format, resol
     ? `\nRESOLVED FLAGS FROM WORKING SESSION:\n${resolvedFlags}\nTreat all resolved flags as decided. Write around them cleanly — no hedging, no risk language, no mention of the original flag.`
     : ''
 
-  const motivationRule = `Candidate motivation is a primary closing signal — place it near the CTA. Use the candidate's actual stated reason for interest, verbatim in substance. "Wants an AE path because his current company has none" is real and usable. "Drawn to [Company]'s mission and culture" constructed from that is fabrication — never bridge the gap with invented alignment. If real motivation is not in the available data, write [NEEDS: candidate's stated reason for interest — confirm before sending]. That placeholder is more useful than a hollow alignment sentence a sharp HM will see through.`
+  const motivationRule = `Candidate motivation is a primary closing signal — place it near the close. Use the candidate's actual stated reason for interest, verbatim in substance. "Wants an AE path because his current company has none" is real and usable. "Drawn to [Company]'s mission and culture" constructed from that is fabrication — never bridge the gap with invented alignment. If real motivation is not in the available data, write [NEEDS: candidate's stated reason for interest — confirm before sending]. That placeholder is more useful than a hollow alignment sentence a sharp HM will see through.`
+
+  // Submittals are a confident handoff, not outreach. The "low-friction close" in the
+  // shared voice rules (buildVoiceBlock rule 7, e.g. "Worth 30 minutes?") is calibrated
+  // for candidate outreach and must not leak into HM-facing submittals. Override it here
+  // rather than editing the shared voice block, which outreach correctly relies on.
+  const closingPosture = `CLOSING POSTURE: A submittal is a confident handoff to the hiring manager, not candidate outreach. Do not end with an ask-for-time CTA — "Worth 30 minutes?", "Worth a quick chat?", "open to a call?" and the like belong in outreach, not here. Close with one of: the candidate's availability, an offer to share more detail, or nothing at all. This overrides the "low-friction close" guidance in the voice rules above, which is written for outreach.`
 
   const formatInstructions = buildExternalFormatInstructions(format)
 
@@ -114,6 +120,8 @@ ${roleSection}
 
 ${formatInstructions}
 
+${closingPosture}
+
 Write only the submission body. No subject line. No greeting unless the format explicitly includes one. No signature. No closing commentary.`
 
   return [{ role: 'user', content: prompt }]
@@ -126,7 +134,7 @@ Structure:
 – Opening: who they are and the single sharpest reason they fit this role. One declarative sentence.
 – Body: 2-3 strengths mapped to role requirements, with real metrics from the data where available.
 – Motivation: candidate's actual stated reason for this org, near the close. Or [NEEDS: stated reason — confirm before sending] if absent.
-– CTA: one low-friction question. "Worth 30 minutes?" is the target energy.`
+– Close: a confident handoff, not an ask for time. Give the candidate's availability, offer to share more detail, or simply end on the last strength. No "Worth 30 minutes?" — that energy belongs in outreach.`
   }
 
   if (format === 'concise') {
@@ -136,8 +144,8 @@ Verdict: one declarative sentence. Who they are and the fit verdict.
 – [strongest quantified point]
 – [second strongest, only if genuinely strong — omit if not]
 – [key logistics: availability, location, comp if known]
-CTA: one line.
-No hook ceremony. No opening pleasantries. No risk. Just signal and ask.`
+Close: one line — the candidate's availability or an offer of more detail. A confident handoff, not an ask for time. Omitting it is fine.
+No hook ceremony. No opening pleasantries. No risk. Just signal and a clean handoff.`
   }
 
   if (format === 'linkedin') {
@@ -145,7 +153,7 @@ No hook ceremony. No opening pleasantries. No risk. Just signal and ask.`
 Opener: one sentence establishing context. State you are a recruiter, name the candidate, and name the role. Direct, no preamble. ("Reaching out about [Candidate Name] for your [Role Title] opening" is the energy.)
 Signal: 2-3 of the tightest evidence points with real metrics from the data. One sentence each. No fabricated numbers.
 Motivation: candidate's actual stated reason for interest, near the close. Or [NEEDS: stated reason — confirm before sending] if absent.
-CTA: one low-friction close. "Worth a quick chat?" is the target energy.
+Close: a confident handoff — the candidate's availability or an offer to send more detail. Not an ask for time; "Worth a quick chat?" belongs in outreach, not a submittal.
 Slightly warmer register than Slack — this is a person being messaged, not an internal channel. Recruiter voice. Rule zero applies. No fabrication. No em dashes.`
   }
 
@@ -160,7 +168,7 @@ Key fit:
 – [fact bullet 2]
 – [fact bullet 3 only if genuinely strong — omit if not]
 Motivation: [candidate's actual stated reason, one clean sentence] OR [NEEDS: stated reason — confirm before sending]
-CTA: [one low-friction close. "Worth 30 minutes?" is the target energy.]`
+Close: [the candidate's availability or an offer of more detail — a confident handoff, not an ask for time. Omit entirely if neither adds anything. No "Worth 30 minutes?"]`
 }
 
 function buildCandidateSection(candidate) {
