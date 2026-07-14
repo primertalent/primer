@@ -28,7 +28,7 @@ Target tier refers to the autonomy ladder in VISION.md.
 | Chasing (client + candidate) | 3-4 | Partial (loop flags, drafts) | 2 (act + report) | Earned promotion only |
 | Status communication | 2-3 | Barely | 2 | Churn defense: candidates ghost quiet recruiters |
 | Scheduling orchestration | 3-5 | Nothing | 2 | Biggest blind spot. Not a scheduler: Wren chases, calendar link books |
-| Prep docs | 1-2 | Prompt exists, no flow | 1 | Calendar-triggered: prep arrives the night before, unprompted |
+| Prep docs | 1-2 | Prompt exists; calendar read live (list_calendar, commit b8d1d18), generation pending | 1 | Calendar-triggered: prep arrives the night before, unprompted |
 | Debrief capture | 1-2 | Live | 0 | Ambient via transcripts post read-scope |
 | Re-engagement + nurture | ~0 today | Nothing | 2 | Nobody does this manually. Pure new capacity |
 
