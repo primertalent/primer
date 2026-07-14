@@ -22,14 +22,14 @@ Target tier refers to the autonomy ladder in VISION.md.
 
 | Task | Est hrs/wk | Coverage today | Target tier | Notes |
 |---|---|---|---|---|
-| Intake capture + data entry | 3-4 | Live (Gemini path, paste); intake now proposes, write-on-approval (not auto-creating pipeline) | 0 (silent) | Proposal path fixes the Tier-0/Tier-1 violation (commit 916ce24); ambient via transcripts post read-scope |
+| Intake capture + data entry | 3-4 | Live (Gemini path, paste); intake now proposes, write-on-approval (not auto-creating pipeline) | 0 (silent) | Proposal path fixes the Tier-0/Tier-1 violation (commit 916ce24); Meet transcript ingestion diagnosed (Session B), build pending on the Drive probe |
 | Screening against role | 2-3 | Live, two moat bugs open | 1 (approve) | Shared fact base fix required |
 | Submittal writing | 2-4 | Live, multi-turn, voice layer | 1 forever | Never above Tier 1 per VISION.md email rule |
 | Chasing (client + candidate) | 3-4 | Partial (loop flags, drafts) | 2 (act + report) | Earned promotion only |
 | Status communication | 2-3 | Barely | 2 | Churn defense: candidates ghost quiet recruiters |
 | Scheduling orchestration | 3-5 | Nothing | 2 | Biggest blind spot. Not a scheduler: Wren chases, calendar link books |
 | Prep docs | 1-2 | Prompt exists; calendar read live (list_calendar, commit b8d1d18), generation pending | 1 | Calendar-triggered: prep arrives the night before, unprompted |
-| Debrief capture | 1-2 | Live | 0 | Ambient via transcripts post read-scope |
+| Debrief capture | 1-2 | Live | 0 | Meet transcript ingestion diagnosed (Session B), build pending on the Drive probe |
 | Re-engagement + nurture | ~0 today | Nothing | 2 | Nobody does this manually. Pure new capacity |
 
 Total: 17-27 hrs/wk of coordinator labor. A human coordinator costs $45-55k/yr.
