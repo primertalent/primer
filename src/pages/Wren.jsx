@@ -194,53 +194,78 @@ export default function Wren() {
   }, [])
 
   async function loadMostRecentConversation() {
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-
-    // Find today's conversation (by created_at, local-midnight boundary)
-    let { data: conv } = await supabase
-      .from('conversations')
-      .select('id')
-      .gte('created_at', todayStart.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    // No today conversation — create one so the brief has a home
-    if (!conv) {
-      const { data: created } = await supabase
-        .from('conversations')
-        .insert({ recruiter_id: recruiter.id })
-        .select('id')
-        .single()
-      conv = created
+    // Conversation resolution now happens SERVER-side in /api/compose-brief via the
+    // shared getOrCreateTodayConversation helper — the same one the 9am cron uses —
+    // so the in-app brief and the emailed brief always land in one conversation per
+    // local day. The app no longer resolves or creates the conversation client-side
+    // (that browser-local-midnight logic diverged from the cron's resolver). We take
+    // the conversation id the server used, then load its thread.
+    const convId = await composeMorningBrief()
+    if (!convId) {
+      // Brief compose/resolve failed — never blank the desk. Fall back to the latest
+      // existing conversation, read-only (no compose, no create), with a quiet note.
+      await loadLatestConversationReadOnly()
+      return
     }
 
-    if (!conv) return
-
-    setConversationId(conv.id)
-    latestConvIdRef.current = conv.id
+    setConversationId(convId)
+    latestConvIdRef.current = convId
 
     const { data: msgs } = await supabase
       .from('conversation_messages')
       .select('id, role, content, created_at')
-      .eq('conversation_id', conv.id)
+      .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
 
     if (msgs) setMessages(msgs)
     loadConversationList()
-
-    // Server decides whether to compose — client always delegates
-    composeMorningBrief(conv.id)
   }
 
-  async function composeMorningBrief(convId) {
+  // Read-only fallback for a failed brief compose. Shows the most recent existing
+  // thread (RLS-scoped to this recruiter) plus a quiet "brief unavailable" note, so a
+  // brief failure never blanks the desk. Never composes and never creates a
+  // conversation — a failed brief must not spawn a stray empty thread.
+  async function loadLatestConversationReadOnly() {
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let existing = []
+    if (conv) {
+      setConversationId(conv.id)
+      latestConvIdRef.current = conv.id
+      const { data } = await supabase
+        .from('conversation_messages')
+        .select('id, role, content, created_at')
+        .eq('conversation_id', conv.id)
+        .order('created_at', { ascending: true })
+      existing = data || []
+      loadConversationList()
+    }
+
+    setMessages([...existing, {
+      id: 'brief-unavailable-' + Date.now(),
+      role: 'assistant',
+      content: { type: 'text', text: 'Morning brief unavailable right now. Your desk is here; refresh in a moment to try again.' },
+      created_at: new Date().toISOString(),
+      _local: true,
+    }])
+  }
+
+  // POSTs to the server, which resolves-or-creates today's conversation and composes
+  // (or returns the already-composed) brief. Returns the resolved conversation id so
+  // the caller can load that thread. The brief itself is persisted server-side and
+  // surfaced when loadMostRecentConversation loads the thread.
+  async function composeMorningBrief() {
     setStreaming(true)
     setStreamingMsg({ text: '', renders: [] })
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) return
+      if (!session?.access_token) return null
 
       const resp = await fetch('/api/compose-brief', {
         method: 'POST',
@@ -248,26 +273,17 @@ export default function Wren() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ conversation_id: convId }),
+        body: JSON.stringify({}),   // server resolves today's conversation
       })
 
-      if (!resp.ok) return
+      if (!resp.ok) return null
 
       const result = await resp.json()
-
-      if (result.message_id) {
-        // Brief freshly composed and persisted — reload messages to surface it
-        const { data: msgs } = await supabase
-          .from('conversation_messages')
-          .select('id, role, content, created_at')
-          .eq('conversation_id', convId)
-          .order('created_at', { ascending: true })
-        if (msgs) setMessages(msgs)
-      }
-      // already_composed: brief already in loaded messages, no reload needed
       // brief always generates — no no_actions early-out (daily ritual, never silent)
+      return result.conversation_id ?? null
     } catch (err) {
       console.error('[brief]', err.message)
+      return null
     } finally {
       setStreaming(false)
       setStreamingMsg(null)

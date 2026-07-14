@@ -112,18 +112,32 @@ export async function composeBrief(supabase, anthropic, { recruiter, conversatio
   const today = new Date().toISOString().slice(0, 10)
   const tz    = recruiter.timezone || 'America/New_York'
 
-  // ── Idempotency gate ──────────────────────────────────────────────────────
-  const { data: existingMsgs } = await supabase
+  // ── Idempotency gate (recruiter-scoped) ───────────────────────────────────
+  // One brief per recruiter per brief_date, across ALL conversations — not just the
+  // passed one. The old conversation-scoped check let the cron and the app compose
+  // two different briefs into two different conversations on the same day (they
+  // resolved the conversation differently). Both callers now share
+  // getOrCreateTodayConversation, so they pass the same conversationId in the normal
+  // case; this recruiter-scoped gate is the guard that holds even if they don't.
+  // Returns the brief's actual conversation so the caller can surface it in-app.
+  const { data: existingBrief } = await supabase
     .from('conversation_messages')
-    .select('id, content')
-    .eq('conversation_id', conversationId)
+    .select('id, conversation_id, content')
+    .eq('recruiter_id', recruiter.id)
     .eq('role', 'assistant')
+    .filter('content->>type', 'eq', 'morning_brief')
+    .filter('content->>brief_date', 'eq', today)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
 
-  const existingBrief = (existingMsgs || []).find(
-    m => m.content?.type === 'morning_brief' && m.content?.brief_date === today
-  )
   if (existingBrief) {
-    return { message_id: existingBrief.id, text: existingBrief.content?.text ?? '', already_composed: true }
+    return {
+      message_id:       existingBrief.id,
+      text:             existingBrief.content?.text ?? '',
+      already_composed: true,
+      conversation_id:  existingBrief.conversation_id,
+    }
   }
 
   // ── Variant selection ─────────────────────────────────────────────────────
@@ -730,6 +744,30 @@ Voice: operator tone, no em dashes, no fluff, lead with what matters. Bullets wh
     .single()
 
   if (insertErr) {
+    // Backstop race: the partial unique index on (recruiter_id, brief_date) means a
+    // concurrent compose that beat us to the insert triggers a unique violation
+    // (23505). Re-read the winning brief and return it rather than throwing — the
+    // recruiter-scoped gate above catches the ordinary case; this catches the tie.
+    if (insertErr.code === '23505') {
+      const { data: winner } = await supabase
+        .from('conversation_messages')
+        .select('id, conversation_id, content')
+        .eq('recruiter_id', recruiter.id)
+        .eq('role', 'assistant')
+        .filter('content->>type', 'eq', 'morning_brief')
+        .filter('content->>brief_date', 'eq', today)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (winner) {
+        return {
+          message_id:       winner.id,
+          text:             winner.content?.text ?? '',
+          already_composed: true,
+          conversation_id:  winner.conversation_id,
+        }
+      }
+    }
     console.error('[composeBrief] insert error:', insertErr.message)
     throw new Error('Failed to persist brief')
   }
@@ -744,5 +782,5 @@ Voice: operator tone, no em dashes, no fluff, lead with what matters. Bullets wh
     if (stampErr) console.warn('[composeBrief] briefed_at stamp error:', stampErr.message)
   }
 
-  return { message_id: msgRow.id, text: briefText, already_composed: false }
+  return { message_id: msgRow.id, text: briefText, already_composed: false, conversation_id: conversationId }
 }

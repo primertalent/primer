@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { composeBrief } from './_lib/composeBrief.js'
+import { getOrCreateTodayConversation } from './_lib/getOrCreateTodayConversation.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -141,31 +142,11 @@ export default async function handler(req, res) {
     }
 
     try {
-      // ── Find or create conversation ────────────────────────────────────
-      let conversationId = null
-      const { data: existingConv } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('recruiter_id', recruiter.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (existingConv) {
-        conversationId = existingConv.id
-      } else {
-        const { data: newConv, error: convErr } = await supabase
-          .from('conversations')
-          .insert({ recruiter_id: recruiter.id })
-          .select('id')
-          .single()
-        if (convErr) {
-          console.error(`[cron-brief] conversation create failed for ${recruiter.id}:`, convErr.message)
-          results.push({ id: recruiter.id, status: 'error', detail: 'conversation_create_failed' })
-          continue
-        }
-        conversationId = newConv.id
-      }
+      // ── Resolve today's conversation (shared with the app compose path) ──
+      // Same helper the in-app path uses, so the emailed brief and the in-app brief
+      // always land in ONE conversation per recruiter per local day. Replaces the old
+      // "newest conversation of any day" logic that diverged from the app's resolver.
+      const conversationId = await getOrCreateTodayConversation(supabase, recruiter)
 
       // ── Compose brief ──────────────────────────────────────────────────
       const { message_id } = await composeBrief(supabase, anthropic, { recruiter, conversationId })
