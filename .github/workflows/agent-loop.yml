@@ -1,8 +1,7 @@
+# Paused 2026-09-04. Schedule removed. Manual dispatch only.
 name: Wren Agent Loop
 
 on:
-  schedule:
-    - cron: '0 */4 * * *'
   workflow_dispatch:
 
 jobs:

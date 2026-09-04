@@ -3,6 +3,8 @@
 
 ---
 
+> PAUSED 2026-09-04. Scheduled processes disabled, Supabase paused, Vercel on Hobby. The Current State block below is the last build state as of session 39 and is stale in places (the "What's built and working" inventory still lists surfaces deleted in Phase 0). Full audit pending in WREN_AUDIT_2026_09.md. Do not build from this doc without reading the audit first.
+
 ## Current State (updated 2026-07-14)
 
 **Session 39 (2026-07-14) — Brief single-compose fix + submittal closing posture:**

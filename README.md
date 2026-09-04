@@ -1,3 +1,5 @@
+> **Status: paused (2026-09-04).** Wren is paused, not deleted. Scheduled processes are disabled and no background activity runs. See `WREN.md` for product and build context.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
